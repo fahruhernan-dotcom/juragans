@@ -1,0 +1,7 @@
+No,Tanggal_Pesanan,Nama_Pemesan,Varian_Bawang,Ukuran_Kemasan_Gram,Jumlah_Pack,Total_Berat_Gram,Total_Berat_Kg,Alamat_Pengiriman,Catatan_Detail,Status_Pengiriman
+1,2026-08-05,Adip,Grade S Murni,250,1,250,0.25,"Rumah Kost Eksklusif Bulusan, Jl. Bulusan Selatan Raya No.9a, Bulusan, Kec. Tembalang, Kota Semarang, Jawa Tengah 50277 (Kamar 9)",Pengiriman via Reyhan ke Semarang,Terkirim
+2,2026-08-07,Renny,Grade S Murni,200,2,400,0.40,-,Order via Reyhan (Tanpa campuran),Menunggu Pengiriman
+3,2026-08-07,Anggi,Grade S Murni,200,5,1000,1.00,-,Order via Reyhan (Tanpa campuran),Menunggu Pengiriman
+4,2026-08-07,Hendry,Grade S Murni,200,4,800,0.80,-,Order via Reyhan (Tanpa campuran),Menunggu Pengiriman
+5,2026-08-07,Amal,Grade S Murni,250,2,500,0.50,-,Order via Reyhan (Tanpa campuran),Menunggu Pengiriman
+6,2026-08-07,Widi,Grade S Murni,150,4,600,0.60,-,Order via Reyhan (Tanpa campuran),Menunggu Pengiriman

@@ -1,0 +1,35 @@
+# Environment & Credentials
+.env
+*.env
+*.json
+!Website/package.json
+!Website/package-lock.json
+!Scraping/shopee_*.json
+session.json
+credentials.json
+token.json
+client_secret*.json
+
+# Browser Profiles & Automation Caches
+Automasi_Medsos/chrome_profile/
+chrome_profile/
+*.ldb
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+env/
+
+# Node & Frontend Builds
+node_modules/
+Website/node_modules/
+Website/dist/
+.DS_Store
+
+# Logs & Evidence Screenshots
+bukti_live_scrape_bapanas.png

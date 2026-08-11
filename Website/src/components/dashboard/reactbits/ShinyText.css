@@ -1,0 +1,23 @@
+.shiny-text {
+  color: #021a02;
+  background: linear-gradient(
+    120deg,
+    #021a02 40%,
+    #F1F5F9 50%,
+    #021a02 60%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shiny-move var(--speed, 5s) linear infinite;
+}
+
+.shiny-text.disabled {
+  animation: none;
+}
+
+@keyframes shiny-move {
+  0% { background-position: 200% center; }
+  100% { background-position: -200% center; }
+}

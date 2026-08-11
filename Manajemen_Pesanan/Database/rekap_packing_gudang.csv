@@ -1,0 +1,14 @@
+Step_Kategori,Area_Cluster,Varian_SKU,Jumlah_Pack,Nama_Customer,Catatan_Packing
+STEP1_GLOBAL_PICK,-,Murni Pouch 200g (200g),11,-,Ambil dari Rak Utama
+STEP1_GLOBAL_PICK,-,[HERO SKU] Murni Pouch 250g (250g),10,-,Ambil dari Rak Utama
+STEP1_GLOBAL_PICK,-,Murni Pouch 150g (150g),4,-,Ambil dari Rak Utama
+STEP1_GLOBAL_PICK,-,Trial Pack Grade A 100g (100g),20,-,Ambil dari Rak Utama
+STEP2_PACKING_CUSTOMER,Jakarta / Jabodetabek,2 pack Grade S Murni (200g @ Rp 37.500),-,Renny,-
+STEP2_PACKING_CUSTOMER,Jakarta / Jabodetabek,5 pack Grade S Murni (200g = 1kg Deal),-,Anggi,-
+STEP2_PACKING_CUSTOMER,Jakarta / Jabodetabek,4 pack Grade S Murni (200g @ Rp 37.500),-,Hendry,-
+STEP2_PACKING_CUSTOMER,Jakarta / Jabodetabek,2 pack Grade S Murni (250g @ Rp 43.500),-,Amal,-
+STEP2_PACKING_CUSTOMER,Jakarta / Jabodetabek,4 pack Grade S Murni (150g @ Rp 26.500),-,Widi,-
+STEP2_PACKING_CUSTOMER,Jakarta / Jabodetabek,2 pack Grade S Murni (250g @ Rp 43.500),-,Bukit,-
+STEP2_PACKING_CUSTOMER,Jakarta / Jabodetabek,4 pack Grade S Murni (250g @ Rp 43.500),-,Farhan,-
+STEP2_PACKING_CUSTOMER,Jakarta / Jabodetabek,2 pack Grade S Murni (250g @ Rp 43.500),-,Yatmo,-
+STEP2_PACKING_CUSTOMER,Solo Raya,"Grade A Crispy 100g (20 pack dipecah kemasan pouch saja, tanpa stiker)",-,Didi,-
