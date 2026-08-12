@@ -1,6 +1,6 @@
 # 📦 LEMBAR KERJA GUDANG (PICK & PACK LIST)
 
-**JURAGAN BY ANAK BAWANG — Update Presisi: 11 August 2026 22:07**
+**JURAGAN BY ANAK BAWANG — Update Presisi: 12 August 2026 19:20**
 
 ---
 
@@ -8,11 +8,12 @@
 
 | Status | Varian Produk & Ukuran | 📦 Jumlah Pack Harus Diambil | Total Berat |
 | :---: | :--- | :---: | :---: |
-| `[ ]` | **Murni Pouch 200g (200g)** | **11 pack** | 2.20 kg |
-| `[ ]` | **[HERO SKU] Murni Pouch 250g (250g)** | **10 pack** | 2.50 kg |
 | `[ ]` | **Murni Pouch 150g (150g)** | **4 pack** | 0.60 kg |
+| `[ ]` | **Murni Pouch 200g (200g)** | **11 pack** | 2.20 kg |
 | `[ ]` | **Trial Pack Grade A 100g (100g)** | **20 pack** | 2.00 kg |
-| `[ ]` | **TOTAL HARUS DIAMBIL DARI RAK** | 🔥 **45 pack** | **7.30 kg** |
+| `[ ]` | **Trial Pack Murni 100g (100g)** | **7 pack** | 0.70 kg |
+| `[ ]` | **[HERO SKU] Murni Pouch 250g (250g)** | **10 pack** | 2.50 kg |
+| `[ ]` | **TOTAL HARUS DIAMBIL DARI RAK** | 🔥 **52 pack** | **80.00 kg** |
 
 ---
 
@@ -21,31 +22,35 @@
 ### 📍 AREA: JAKARTA / JABODETABEK
 
 1. `[ ]` **RENNY** (0.4 kg)
-   - 🛒 **Items**: 2 pack Grade S Murni (200g @ Rp 37.500)
+   - 🛒 **Items**: Murni Pouch 200g x2
 
 2. `[ ]` **ANGGI** (1.0 kg)
-   - 🛒 **Items**: 5 pack Grade S Murni (200g = 1kg Deal)
+   - 🛒 **Items**: Murni Pouch 200g x5
 
 3. `[ ]` **HENDRY** (0.8 kg)
-   - 🛒 **Items**: 4 pack Grade S Murni (200g @ Rp 37.500)
+   - 🛒 **Items**: Murni Pouch 200g x4
 
 4. `[ ]` **AMAL** (0.5 kg)
-   - 🛒 **Items**: 2 pack Grade S Murni (250g @ Rp 43.500)
+   - 🛒 **Items**: [HERO SKU] Murni Pouch 250g x2
 
 5. `[ ]` **WIDI** (0.6 kg)
-   - 🛒 **Items**: 4 pack Grade S Murni (150g @ Rp 26.500)
+   - 🛒 **Items**: Murni Pouch 150g x4
 
 6. `[ ]` **BUKIT** (0.5 kg)
-   - 🛒 **Items**: 2 pack Grade S Murni (250g @ Rp 43.500)
+   - 🛒 **Items**: [HERO SKU] Murni Pouch 250g x2
 
 7. `[ ]` **FARHAN** (1.0 kg)
-   - 🛒 **Items**: 4 pack Grade S Murni (250g @ Rp 43.500)
+   - 🛒 **Items**: [HERO SKU] Murni Pouch 250g x4
 
 8. `[ ]` **YATMO** (0.5 kg)
-   - 🛒 **Items**: 2 pack Grade S Murni (250g @ Rp 43.500)
+   - 🛒 **Items**: [HERO SKU] Murni Pouch 250g x2
 
 ### 📍 AREA: SOLO RAYA
 
 1. `[ ]` **DIDI** (2.0 kg)
-   - 🛒 **Items**: Grade A Crispy 100g (20 pack dipecah kemasan pouch saja, tanpa stiker) ⚠️ **KHUSUS POUCH POLOS TANPA STIKER (REPACK)**
+   - 🛒 **Items**: Trial Pack Grade A 100g x20
+
+2. `[ ]` **MAMAH DIDI** (0.7 kg)
+   - 🛒 **Items**: Trial Pack Murni 100g x7
+   - 📍 **Catatan**: Harga Resmi Regional Solo Raya (7 pack 100g Grade S Murni @ Rp 22.000)
 

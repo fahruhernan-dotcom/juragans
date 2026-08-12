@@ -1,9 +1,9 @@
 # 🧾 INVOICE PENJUALAN PELANGGAN - JURAGAN BY ANAK BAWANG
 
-**Nomor Invoice**: `INV/2026/08/001`  
-**Tanggal Transaksi**: 5 Agustus 2026  
+**Nomor Invoice**: `INV/2026/08/009`  
+**Tanggal Transaksi**: 10 Agustus 2026  
 **Penerbit Invoice**: **Juragan by Anak Bawang** (Produsen Bawang Goreng Boyolali Murni)  
-**Ditujukan Kepada**: **Adip**  
+**Ditujukan Kepada**: **Ares**  
 **Status Pembayaran**: ✅ **LUNAS**  
 **Status Pengiriman**: 🚚 **Terkirim**  
 
@@ -13,23 +13,23 @@
 
 | No | Deskripsi Produk / Layanan | Kemasan | Jumlah Pack | Total Berat (Kg) | Harga Satuan (Rp) | Subtotal (Rp) |
 | :---: | :--- | :---: | :---: | :---: | :---: | :---: |
-| 1 | **Bawang Goreng Grade S Murni**<br/>*(100% Bawang Merah Boyolali Murni - Tanpa Tepung)* | 250g | 1 pack | 0.25 kg | Rp 43,500 | Rp 43,500 |
+| 1 | **Bawang Goreng Grade S Murni**<br/>*(100% Bawang Merah Boyolali Murni - Tanpa Tepung)* | 250g | 1 pack | 0.25 kg | Rp 40,000 | Rp 40,000 |
 | 2 | **Ongkos Kirim Ekspedisi**<br/>*(Tarif Flat Pengiriman)* | — | 1 paket | — | Rp 10,000 | Rp 10,000 |
-| **TOTAL** | **Akumulasi Tagihan** | **250g** | **1 pack** | **0.25 kg** | — | **Rp 53,500** |
+| **TOTAL** | **Akumulasi Tagihan** | **250g** | **1 pack** | **0.25 kg** | — | **Rp 50,000** |
 
 ---
 
 ### 💰 Ringkasan Tagihan
 
-* **Subtotal Produk**: `Rp 43,500`
+* **Subtotal Produk**: `Rp 40,000`
 * **Ongkos Kirim**: `Rp 10,000`
-* **Total Tagihan**: **`Rp 53,500`**
-* **Terbilang**: *(Lima Puluh Tiga Ribu Lima Ratus Rupiah)*
+* **Total Tagihan**: **`Rp 50,000`**
+* **Terbilang**: *(Lima Puluh  Ribu Rupiah)*
 * **Status Pembayaran**: ✅ **LUNAS**
 
 ---
 
 ### 📝 Catatan & Alamat Pengiriman:
-1. **Catatan Transaksi**: Rumah Kost Eksklusif Bulusan, Jl. Bulusan Selatan Raya No.9a, Tembalang, Semarang (Kamar 9)
+1. **Catatan Transaksi**: Harga Resmi Regional Solo Raya (1 pack 250g @ Rp 40.000)
 2. **Metode Pembayaran**: Transfer Bank / Cash / E-Wallet.
 3. Terima kasih telah berbelanja produk **Juragan by Anak Bawang**! Kebersihan, kerenyahan, dan kemurnian rasa adalah prioritas utama kami.

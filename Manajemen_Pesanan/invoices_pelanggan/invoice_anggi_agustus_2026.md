@@ -11,16 +11,19 @@
 
 ### 📦 Detail Item Pesanan
 
-| No | Deskripsi Produk / Varian | Kemasan | Jumlah Pack | Total Berat (Kg) | Harga Satuan Pack (Rp) | Subtotal (Rp) |
+| No | Deskripsi Produk / Layanan | Kemasan | Jumlah Pack | Total Berat (Kg) | Harga Satuan (Rp) | Subtotal (Rp) |
 | :---: | :--- | :---: | :---: | :---: | :---: | :---: |
 | 1 | **Bawang Goreng Grade S Murni**<br/>*(100% Bawang Merah Boyolali Murni - Tanpa Tepung)* | 200g | 5 pack | 1.00 kg | Rp 33,100 | Rp 165,500 |
-| **TOTAL** | **Akumulasi Pesanan** | **200g** | **5 pack** | **1.00 kg** | — | **Rp 165,500** |
+| 2 | **Ongkos Kirim Ekspedisi**<br/>*(Bebas Ongkir / Regional Solo Raya)* | — | 1 paket | — | Rp 0 | Rp 0 |
+| **TOTAL** | **Akumulasi Tagihan** | **200g** | **5 pack** | **1.00 kg** | — | **Rp 165,500** |
 
 ---
 
 ### 💰 Ringkasan Tagihan
 
-* **Total Pembelian**: **`Rp 165,500`**
+* **Subtotal Produk**: `Rp 165,500`
+* **Ongkos Kirim**: `Rp 0`
+* **Total Tagihan**: **`Rp 165,500`**
 * **Terbilang**: *(Seratus Enam Puluh Lima Ribu Lima Ratus Rupiah)*
 * **Status Pembayaran**: ⏳ **BELUM LUNAS (Menunggu Pelunasan)**
 

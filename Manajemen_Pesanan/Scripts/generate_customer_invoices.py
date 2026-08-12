@@ -193,6 +193,72 @@ orders = [
         "delivery_status": "Menunggu Pengiriman",
         "notes": "Harga Resmi Grade S 250g Jakarta/Semarang (2 pack @ Rp 43.500)",
         "file_slug": "yatmo"
+    },
+    {
+        "no": 11,
+        "inv_no": "INV/2026/08/009",
+        "date": "2026-08-10",
+        "date_fmt": "10 Agustus 2026",
+        "customer": "Ares",
+        "variant": "Grade S Murni",
+        "size": "250g",
+        "packs": 1,
+        "weight_kg": 0.25,
+        "price_per_pack": 40000,
+        "total_price": 40000,
+        "shipping_fee": 0,
+        "payment_status": "Lunas",
+        "delivery_status": "Terkirim",
+        "notes": "Harga Resmi Regional Solo Raya (1 pack 250g @ Rp 40.000)",
+        "file_slug": "ares"
+    },
+    {
+        "no": 12,
+        "inv_no": "INV/2026/08/010",
+        "date": "2026-08-07",
+        "date_fmt": "7 Agustus 2026",
+        "customer": "Zaki",
+        "items": [
+            {
+                "variant": "Grade S Murni",
+                "size": "100g",
+                "packs": 1,
+                "weight_kg": 0.10,
+                "price_per_pack": 21600,
+                "subtotal": 21600
+            },
+            {
+                "variant": "Grade A Crispy",
+                "size": "100g",
+                "packs": 1,
+                "weight_kg": 0.10,
+                "price_per_pack": 18900,
+                "subtotal": 18900
+            }
+        ],
+        "shipping_fee": 0,
+        "payment_status": "Lunas",
+        "delivery_status": "Terkirim",
+        "notes": "Trial Pack Grade S Murni (100g) & Grade A Crispy (100g) Solo Raya",
+        "file_slug": "zaki"
+    },
+    {
+        "no": 13,
+        "inv_no": "INV/2026/08/014",
+        "date": "2026-08-12",
+        "date_fmt": "12 Agustus 2026",
+        "customer": "Mamah Didi",
+        "variant": "Grade S Murni",
+        "size": "100g",
+        "packs": 7,
+        "weight_kg": 0.70,
+        "price_per_pack": 22000,
+        "total_price": 154000,
+        "shipping_fee": 0,
+        "payment_status": "Belum Lunas",
+        "delivery_status": "Menunggu Pengiriman",
+        "notes": "Harga Resmi Regional Solo Raya (7 pack 100g Grade S Murni @ Rp 22.000)",
+        "file_slug": "mamah_didi"
     }
 ]
 
@@ -202,7 +268,33 @@ def generate_markdown(order, output_dir):
     
     is_lunas = order['payment_status'] == "Lunas"
     status_badge = "✅ **LUNAS**" if is_lunas else "⏳ **BELUM LUNAS (Menunggu Pelunasan)**"
-    terbilang = number_to_terbilang(order['total_price']).strip() + " Rupiah"
+    
+    items_rows = []
+    if 'items' in order:
+        subtotal_produk = sum(item['subtotal'] for item in order['items'])
+        for idx, item in enumerate(order['items'], 1):
+            items_rows.append(f"| {idx} | **Bawang Goreng {item['variant']}**<br/>*(100% Bawang Merah Boyolali Murni)* | {item['size']} | {item['packs']} pack | {item['weight_kg']:.2f} kg | Rp {item['price_per_pack']:,} | Rp {item['subtotal']:,} |")
+        total_size = " + ".join(item['size'] for item in order['items'])
+        total_packs = sum(item['packs'] for item in order['items'])
+        total_weight = sum(item['weight_kg'] for item in order['items'])
+    else:
+        subtotal_produk = order['total_price']
+        items_rows.append(f"| 1 | **Bawang Goreng {order['variant']}**<br/>*(100% Bawang Merah Boyolali Murni - Tanpa Tepung)* | {order['size']} | {order['packs']} pack | {order['weight_kg']:.2f} kg | Rp {order['price_per_pack']:,} | Rp {subtotal_produk:,} |")
+        total_size = order['size']
+        total_packs = order['packs']
+        total_weight = order['weight_kg']
+        
+    shipping_fee = order.get('shipping_fee', 0)
+    ongkir_idx = len(items_rows) + 1
+    if shipping_fee > 0:
+        items_rows.append(f"| {ongkir_idx} | **Ongkos Kirim Ekspedisi**<br/>*(Tarif Flat Pengiriman)* | — | 1 paket | — | Rp {shipping_fee:,} | Rp {shipping_fee:,} |")
+    else:
+        items_rows.append(f"| {ongkir_idx} | **Ongkos Kirim Ekspedisi**<br/>*(Bebas Ongkir / Regional Solo Raya)* | — | 1 paket | — | Rp 0 | Rp 0 |")
+    
+    grand_total = subtotal_produk + shipping_fee
+    terbilang = number_to_terbilang(grand_total).strip() + " Rupiah"
+    
+    table_items_content = "\n".join(items_rows)
     
     content = f"""# 🧾 INVOICE PENJUALAN PELANGGAN - JURAGAN BY ANAK BAWANG
 
@@ -217,16 +309,18 @@ def generate_markdown(order, output_dir):
 
 ### 📦 Detail Item Pesanan
 
-| No | Deskripsi Produk / Varian | Kemasan | Jumlah Pack | Total Berat (Kg) | Harga Satuan Pack (Rp) | Subtotal (Rp) |
+| No | Deskripsi Produk / Layanan | Kemasan | Jumlah Pack | Total Berat (Kg) | Harga Satuan (Rp) | Subtotal (Rp) |
 | :---: | :--- | :---: | :---: | :---: | :---: | :---: |
-| 1 | **Bawang Goreng {order['variant']}**<br/>*(100% Bawang Merah Boyolali Murni - Tanpa Tepung)* | {order['size']} | {order['packs']} pack | {order['weight_kg']:.2f} kg | Rp {order['price_per_pack']:,} | Rp {order['total_price']:,} |
-| **TOTAL** | **Akumulasi Pesanan** | **{order['size']}** | **{order['packs']} pack** | **{order['weight_kg']:.2f} kg** | — | **Rp {order['total_price']:,}** |
+{table_items_content}
+| **TOTAL** | **Akumulasi Tagihan** | **{total_size}** | **{total_packs} pack** | **{total_weight:.2f} kg** | — | **Rp {grand_total:,}** |
 
 ---
 
 ### 💰 Ringkasan Tagihan
 
-* **Total Pembelian**: **`Rp {order['total_price']:,}`**
+* **Subtotal Produk**: `Rp {subtotal_produk:,}`
+* **Ongkos Kirim**: `Rp {shipping_fee:,}`
+* **Total Tagihan**: **`Rp {grand_total:,}`**
 * **Terbilang**: *({terbilang})*
 * **Status Pembayaran**: {status_badge}
 
@@ -343,7 +437,7 @@ def generate_pdf(order, output_dir):
     
     headers = [
         Paragraph("No", header_table_style),
-        Paragraph("Deskripsi Produk", header_table_style),
+        Paragraph("Deskripsi Produk / Layanan", header_table_style),
         Paragraph("Kemasan", header_table_style),
         Paragraph("Jumlah Pack", header_table_style),
         Paragraph("Harga Satuan", header_table_style),
@@ -351,17 +445,48 @@ def generate_pdf(order, output_dir):
     ]
     
     table_data = [headers]
-    item_desc = f"<b>Bawang Goreng {order['variant']}</b><br/><font size=7.5 color='#64748B'>100% Bawang Merah Boyolali Murni (Tanpa Tepung)</font>"
-    price_str = f"Rp {order['price_per_pack']:,}".replace(',', '.')
-    total_str = f"Rp {order['total_price']:,}".replace(',', '.')
+    if 'items' in order:
+        subtotal_produk = sum(item['subtotal'] for item in order['items'])
+        for idx, item in enumerate(order['items'], 1):
+            item_desc = f"<b>Bawang Goreng {item['variant']}</b><br/><font size=7.5 color='#64748B'>100% Bawang Merah Boyolali Murni</font>"
+            price_str = f"Rp {item['price_per_pack']:,}".replace(',', '.')
+            subtotal_str = f"Rp {item['subtotal']:,}".replace(',', '.')
+            table_data.append([
+                Paragraph(str(idx), normal_style),
+                Paragraph(item_desc, normal_style),
+                Paragraph(item['size'], normal_style),
+                Paragraph(f"{item['packs']} pack ({item['weight_kg']:.2f} kg)", normal_style),
+                Paragraph(price_str, normal_style),
+                Paragraph(subtotal_str, normal_style)
+            ])
+    else:
+        subtotal_produk = order['total_price']
+        item_desc = f"<b>Bawang Goreng {order['variant']}</b><br/><font size=7.5 color='#64748B'>100% Bawang Merah Boyolali Murni (Tanpa Tepung)</font>"
+        price_str = f"Rp {order['price_per_pack']:,}".replace(',', '.')
+        subtotal_str = f"Rp {subtotal_produk:,}".replace(',', '.')
+        table_data.append([
+            Paragraph("1", normal_style),
+            Paragraph(item_desc, normal_style),
+            Paragraph(order['size'], normal_style),
+            Paragraph(f"{order['packs']} pack ({order['weight_kg']:.2f} kg)", normal_style),
+            Paragraph(price_str, normal_style),
+            Paragraph(subtotal_str, normal_style)
+        ])
+        
+    shipping_fee = order.get('shipping_fee', 0)
+    grand_total = subtotal_produk + shipping_fee
+    shipping_str = f"Rp {shipping_fee:,}".replace(',', '.') if shipping_fee > 0 else "Rp 0"
+    grand_total_str = f"Rp {grand_total:,}".replace(',', '.')
+    ongkir_label = "<b>Ongkos Kirim Ekspedisi</b><br/><font size=7.5 color='#64748B'>Tarif Flat Pengiriman</font>" if shipping_fee > 0 else "<b>Ongkos Kirim Ekspedisi</b><br/><font size=7.5 color='#64748B'>Bebas Ongkir / Regional Solo Raya</font>"
     
+    ongkir_idx = str(len(table_data))
     table_data.append([
-        Paragraph("1", normal_style),
-        Paragraph(item_desc, normal_style),
-        Paragraph(order['size'], normal_style),
-        Paragraph(f"{order['packs']} pack ({order['weight_kg']:.2f} kg)", normal_style),
-        Paragraph(price_str, normal_style),
-        Paragraph(f"<b>{total_str}</b>", normal_style)
+        Paragraph(ongkir_idx, normal_style),
+        Paragraph(ongkir_label, normal_style),
+        Paragraph("—", normal_style),
+        Paragraph("1 paket", normal_style),
+        Paragraph(shipping_str, normal_style),
+        Paragraph(shipping_str, normal_style)
     ])
         
     items_table = Table(table_data, colWidths=[25, 215, 60, 90, 75, 75])
@@ -376,10 +501,10 @@ def generate_pdf(order, output_dir):
     story.append(items_table)
     story.append(Spacer(1, 15))
     
-    terbilang_str = number_to_terbilang(order['total_price']).strip() + " Rupiah"
+    terbilang_str = number_to_terbilang(grand_total).strip() + " Rupiah"
     
     total_data = [
-        [Paragraph(f"<b>STATUS:</b> {order['payment_status'].upper()}", bold_style), Paragraph("<b>TOTAL TAGIHAN:</b>", right_bold_style), Paragraph(f"<font size=12 color='{primary_color.hexval()}'><b>{total_str}</b></font>", right_bold_style)]
+        [Paragraph(f"<b>STATUS:</b> {order['payment_status'].upper()}", bold_style), Paragraph("<b>TOTAL TAGIHAN:</b>", right_bold_style), Paragraph(f"<font size=12 color='{primary_color.hexval()}'><b>{grand_total_str}</b></font>", right_bold_style)]
     ]
     total_table = Table(total_data, colWidths=[180, 180, 180])
     total_table.setStyle(TableStyle([
@@ -429,3 +554,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+

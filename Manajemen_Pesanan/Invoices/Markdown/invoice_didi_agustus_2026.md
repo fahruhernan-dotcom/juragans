@@ -11,17 +11,20 @@
 
 ### 📦 Detail Item Pesanan
 
-| No | Deskripsi Produk / Varian | Kemasan | Jumlah Pack | Total Berat (Kg) | Harga Satuan Pack (Rp) | Subtotal (Rp) |
+| No | Deskripsi Produk / Layanan | Kemasan | Jumlah Pack | Total Berat (Kg) | Harga Satuan (Rp) | Subtotal (Rp) |
 | :---: | :--- | :---: | :---: | :---: | :---: | :---: |
 | 1 | **Bawang Goreng Grade A Crispy**<br/>*(100% Bawang Merah Boyolali Murni - Tanpa Tepung)* | 1000g | 2 pack | 2.00 kg | Rp 135,500 | Rp 271,000 |
-| **TOTAL** | **Akumulasi Pesanan** | **1000g** | **2 pack** | **2.00 kg** | — | **Rp 271,000** |
+| 2 | **Ongkos Kirim Ekspedisi**<br/>*(Tarif Flat Pengiriman)* | — | 1 paket | — | Rp 10,000 | Rp 10,000 |
+| **TOTAL** | **Akumulasi Tagihan** | **1000g** | **2 pack** | **2.00 kg** | — | **Rp 281,000** |
 
 ---
 
 ### 💰 Ringkasan Tagihan
 
-* **Total Pembelian**: **`Rp 271,000`**
-* **Terbilang**: *(Dua Ratus Tujuh Puluh Satu Ribu Rupiah)*
+* **Subtotal Produk**: `Rp 271,000`
+* **Ongkos Kirim**: `Rp 10,000`
+* **Total Tagihan**: **`Rp 281,000`**
+* **Terbilang**: *(Dua Ratus Delapan Puluh Satu Ribu Rupiah)*
 * **Status Pembayaran**: ⏳ **BELUM LUNAS (Menunggu Pelunasan)**
 
 ---
