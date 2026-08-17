@@ -5,6 +5,7 @@
 !Website/package.json
 !Website/package-lock.json
 !Scraping/shopee_*.json
+!Automasi_n8n/Workflows/*.json
 session.json
 credentials.json
 token.json

@@ -1,0 +1,166 @@
+{
+  "name": "B2B WhatsApp Outreach Engine - Singapore F&B (Supabase + AI + WA API)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 10 * * 1-5"
+            }
+          ]
+        }
+      },
+      "id": "wa-schedule-trigger",
+      "name": "1. Schedule (Mon-Fri 10:00 SGT)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n    lead_id,\n    name,\n    clean_name,\n    category,\n    address,\n    phone,\n    website,\n    instagram_url,\n    rating,\n    review_count,\n    lead_priority\nFROM v_n8n_pending_whatsapp \nLIMIT 15;"
+      },
+      "id": "wa-fetch-leads",
+      "name": "2. Fetch Pending WhatsApp Leads",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [420, 300],
+      "credentials": {
+        "postgres": {
+          "id": "YOUR_POSTGRES_CREDENTIAL_ID",
+          "name": "Supabase PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "wa-split-batches",
+      "name": "3. Loop Leads Sequentially",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are a friendly, professional B2B Sales Executive from 'Juragan by Anak Bawang' (Boyolali, Central Java). Write a warm, concise (under 80 words) WhatsApp message in Indonesian/English to a restaurant manager in Singapore offering a complimentary 1kg sample box of authentic Boyolali Fried Shallots (Grade S Murni 100% & Grade A Crispy, Halal ID33110018517710724). Return valid JSON with key \"wa_message\"."
+            },
+            {
+              "role": "user",
+              "content": "=Restaurant: {{ $json.clean_name || $json.name }}\nAddress: {{ $json.address }}\nRating: {{ $json.rating }}★ ({{ $json.review_count }} reviews)\nPhone: {{ $json.phone }}\n\nGenerate concise WhatsApp B2B outreach message."
+            }
+          ]
+        },
+        "jsonOutput": true
+      },
+      "id": "wa-ai-generator",
+      "name": "4. AI WhatsApp Copy Generator",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1.4,
+      "position": [860, 200],
+      "credentials": {
+        "openAiApi": {
+          "id": "YOUR_OPENAI_CREDENTIAL_ID",
+          "name": "OpenAI API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const lead = $('3. Loop Leads Sequentially').item.json;\nconst aiMsg = $input.first().json.message?.content || $input.first().json;\n\nlet parsedText;\ntry {\n  const obj = typeof aiMsg === 'string' ? JSON.parse(aiMsg) : aiMsg;\n  parsedText = obj.wa_message || obj.message || aiMsg;\n} catch (e) {\n  parsedText = `Halo tim ${lead.clean_name || lead.name}, salam kenal saya Fahru dari Juragan by Anak Bawang (produsen Bawang Goreng Asli Boyolali, Halal ID33110018517710724). Boleh kami kirimkan 1 box sampel tester (Grade S Murni & Grade A) langsung ke dapur ${lead.clean_name || lead.name} di Singapore? Terima kasih banyak 🙏`;\n}\n\n// Format phone (remove spaces, symbols)\nconst cleanPhone = (lead.phone || '').replace(/[^0-9]/g, '');\n\nreturn [{\n  json: {\n    lead_id: lead.lead_id,\n    restaurant_name: lead.clean_name,\n    phone: cleanPhone,\n    message: parsedText\n  }\n}];"
+      },
+      "id": "wa-format-payload",
+      "name": "5. Format Phone & Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1080, 200]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=UPDATE b2b_leads\nSET \n    status_whatsapp = 'sent',\n    wa_sent_count = wa_sent_count + 1,\n    last_contacted_at = NOW(),\n    ai_generated_pitch = '{{ $json.message.replace(/'/g, \"''\") }}'\nWHERE id = '{{ $json.lead_id }}';"
+      },
+      "id": "wa-update-lead",
+      "name": "6. Update Lead Status (WhatsApp)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1300, 200],
+      "credentials": {
+        "postgres": {
+          "id": "YOUR_POSTGRES_CREDENTIAL_ID",
+          "name": "Supabase PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=INSERT INTO b2b_outreach_logs (\n    lead_id, \n    channel, \n    recipient, \n    subject, \n    message_body, \n    status\n) VALUES (\n    '{{ $json.lead_id }}',\n    'whatsapp',\n    '{{ $json.phone }}',\n    'WhatsApp Direct Outreach',\n    '{{ $json.message.replace(/'/g, \"''\") }}',\n    'sent'\n);"
+      },
+      "id": "wa-insert-log",
+      "name": "7. Insert into b2b_outreach_logs",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1520, 200],
+      "credentials": {
+        "postgres": {
+          "id": "YOUR_POSTGRES_CREDENTIAL_ID",
+          "name": "Supabase PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": "={{ Math.floor(Math.random() * (240 - 120 + 1)) + 120 }}",
+        "unit": "seconds"
+      },
+      "id": "wa-delay",
+      "name": "8. Anti-Ban Delay (2-4 Mins)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1740, 200]
+    }
+  ],
+  "connections": {
+    "1. Schedule (Mon-Fri 10:00 SGT)": {
+      "main": [[{ "node": "2. Fetch Pending WhatsApp Leads", "type": "main", "index": 0 }]]
+    },
+    "2. Fetch Pending WhatsApp Leads": {
+      "main": [[{ "node": "3. Loop Leads Sequentially", "type": "main", "index": 0 }]]
+    },
+    "3. Loop Leads Sequentially": {
+      "main": [
+        [],
+        [{ "node": "4. AI WhatsApp Copy Generator", "type": "main", "index": 0 }]
+      ]
+    },
+    "4. AI WhatsApp Copy Generator": {
+      "main": [[{ "node": "5. Format & Validate Phone & Message", "type": "main", "index": 0 }]]
+    },
+    "5. Format & Validate Phone & Message": {
+      "main": [[{ "node": "6. Update Lead Status (WhatsApp)", "type": "main", "index": 0 }]]
+    },
+    "6. Update Lead Status (WhatsApp)": {
+      "main": [[{ "node": "7. Insert into b2b_outreach_logs", "type": "main", "index": 0 }]]
+    },
+    "7. Insert into b2b_outreach_logs": {
+      "main": [[{ "node": "8. Anti-Ban Delay (2-4 Mins)", "type": "main", "index": 0 }]]
+    },
+    "8. Anti-Ban Delay (2-4 Mins)": {
+      "main": [[{ "node": "3. Loop Leads Sequentially", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -1,0 +1,160 @@
+{
+  "name": "01. Apify Scraper & Supabase Ingestion (Auto-Rotating Country Queue)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 2 */5 * *"
+            }
+          ]
+        }
+      },
+      "id": "node-schedule",
+      "name": "1. Schedule (Setiap 5 Hari)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n    id AS queue_id,\n    country,\n    city_or_region,\n    target_location\nFROM b2b_scraping_queue\nWHERE status = 'pending' \n   OR last_scraped_at < NOW() - INTERVAL '30 days'\nORDER BY \n    CASE status WHEN 'pending' THEN 1 ELSE 2 END,\n    last_scraped_at ASC NULLS FIRST\nLIMIT 1;"
+      },
+      "id": "node-fetch-queue",
+      "name": "2. Cek Antrian Negara di Supabase",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [420, 300],
+      "credentials": {
+        "postgres": {
+          "id": "YOUR_POSTGRES_CREDENTIAL_ID",
+          "name": "Supabase PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.apify.com/v2/acts/berkaydev~google-maps-email-scraper-business-leads/run-sync-get-dataset-items?token=YOUR_APIFY_API_TOKEN",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"enrichLeads\": true,\n  \"extractEmail\": true,\n  \"location\": \"{{ $json.target_location }}\",\n  \"maxResults\": 50,\n  \"onlyWithPhone\": true,\n  \"onlyWithWebsite\": true,\n  \"proxyConfiguration\": {\n    \"useApifyProxy\": true,\n    \"apifyProxyGroups\": []\n  },\n  \"searchTerms\": [\n    \"Indonesian restaurant\",\n    \"Indonesian food\",\n    \"Indonesian cuisine\",\n    \"Indonesian restaurant {{ $json.target_location }}\",\n    \"Nusantara restaurant\",\n    \"Nusantara cuisine\",\n    \"Indonesian cafe\",\n    \"Indonesian halal restaurant\",\n    \"Indonesian catering\",\n    \"Padang restaurant\",\n    \"Nasi Padang\",\n    \"Warung Indonesia\"\n  ]\n}",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "node-apify-sync",
+      "name": "3. Scrape Google Maps (Apify Sync)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst cleanedData = [];\n\nfunction cleanRestoName(raw) {\n  if (!raw) return '';\n  let n = raw.split('|')[0].split('@')[0].trim();\n  n = n.replace(/\\s*-\\s*Kandahar Street/gi, '');\n  n = n.replace(/\\((.*?)\\)/g, '').trim();\n  n = n.replace(/Restaurant|Singapore|Malaysia|SG|KL/gi, '').trim();\n  return n || raw.trim();\n}\n\nlet targetCountry = 'Malaysia';\nlet targetCity = 'Kuala Lumpur';\nlet queueId = null;\n\ntry {\n  const q = $('2. Cek Antrian Negara di Supabase').item.json;\n  targetCountry = q.country || 'Malaysia';\n  targetCity = q.city_or_region || 'Kuala Lumpur';\n  queueId = q.queue_id || null;\n} catch (e) {}\n\nfor (const item of items) {\n  const row = item.json;\n  if (!row.name && !row.title) continue;\n\n  const rawName = row.name || row.title;\n  const cleanName = cleanRestoName(rawName);\n  \n  const socials = row.social_links || {};\n  const instagram = socials.instagram || row['social_links/instagram'] || null;\n  const facebook = socials.facebook || row['social_links/facebook'] || null;\n  const tiktok = socials.tiktok || row['social_links/tiktok'] || null;\n  const linkedin = socials.linkedin || row['social_links/linkedin'] || null;\n\n  const email = (row.email && typeof row.email === 'string' && row.email.includes('@')) \n    ? row.email.trim().toLowerCase() \n    : null;\n    \n  const phone = row.phone ? String(row.phone).trim() : null;\n\n  cleanedData.push({\n    json: {\n      queue_id: queueId,\n      place_id: row.place_id || `temp_${cleanName.replace(/\\s+/g, '_')}`,\n      name: rawName,\n      clean_name: cleanName,\n      category: row.category || 'Indonesian restaurant',\n      country: row.country || targetCountry,\n      city: row.city || targetCity,\n      address: row.address || '',\n      latitude: row.latitude ? parseFloat(row.latitude) : null,\n      longitude: row.longitude ? parseFloat(row.longitude) : null,\n      maps_url: row.maps_url || row.url || null,\n      phone: phone,\n      email: email,\n      email_source: row.email_source || (email ? 'apify_scraper' : null),\n      website: row.website || null,\n      cms: row.cms || null,\n      has_contact_form: row.has_contact_form === true || row.has_contact_form === 'true',\n      instagram_url: instagram,\n      facebook_url: facebook,\n      tiktok_url: tiktok,\n      linkedin_url: linkedin,\n      rating: row.rating ? parseFloat(row.rating) : 4.5,\n      review_count: row.review_count ? parseInt(row.review_count, 10) : 0,\n      contactability_score: row.contactability_score ? parseInt(row.contactability_score, 10) : (email ? 85 : 50),\n      lead_priority: (row.lead_priority || (email ? 'hot' : 'warm')).toLowerCase(),\n      status_email: 'pending',\n      status_whatsapp: 'pending'\n    }\n  });\n}\n\nreturn cleanedData;"
+      },
+      "id": "node-clean-data",
+      "name": "4. Normalize & Standardize Leads",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [860, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=INSERT INTO b2b_leads (\n    place_id, name, clean_name, category, country, city, address,\n    latitude, longitude, maps_url, phone, email, email_source,\n    website, cms, has_contact_form, instagram_url, facebook_url,\n    tiktok_url, linkedin_url, rating, review_count, contactability_score,\n    lead_priority, status_email, email_sent_count, scraped_at\n) VALUES (\n    '{{ $json.place_id }}',\n    '{{ $json.name.replace(/'/g, \"''\") }}',\n    '{{ $json.clean_name.replace(/'/g, \"''\") }}',\n    '{{ $json.category.replace(/'/g, \"''\") }}',\n    '{{ $json.country }}',\n    '{{ $json.city }}',\n    '{{ $json.address.replace(/'/g, \"''\") }}',\n    {{ $json.latitude !== null ? $json.latitude : 'NULL' }},\n    {{ $json.longitude !== null ? $json.longitude : 'NULL' }},\n    {{ $json.maps_url ? \"'\" + $json.maps_url.replace(/'/g, \"''\") + \"'\" : 'NULL' }},\n    {{ $json.phone ? \"'\" + $json.phone.replace(/'/g, \"''\") + \"'\" : 'NULL' }},\n    {{ $json.email ? \"'\" + $json.email.replace(/'/g, \"''\") + \"'\" : 'NULL' }},\n    {{ $json.email_source ? \"'\" + $json.email_source.replace(/'/g, \"''\") + \"'\" : 'NULL' }},\n    {{ $json.website ? \"'\" + $json.website.replace(/'/g, \"''\") + \"'\" : 'NULL' }},\n    {{ $json.cms ? \"'\" + $json.cms.replace(/'/g, \"''\") + \"'\" : 'NULL' }},\n    {{ $json.has_contact_form }},\n    {{ $json.instagram_url ? \"'\" + $json.instagram_url.replace(/'/g, \"''\") + \"'\" : 'NULL' }},\n    {{ $json.facebook_url ? \"'\" + $json.facebook_url.replace(/'/g, \"''\") + \"'\" : 'NULL' }},\n    {{ $json.tiktok_url ? \"'\" + $json.tiktok_url.replace(/'/g, \"''\") + \"'\" : 'NULL' }},\n    {{ $json.linkedin_url ? \"'\" + $json.linkedin_url.replace(/'/g, \"''\") + \"'\" : 'NULL' }},\n    {{ $json.rating }},\n    {{ $json.review_count }},\n    {{ $json.contactability_score }},\n    '{{ $json.lead_priority }}',\n    'pending',\n    0,\n    NOW()\n)\nON CONFLICT (place_id) DO UPDATE SET\n    email = COALESCE(EXCLUDED.email, b2b_leads.email),\n    phone = COALESCE(EXCLUDED.phone, b2b_leads.phone),\n    website = COALESCE(EXCLUDED.website, b2b_leads.website),\n    rating = EXCLUDED.rating,\n    review_count = EXCLUDED.review_count,\n    contactability_score = EXCLUDED.contactability_score,\n    lead_priority = EXCLUDED.lead_priority,\n    updated_at = NOW();"
+      },
+      "id": "node-supabase-upsert",
+      "name": "5. Upsert ke Supabase b2b_leads",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1080, 300],
+      "credentials": {
+        "postgres": {
+          "id": "YOUR_POSTGRES_CREDENTIAL_ID",
+          "name": "Supabase PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=UPDATE b2b_scraping_queue\nSET \n    status = 'completed',\n    total_leads_collected = total_leads_collected + 1,\n    last_scraped_at = NOW()\nWHERE id = '{{ $('4. Normalize & Standardize Leads').first().json.queue_id }}';"
+      },
+      "id": "node-update-queue",
+      "name": "6. Update Status Antrian Selesai",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1300, 300],
+      "credentials": {
+        "postgres": {
+          "id": "YOUR_POSTGRES_CREDENTIAL_ID",
+          "name": "Supabase PostgreSQL"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "1. Schedule (Setiap 5 Hari)": {
+      "main": [
+        [
+          {
+            "node": "2. Cek Antrian Negara di Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. Cek Antrian Negara di Supabase": {
+      "main": [
+        [
+          {
+            "node": "3. Scrape Google Maps (Apify Sync)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. Scrape Google Maps (Apify Sync)": {
+      "main": [
+        [
+          {
+            "node": "4. Normalize & Standardize Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4. Normalize & Standardize Leads": {
+      "main": [
+        [
+          {
+            "node": "5. Upsert ke Supabase b2b_leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5. Upsert ke Supabase b2b_leads": {
+      "main": [
+        [
+          {
+            "node": "6. Update Status Antrian Selesai",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

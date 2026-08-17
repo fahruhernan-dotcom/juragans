@@ -1,207 +1,499 @@
 import { useState, useEffect } from 'react'
 import { supabase, isSupabaseConfigured } from '../../lib/supabaseClient'
-import { Utensils, MessageSquare, MapPin, Search, Filter, Star } from 'lucide-react'
+import { 
+  Utensils, MessageSquare, Mail, MapPin, Search, Filter, 
+  Star, ExternalLink, RefreshCw, Send, CheckCircle2, 
+  Clock, AlertCircle, PackageCheck, Globe, PhoneCall
+} from 'lucide-react'
 
 export default function B2BProspects() {
+  const [activeMarket, setActiveMarket] = useState('singapore') // 'singapore' | 'solo_raya'
   const [search, setSearch] = useState('')
-  const [categoryFilter, setCategoryFilter] = useState('ALL')
-  const [prospects, setProspects] = useState([
-    // Kategori A - WA Direct (15 Resto)
-    { id: 1, name: 'Bakso Remaja Solo', area: 'Surakarta', category: 'Kategori A (WA Direct)', phone: '0812-3456-7891', rating: '4.8', reviews: '1.200+', status: 'Siap WA Pitching', pitchMsg: 'Email/WA Draf 1' },
-    { id: 2, name: 'Bakso & Soto Kadipolo', area: 'Surakarta', category: 'Kategori A (WA Direct)', phone: '0813-9876-5432', rating: '4.7', reviews: '850+', status: 'Siap WA Pitching', pitchMsg: 'Email/WA Draf 1' },
-    { id: 3, name: 'Bakso Alex Solo', area: 'Surakarta', category: 'Kategori A (WA Direct)', phone: '0811-2233-4455', rating: '4.6', reviews: '950+', status: 'Siap WA Pitching', pitchMsg: 'Email/WA Draf 1' },
-    { id: 4, name: 'Bakso Titoti Sukoharjo', area: 'Sukoharjo', category: 'Kategori A (WA Direct)', phone: '0815-6677-8899', rating: '4.7', reviews: '1.500+', status: 'Siap WA Pitching', pitchMsg: 'Email/WA Draf 1' },
-    { id: 5, name: 'Bakso Kalilarangan', area: 'Surakarta', category: 'Kategori A (WA Direct)', phone: '0818-1122-3344', rating: '4.5', reviews: '420+', status: 'Siap WA Pitching', pitchMsg: 'Email/WA Draf 1' },
-    { id: 6, name: 'Bakso Urat Pak Noso', area: 'Sukoharjo', category: 'Kategori A (WA Direct)', phone: '0857-4433-2211', rating: '4.6', reviews: '310+', status: 'Siap WA Pitching', pitchMsg: 'Email/WA Draf 1' },
-    { id: 7, name: 'Bakso Solo Samrat Sub-area', area: 'Surakarta', category: 'Kategori A (WA Direct)', phone: '0819-8877-6655', rating: '4.8', reviews: '620+', status: 'Siap WA Pitching', pitchMsg: 'Email/WA Draf 1' },
-    { id: 8, name: 'Bakso Rusuk Palur', area: 'Surakarta/Karanganyar', category: 'Kategori A (WA Direct)', phone: '0821-3344-5566', rating: '4.6', reviews: '780+', status: 'Siap WA Pitching', pitchMsg: 'Email/WA Draf 1' },
-    { id: 9, name: 'Bakso Klewer Legendaris', area: 'Surakarta', category: 'Kategori A (WA Direct)', phone: '0813-5566-7788', rating: '4.5', reviews: '290+', status: 'Siap WA Pitching', pitchMsg: 'Email/WA Draf 1' },
-    { id: 10, name: 'Bakso Beranak Solo', area: 'Surakarta', category: 'Kategori A (WA Direct)', phone: '0852-9900-1122', rating: '4.4', reviews: '180+', status: 'Siap WA Pitching', pitchMsg: 'Email/WA Draf 1' },
-    { id: 11, name: 'Bakso & Mie Ayam Pak Tukiman', area: 'Sukoharjo', category: 'Kategori A (WA Direct)', phone: '0812-7788-9900', rating: '4.6', reviews: '240+', status: 'Siap WA Pitching', pitchMsg: 'Email/WA Draf 1' },
-    { id: 12, name: 'Bakso Uleg Bambu', area: 'Surakarta', category: 'Kategori A (WA Direct)', phone: '0813-1122-3344', rating: '4.5', reviews: '350+', status: 'Siap WA Pitching', pitchMsg: 'Email/WA Draf 1' },
-    { id: 13, name: 'Bakso & Soto Triwindu', area: 'Surakarta', category: 'Kategori A (WA Direct)', phone: '0856-2233-4455', rating: '4.7', reviews: '510+', status: 'Siap WA Pitching', pitchMsg: 'Email/WA Draf 1' },
-    { id: 14, name: 'Bakso Telur Manahan', area: 'Surakarta', category: 'Kategori A (WA Direct)', phone: '0812-8899-0011', rating: '4.6', reviews: '400+', status: 'Siap WA Pitching', pitchMsg: 'Email/WA Draf 1' },
-    { id: 15, name: 'Bakso Jumbo Kartasura', area: 'Sukoharjo', category: 'Kategori A (WA Direct)', phone: '0818-7766-5544', rating: '4.5', reviews: '330+', status: 'Siap WA Pitching', pitchMsg: 'Email/WA Draf 1' },
+  const [priorityFilter, setPriorityFilter] = useState('ALL')
+  const [statusFilter, setStatusFilter] = useState('ALL')
+  const [channelFilter, setChannelFilter] = useState('ALL')
+  const [loading, setLoading] = useState(false)
+  const [selectedLead, setSelectedLead] = useState(null)
+  
+  // SG Leads State
+  const [sgLeads, setSgLeads] = useState([])
+  
+  // Solo Raya Leads State
+  const [soloLeads, setSoloLeads] = useState([])
 
-    // Kategori B - Telepon Kantor (2 Resto)
-    { id: 16, name: 'Bakso Resto Sumber Solo', area: 'Surakarta', category: 'Kategori B (Telepon Kantor)', phone: '(0271) 712-345', rating: '4.6', reviews: '650+', status: 'Follow Up Telp', pitchMsg: 'Draf Telepon B2B' },
-    { id: 17, name: 'Bakso Warung Gede Sukoharjo', area: 'Sukoharjo', category: 'Kategori B (Telepon Kantor)', phone: '(0271) 591-888', rating: '4.5', reviews: '480+', status: 'Follow Up Telp', pitchMsg: 'Draf Telepon B2B' },
-
-    // Kategori C - Kanvas / Drop Sample (10 Resto)
-    { id: 18, name: 'Bakso Urat Kraton Solo', area: 'Surakarta', category: 'Kategori C (Drop Sample/Kanvas)', phone: 'Kanvas Fisik', rating: '4.7', reviews: '890+', status: 'Siap Drop Sample', pitchMsg: 'Kunjungan Drop Sample 100g' },
-    { id: 19, name: 'Bakso Pasar Gede NIK', area: 'Surakarta', category: 'Kategori C (Drop Sample/Kanvas)', phone: 'Kanvas Fisik', rating: '4.8', reviews: '1.100+', status: 'Siap Drop Sample', pitchMsg: 'Kunjungan Drop Sample 100g' },
-    { id: 20, name: 'Bakso Mas Kribo', area: 'Sukoharjo', category: 'Kategori C (Drop Sample/Kanvas)', phone: 'Kanvas Fisik', rating: '4.5', reviews: '220+', status: 'Siap Drop Sample', pitchMsg: 'Kunjungan Drop Sample 100g' },
-    { id: 21, name: 'Bakso Rudal Solo Baru', area: 'Sukoharjo', category: 'Kategori C (Drop Sample/Kanvas)', phone: 'Kanvas Fisik', rating: '4.6', reviews: '540+', status: 'Siap Drop Sample', pitchMsg: 'Kunjungan Drop Sample 100g' },
-    { id: 22, name: 'Bakso & Soto Mbok Giyem Solo', area: 'Surakarta', category: 'Kategori C (Drop Sample/Kanvas)', phone: 'Kanvas Fisik', rating: '4.7', reviews: '970+', status: 'Siap Drop Sample', pitchMsg: 'Kunjungan Drop Sample 100g' },
-    { id: 23, name: 'Bakso Urat Pak Kumis Baturono', area: 'Surakarta', category: 'Kategori C (Drop Sample/Kanvas)', phone: 'Kanvas Fisik', rating: '4.6', reviews: '380+', status: 'Siap Drop Sample', pitchMsg: 'Kunjungan Drop Sample 100g' },
-    { id: 24, name: 'Bakso Selo Merbabu Solo', area: 'Surakarta', category: 'Kategori C (Drop Sample/Kanvas)', phone: 'Kanvas Fisik', rating: '4.5', reviews: '290+', status: 'Siap Drop Sample', pitchMsg: 'Kunjungan Drop Sample 100g' },
-    { id: 25, name: 'Bakso Bang Joko Kartasura', area: 'Sukoharjo', category: 'Kategori C (Drop Sample/Kanvas)', phone: 'Kanvas Fisik', rating: '4.6', reviews: '410+', status: 'Siap Drop Sample', pitchMsg: 'Kunjungan Drop Sample 100g' },
-    { id: 26, name: 'Bakso Balungan Pajang', area: 'Surakarta', category: 'Kategori C (Drop Sample/Kanvas)', phone: 'Kanvas Fisik', rating: '4.5', reviews: '330+', status: 'Siap Drop Sample', pitchMsg: 'Kunjungan Drop Sample 100g' },
-    { id: 27, name: 'Bakso Mie Ayam Pak Wagiman', area: 'Sukoharjo', category: 'Kategori C (Drop Sample/Kanvas)', phone: 'Kanvas Fisik', rating: '4.4', reviews: '190+', status: 'Siap Drop Sample', pitchMsg: 'Kunjungan Drop Sample 100g' }
-  ])
-
-  const fetchProspects = async () => {
+  // Fetch Singapore Leads from Supabase
+  const fetchSgLeads = async () => {
+    setLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('juragan_b2b_prospects')
-        .select('*')
-        .order('created_at', { ascending: true })
+      if (isSupabaseConfigured()) {
+        const { data, error } = await supabase
+          .from('b2b_leads')
+          .select('*')
+          .order('lead_priority', { ascending: true })
+          .order('review_count', { ascending: false })
 
-      if (!error && data && data.length > 0) {
-        setProspects(data.map(p => ({ ...p, name: p.restaurant_name, pitchMsg: p.pitch_msg })))
+        if (!error && data) {
+          setSgLeads(data)
+        } else {
+          setSgLeads([])
+        }
+
+        // Also fetch local solo prospects if table exists
+        const { data: localData } = await supabase
+          .from('juragan_b2b_prospects')
+          .select('*')
+          .order('created_at', { ascending: false })
+        
+        if (localData && localData.length > 0) {
+          setSoloLeads(localData.map(p => ({
+            id: p.id,
+            name: p.restaurant_name,
+            area: p.area || 'Solo Raya',
+            category: p.category || 'Kategori A (WA Direct)',
+            phone: p.phone || 'Kanvas Fisik',
+            rating: p.rating || '4.5',
+            reviews: p.reviews_count || '100+',
+            status: p.status || 'Siap WA Pitching'
+          })))
+        } else {
+          setSoloLeads([])
+        }
       }
+    } catch (err) {
+      console.warn('Error fetching B2B leads from Supabase:', err)
+      setSgLeads([])
+      setSoloLeads([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Update Status in Supabase
+  const handleUpdateStatus = async (leadId, field, newStatus) => {
+    try {
+      if (isSupabaseConfigured()) {
+        const updatePayload = { [field]: newStatus, updated_at: new Date().toISOString() }
+        if (field === 'status_email' && newStatus === 'sent') {
+          updatePayload.last_contacted_at = new Date().toISOString()
+        }
+        await supabase.from('b2b_leads').update(updatePayload).eq('id', leadId)
+      }
+      setSgLeads(prev => prev.map(item => item.id === leadId ? { ...item, [field]: newStatus } : item))
     } catch (e) {
-      console.warn('Fallback to local B2B prospects:', e)
+      console.error('Update status error:', e)
     }
   }
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (isSupabaseConfigured()) {
-        fetchProspects()
-      }
-    }, 0)
-    return () => clearTimeout(timer)
+    fetchSgLeads()
+
+    // Realtime Supabase Subscription (when n8n updates status, dashboard syncs instantly)
+    let channel
+    if (isSupabaseConfigured()) {
+      channel = supabase
+        .channel('public:b2b_leads')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'b2b_leads' }, payload => {
+          if (payload.eventType === 'UPDATE') {
+            setSgLeads(prev => prev.map(l => l.id === payload.new.id ? payload.new : l))
+          } else if (payload.eventType === 'INSERT') {
+            setSgLeads(prev => [payload.new, ...prev])
+          }
+        })
+        .subscribe()
+    }
+
+    return () => {
+      if (channel) supabase.removeChannel(channel)
+    }
   }, [])
 
-  const filtered = prospects.filter(p => {
-    const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) || p.area.toLowerCase().includes(search.toLowerCase())
-    const matchCat = categoryFilter === 'ALL' || p.category.startsWith(categoryFilter)
-    return matchSearch && matchCat
+  // Filtered Singapore Leads
+  const filteredSgLeads = sgLeads.filter(lead => {
+    const term = search.toLowerCase()
+    const matchSearch = (lead.clean_name || lead.name || '').toLowerCase().includes(term) ||
+                        (lead.address || '').toLowerCase().includes(term) ||
+                        (lead.email || '').toLowerCase().includes(term) ||
+                        (lead.phone || '').toLowerCase().includes(term)
+
+    const matchPriority = priorityFilter === 'ALL' || lead.lead_priority === priorityFilter
+    const matchStatus = statusFilter === 'ALL' || lead.status_email === statusFilter || lead.status_whatsapp === statusFilter
+    const matchChannel = channelFilter === 'ALL' || 
+                         (channelFilter === 'email' && lead.email) ||
+                         (channelFilter === 'phone' && lead.phone)
+
+    return matchSearch && matchPriority && matchStatus && matchChannel
   })
+
+  // Summary Metrics for Singapore F&B
+  const totalLeads = sgLeads.length
+  const hotLeads = sgLeads.filter(l => l.lead_priority === 'hot').length
+  const hasEmail = sgLeads.filter(l => l.email).length
+  const emailSent = sgLeads.filter(l => l.status_email === 'sent').length
+  const sampleSent = sgLeads.filter(l => l.status_email === 'sample_sent' || l.status_whatsapp === 'sample_sent').length
 
   return (
     <div className="space-y-6 text-left font-sans">
       {/* Header Banner */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gradient-to-r from-brand-maroon to-brand-maroon-dark p-6 rounded-2xl text-white shadow-lg border border-brand-gold/30">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gradient-to-r from-stone-900 via-amber-950 to-stone-900 p-6 rounded-3xl text-white shadow-xl border border-amber-500/20">
         <div>
-          <span className="text-xs uppercase tracking-widest text-brand-gold font-bold">Riset B2B Solo Raya</span>
-          <h2 className="text-2xl font-bold tracking-tight mt-1 text-white">27 Prospek Warung Bakso Solo & Sukoharjo</h2>
-          <p className="text-xs text-brand-cream/80 mt-1">Data hasil scraping & filter rating ≥ 4.0, reviews &gt; 20 untuk outreach penawaran B2B</p>
-        </div>
-      </div>
-
-      {/* Metrics Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white p-5 rounded-2xl border-2 border-brand-gold/30 shadow-sm">
-          <span className="text-xs font-semibold text-brand-charcoal/70 uppercase">Kategori A (WA Direct)</span>
-          <p className="text-2xl font-bold text-brand-maroon mt-1">15 Resto Bakso</p>
-          <p className="text-xs text-brand-charcoal/60 mt-1">Pitching via WA + Katalog Website</p>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border-2 border-brand-gold/30 shadow-sm">
-          <span className="text-xs font-semibold text-brand-charcoal/70 uppercase">Kategori B (Telepon)</span>
-          <p className="text-2xl font-bold text-amber-600 mt-1">2 Resto Bakso</p>
-          <p className="text-xs text-brand-charcoal/60 mt-1">Tindak lanjut via panggilan kantor</p>
+          <div className="flex items-center space-x-2">
+            <span className="px-2.5 py-0.5 bg-amber-500/20 text-amber-300 font-bold uppercase text-[10px] tracking-wider rounded-full border border-amber-500/30">
+              B2B Outreach Engine
+            </span>
+            <span className="text-stone-400 text-xs">• Juragan by Anak Bawang</span>
+          </div>
+          <h2 className="text-2xl font-extrabold tracking-tight mt-1 text-white">
+            Pusat Prospek & Automasi Outreach Restoran B2B
+          </h2>
+          <p className="text-xs text-stone-300 mt-1 max-w-2xl">
+            Monitoring prospek restoran Indonesia di Singapore & Solo Raya yang terintegrasi langsung dengan otomasi AI & n8n Scheduler.
+          </p>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border-2 border-brand-gold/30 shadow-sm">
-          <span className="text-xs font-semibold text-brand-charcoal/70 uppercase">Kategori C (Drop Sample)</span>
-          <p className="text-2xl font-bold text-emerald-600 mt-1">10 Resto Bakso</p>
-          <p className="text-xs text-brand-charcoal/60 mt-1">Sales Kanvas Drop Sampel 100g</p>
-        </div>
-      </div>
-
-      {/* Search & Filter Bar */}
-      <div className="bg-white p-4 rounded-2xl border border-brand-gold/30 shadow-sm flex flex-col sm:flex-row gap-3 items-center justify-between">
-        <div className="relative w-full sm:w-80">
-          <Search className="w-4 h-4 text-brand-charcoal/40 absolute left-3 top-3" />
-          <input
-            type="text"
-            placeholder="Cari nama resto / area..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 bg-brand-cream/30 border border-brand-gold/30 rounded-xl text-xs focus:ring-2 focus:ring-brand-gold"
-          />
-        </div>
-
-        <div className="flex items-center space-x-2 w-full sm:w-auto">
-          <Filter className="w-4 h-4 text-brand-maroon shrink-0" />
-          <select
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className="p-2 bg-brand-cream/30 border border-brand-gold/30 rounded-xl text-xs focus:ring-2 focus:ring-brand-gold font-semibold text-brand-charcoal"
+        {/* Market Switcher Tabs */}
+        <div className="flex bg-stone-800/80 p-1.5 rounded-2xl border border-stone-700">
+          <button
+            onClick={() => setActiveMarket('singapore')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center space-x-2 ${
+              activeMarket === 'singapore' 
+                ? 'bg-amber-500 text-stone-950 shadow-md' 
+                : 'text-stone-300 hover:text-white'
+            }`}
           >
-            <option value="ALL">Semua Kategori (27 Prospek)</option>
-            <option value="Kategori A">Kategori A (15 WA Direct)</option>
-            <option value="Kategori B">Kategori B (2 Telepon)</option>
-            <option value="Kategori C">Kategori C (10 Drop Sample)</option>
-          </select>
+            <span>🇸🇬 Singapore F&B</span>
+            <span className="px-1.5 py-0.2 bg-black/20 rounded-full text-[10px]">{sgLeads.length}</span>
+          </button>
+          <button
+            onClick={() => setActiveMarket('solo_raya')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center space-x-2 ${
+              activeMarket === 'solo_raya' 
+                ? 'bg-amber-500 text-stone-950 shadow-md' 
+                : 'text-stone-300 hover:text-white'
+            }`}
+          >
+            <span>🇮🇩 Solo Raya</span>
+            <span className="px-1.5 py-0.2 bg-black/20 rounded-full text-[10px]">{soloLeads.length}</span>
+          </button>
         </div>
       </div>
 
-      {/* Prospects Table */}
-      <div className="bg-white rounded-2xl border border-brand-gold/30 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-brand-charcoal text-brand-gold uppercase text-[10px] tracking-wider font-bold">
-              <tr>
-                <th className="p-3.5">No</th>
-                <th className="p-3.5">Nama Restoran Bakso</th>
-                <th className="p-3.5">Area Wilayah</th>
-                <th className="p-3.5">Segmentasi Target</th>
-                <th className="p-3.5">Kontak / Telepon</th>
-                <th className="p-3.5">Rating & Review</th>
-                <th className="p-3.5">Action Pitching</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-brand-maroon/10">
-              {filtered.map((p, idx) => (
-                <tr key={p.id} className="hover:bg-brand-cream/20 transition-colors">
-                  <td className="p-3.5 font-bold text-brand-maroon">{idx + 1}</td>
-                  <td className="p-3.5 font-bold text-brand-charcoal flex items-center space-x-2">
-                    <Utensils className="w-4 h-4 text-brand-maroon shrink-0" />
-                    <span>{p.name}</span>
-                  </td>
-                  <td className="p-3.5 font-medium text-brand-charcoal/80">
-                    <span className="inline-flex items-center space-x-1">
-                      <MapPin className="w-3 h-3 text-brand-gold-dark" />
-                      <span>{p.area}</span>
-                    </span>
-                  </td>
-                  <td className="p-3.5">
-                    {p.category.includes('Kategori A') ? (
-                      <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-full font-bold text-[10px]">
-                        {p.category}
-                      </span>
-                    ) : p.category.includes('Kategori B') ? (
+      {activeMarket === 'singapore' ? (
+        <>
+          {/* SG Metrics Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3.5">
+            <div className="bg-white p-4 rounded-2xl border border-stone-200 shadow-sm">
+              <span className="text-[11px] font-semibold text-stone-500 uppercase tracking-wide">Total Leads SG</span>
+              <p className="text-2xl font-black text-stone-900 mt-0.5">{totalLeads}</p>
+              <p className="text-[10px] text-stone-400 mt-0.5">Scraped Google Maps</p>
+            </div>
+
+            <div className="bg-white p-4 rounded-2xl border border-amber-200/80 bg-amber-50/30 shadow-sm">
+              <span className="text-[11px] font-semibold text-amber-800 uppercase tracking-wide">🔥 Hot Priority</span>
+              <p className="text-2xl font-black text-amber-700 mt-0.5">{hotLeads}</p>
+              <p className="text-[10px] text-amber-600 mt-0.5">Rating & Review Tinggi</p>
+            </div>
+
+            <div className="bg-white p-4 rounded-2xl border border-blue-200/80 bg-blue-50/30 shadow-sm">
+              <span className="text-[11px] font-semibold text-blue-800 uppercase tracking-wide">✉️ Verified Email</span>
+              <p className="text-2xl font-black text-blue-700 mt-0.5">{hasEmail}</p>
+              <p className="text-[10px] text-blue-600 mt-0.5">Siap n8n Cold Email</p>
+            </div>
+
+            <div className="bg-white p-4 rounded-2xl border border-emerald-200/80 bg-emerald-50/30 shadow-sm">
+              <span className="text-[11px] font-semibold text-emerald-800 uppercase tracking-wide">📤 Email Terkirim</span>
+              <p className="text-2xl font-black text-emerald-700 mt-0.5">{emailSent}</p>
+              <p className="text-[10px] text-emerald-600 mt-0.5">Live via n8n Scheduler</p>
+            </div>
+
+            <div className="bg-white p-4 rounded-2xl border border-purple-200/80 bg-purple-50/30 shadow-sm">
+              <span className="text-[11px] font-semibold text-purple-800 uppercase tracking-wide">📦 Tester Terkirim</span>
+              <p className="text-2xl font-black text-purple-700 mt-0.5">{sampleSent}</p>
+              <p className="text-[10px] text-purple-600 mt-0.5">1kg Sample Box ke SG</p>
+            </div>
+          </div>
+
+          {/* Search, Filter & Refresh Bar */}
+          <div className="bg-white p-4 rounded-2xl border border-stone-200 shadow-sm flex flex-col md:flex-row gap-3 items-center justify-between">
+            <div className="relative w-full md:w-80">
+              <Search className="w-4 h-4 text-stone-400 absolute left-3.5 top-3" />
+              <input
+                type="text"
+                placeholder="Cari resto, alamat, email, telepon..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="w-full pl-10 pr-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs focus:ring-2 focus:ring-amber-500 font-medium"
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+              <select
+                value={priorityFilter}
+                onChange={e => setPriorityFilter(e.target.value)}
+                className="px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl text-xs font-semibold text-stone-700 focus:ring-2 focus:ring-amber-500"
+              >
+                <option value="ALL">Semua Prioritas</option>
+                <option value="hot">🔥 Hot Priority</option>
+                <option value="warm">⚡ Warm Priority</option>
+                <option value="cold">❄️ Cold Priority</option>
+              </select>
+
+              <select
+                value={statusFilter}
+                onChange={e => setStatusFilter(e.target.value)}
+                className="px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl text-xs font-semibold text-stone-700 focus:ring-2 focus:ring-amber-500"
+              >
+                <option value="ALL">Semua Status Outreach</option>
+                <option value="pending">⏳ Pending (Belum Kirim)</option>
+                <option value="sent">📤 Sent (Terkirim)</option>
+                <option value="replied">💬 Replied (Membalas)</option>
+                <option value="sample_sent">📦 Sample Tester Sent</option>
+              </select>
+
+              <select
+                value={channelFilter}
+                onChange={e => setChannelFilter(e.target.value)}
+                className="px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl text-xs font-semibold text-stone-700 focus:ring-2 focus:ring-amber-500"
+              >
+                <option value="ALL">Semua Channel</option>
+                <option value="email">✉️ Ada Email</option>
+                <option value="phone">📱 Ada Telepon (+65)</option>
+              </select>
+
+              <button
+                onClick={fetchSgLeads}
+                disabled={loading}
+                className="px-3.5 py-2 bg-stone-900 hover:bg-stone-800 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all shadow-sm"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                <span>Sync Supabase</span>
+              </button>
+            </div>
+          </div>
+
+          {/* SG Prospects Table */}
+          <div className="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-stone-900 text-amber-400 uppercase text-[10px] tracking-wider font-bold">
+                  <tr>
+                    <th className="p-3.5">Restoran / Brand</th>
+                    <th className="p-3.5">Lokasi di Singapore</th>
+                    <th className="p-3.5">Rating & Review</th>
+                    <th className="p-3.5">Email & Kontak</th>
+                    <th className="p-3.5">Status n8n Email</th>
+                    <th className="p-3.5">Status WhatsApp</th>
+                    <th className="p-3.5 text-right">Aksi Outreach</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-stone-100">
+                  {filteredSgLeads.length > 0 ? (
+                    filteredSgLeads.map((lead, idx) => (
+                      <tr key={lead.id || idx} className="hover:bg-amber-50/40 transition-colors">
+                        {/* Name & Priority */}
+                        <td className="p-3.5">
+                          <div className="flex items-start space-x-2">
+                            <Utensils className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                            <div>
+                              <p className="font-bold text-stone-900 flex items-center space-x-1.5">
+                                <span>{lead.clean_name || lead.name}</span>
+                                {lead.lead_priority === 'hot' && (
+                                  <span className="px-1.5 py-0.2 bg-red-100 text-red-700 rounded-md text-[9px] font-black uppercase">
+                                    Hot
+                                  </span>
+                                )}
+                              </p>
+                              <p className="text-[10px] text-stone-400">{lead.category}</p>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Location */}
+                        <td className="p-3.5 max-w-[200px]">
+                          <span className="text-[11px] text-stone-600 line-clamp-2" title={lead.address}>
+                            {lead.address}
+                          </span>
+                        </td>
+
+                        {/* Rating */}
+                        <td className="p-3.5">
+                          <span className="inline-flex items-center space-x-1 font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200/60">
+                            <Star className="w-3 h-3 fill-amber-400 text-amber-500" />
+                            <span>{lead.rating || '-'} ({lead.review_count || 0})</span>
+                          </span>
+                        </td>
+
+                        {/* Contacts */}
+                        <td className="p-3.5 font-mono text-[11px]">
+                          {lead.email ? (
+                            <p className="text-blue-700 font-semibold truncate max-w-[170px]" title={lead.email}>
+                              ✉️ {lead.email}
+                            </p>
+                          ) : (
+                            <p className="text-stone-400 italic text-[10px]">No direct email</p>
+                          )}
+                          {lead.phone && (
+                            <p className="text-stone-700 mt-0.5">📞 {lead.phone}</p>
+                          )}
+                        </td>
+
+                        {/* Status Email */}
+                        <td className="p-3.5">
+                          {lead.status_email === 'sent' ? (
+                            <span className="inline-flex items-center space-x-1 px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-full font-bold text-[10px]">
+                              <CheckCircle2 className="w-3 h-3" />
+                              <span>Terkirim (n8n)</span>
+                            </span>
+                          ) : lead.status_email === 'replied' ? (
+                            <span className="inline-flex items-center space-x-1 px-2.5 py-1 bg-purple-100 text-purple-800 rounded-full font-bold text-[10px]">
+                              <MessageSquare className="w-3 h-3" />
+                              <span>Membalas</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center space-x-1 px-2.5 py-1 bg-stone-100 text-stone-600 rounded-full font-semibold text-[10px]">
+                              <Clock className="w-3 h-3" />
+                              <span>Pending</span>
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Status WhatsApp */}
+                        <td className="p-3.5">
+                          {lead.status_whatsapp === 'sent' ? (
+                            <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 font-bold rounded-md text-[10px]">
+                              WA Sent
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 bg-stone-100 text-stone-500 rounded-md text-[10px]">
+                              Ready
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Action Buttons */}
+                        <td className="p-3.5 text-right">
+                          <div className="inline-flex items-center space-x-1.5">
+                            {lead.phone && (
+                              <a
+                                href={`https://wa.me/${lead.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
+                                  `Halo tim ${lead.clean_name || lead.name}, salam kenal saya Fahru dari Juragan by Anak Bawang (produsen Bawang Goreng Asli Boyolali, Grade S Murni & Grade A Crispy Halal ID33110018517710724). Boleh kami kirimkan 1 box tester gratis ke dapur ${lead.clean_name || lead.name} di Singapore?`
+                                )}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-all shadow-sm"
+                                title="Kirim WhatsApp Direct"
+                              >
+                                <MessageSquare className="w-3.5 h-3.5" />
+                              </a>
+                            )}
+
+                            {lead.email && (
+                              <a
+                                href={`mailto:${lead.email}?subject=${encodeURIComponent(`Shallot Supply for ${lead.clean_name || lead.name}`)}`}
+                                className="p-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all shadow-sm"
+                                title="Buka Email Client"
+                              >
+                                <Mail className="w-3.5 h-3.5" />
+                              </a>
+                            )}
+
+                            {lead.website && (
+                              <a
+                                href={lead.website}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg transition-all"
+                                title="Kunjungi Website"
+                              >
+                                <Globe className="w-3.5 h-3.5" />
+                              </a>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={7} className="p-8 text-center text-stone-500">
+                        {loading ? (
+                          <div className="flex items-center justify-center space-x-2">
+                            <RefreshCw className="w-4 h-4 animate-spin text-amber-600" />
+                            <span>Memuat data prospek dari Supabase...</span>
+                          </div>
+                        ) : (
+                          <div>
+                            <AlertCircle className="w-6 h-6 text-stone-400 mx-auto mb-2" />
+                            <p className="font-semibold text-stone-700">Belum ada data leads Singapore di database</p>
+                            <p className="text-xs text-stone-400 mt-1">Jalankan script <code>python import_b2b_leads_to_supabase.py</code> untuk mengimpor data.</p>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      ) : (
+        /* Solo Raya Leads Table */
+        <div className="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden">
+          <div className="p-4 bg-stone-50 border-b border-stone-200 flex justify-between items-center">
+            <span className="font-bold text-stone-800 text-xs uppercase tracking-wider">Prospek Warung Bakso & Resto Lokal Solo Raya</span>
+            <span className="text-stone-500 text-xs font-semibold">{soloLeads.length} Resto</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-stone-900 text-amber-400 uppercase text-[10px] tracking-wider font-bold">
+                <tr>
+                  <th className="p-3.5">No</th>
+                  <th className="p-3.5">Nama Restoran</th>
+                  <th className="p-3.5">Area</th>
+                  <th className="p-3.5">Kategori</th>
+                  <th className="p-3.5">Kontak</th>
+                  <th className="p-3.5">Rating & Review</th>
+                  <th className="p-3.5">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-stone-100">
+                {soloLeads.map((p, idx) => (
+                  <tr key={p.id} className="hover:bg-amber-50/30 transition-colors">
+                    <td className="p-3.5 font-bold text-amber-800">{idx + 1}</td>
+                    <td className="p-3.5 font-bold text-stone-800">{p.name}</td>
+                    <td className="p-3.5 font-medium text-stone-600">{p.area}</td>
+                    <td className="p-3.5">
                       <span className="px-2.5 py-1 bg-amber-100 text-amber-800 rounded-full font-bold text-[10px]">
                         {p.category}
                       </span>
-                    ) : (
-                      <span className="px-2.5 py-1 bg-blue-100 text-blue-800 rounded-full font-bold text-[10px]">
-                        {p.category}
+                    </td>
+                    <td className="p-3.5 font-mono text-stone-700">{p.phone}</td>
+                    <td className="p-3.5">
+                      <span className="inline-flex items-center space-x-1 font-bold text-amber-700">
+                        <Star className="w-3 h-3 fill-amber-400 text-amber-500" />
+                        <span>{p.rating} ({p.reviews})</span>
                       </span>
-                    )}
-                  </td>
-                  <td className="p-3.5 font-mono text-brand-charcoal">{p.phone}</td>
-                  <td className="p-3.5">
-                    <span className="inline-flex items-center space-x-1 font-bold text-amber-700">
-                      <Star className="w-3 h-3 fill-amber-400 text-amber-500" />
-                      <span>{p.rating} ({p.reviews})</span>
-                    </span>
-                  </td>
-                  <td className="p-3.5">
-                    {p.phone.startsWith('08') ? (
-                      <a
-                        href={`https://wa.me/62${p.phone.slice(1).replace(/-/g,'')}?text=${encodeURIComponent(`Halo ${p.name}, saya dari Juragan by Anak Bawang suplier Bawang Goreng Murni Boyolali. Izin menyampaikan penawaran suplai dapur resto.`)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center space-x-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg transition-all text-[11px]"
-                      >
-                        <MessageSquare className="w-3 h-3" />
-                        <span>Kirim WA</span>
-                      </a>
-                    ) : (
-                      <span className="text-brand-charcoal/60 italic text-[11px]">Siap Drop Sample</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    </td>
+                    <td className="p-3.5">
+                      {p.phone.startsWith('08') ? (
+                        <a
+                          href={`https://wa.me/62${p.phone.slice(1).replace(/-/g,'')}?text=${encodeURIComponent(`Halo ${p.name}, saya dari Juragan by Anak Bawang produsen Bawang Goreng Murni Boyolali. Izin menyampaikan penawaran suplai dapur resto.`)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center space-x-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg transition-all text-[11px]"
+                        >
+                          <MessageSquare className="w-3 h-3" />
+                          <span>Kirim WA</span>
+                        </a>
+                      ) : (
+                        <span className="text-stone-400 italic text-[11px]">Siap Drop Sample</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }

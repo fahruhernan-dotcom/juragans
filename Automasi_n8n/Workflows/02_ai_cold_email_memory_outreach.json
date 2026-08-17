@@ -1,0 +1,287 @@
+{
+  "name": "02. AI B2B Cold Outreach Engine with Memory (Supabase + AI + Gmail)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "30 9 * * 1-5"
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger-node",
+      "name": "1. Schedule (Mon-Fri 09:30 SGT)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n    l.id AS lead_id,\n    l.name,\n    l.clean_name,\n    l.category,\n    l.country,\n    l.city,\n    l.address,\n    l.email,\n    l.phone,\n    l.website,\n    l.instagram_url,\n    l.rating,\n    l.review_count,\n    l.lead_priority,\n    l.contactability_score,\n    COALESCE(\n        (SELECT json_agg(json_build_object('subject', log.subject, 'date', log.sent_at)) \n         FROM b2b_outreach_logs log \n         WHERE log.lead_id = l.id),\n        '[]'::json\n    ) AS past_pitch_history\nFROM b2b_leads l\nWHERE l.email IS NOT NULL \n  AND l.email != ''\n  AND l.status_email = 'pending'\nORDER BY \n    CASE l.lead_priority \n        WHEN 'hot' THEN 1 \n        WHEN 'warm' THEN 2 \n        ELSE 3 \n    END,\n    l.review_count DESC\nLIMIT 15;"
+      },
+      "id": "supabase-fetch-leads-memory",
+      "name": "2. Fetch Pending Leads & Interaction Memory",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [440, 300],
+      "credentials": {
+        "postgres": {
+          "id": "YOUR_POSTGRES_CREDENTIAL_ID",
+          "name": "Supabase PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "split-batches-node",
+      "name": "3. Loop Leads Sequentially",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are the B2B Culinary Partnership Manager for 'Juragan by Anak Bawang' (direct producers from Cepogo, Boyolali, Central Java).\n\nYour Mission:\nWrite a warm, concise (100-140 words), peer-to-peer cold email offering authentic Boyolali fried shallots and a complimentary 1kg sample box to restaurants in Singapore.\n\nProduct Lineups:\n1. Grade S Murni: 100% pure Boyolali shallots, 0% flour/filler. Deep volcanic soil aroma, perfect for curries, rendang, and soups.\n2. Grade A Crispy: Lightly coated (~5% flour) for high-volume dining and extended 6+ hour crunch on rice dishes.\n3. Direct Factory Pricing & Certs: Official Halal Certified (ID33110018517710724), 1kg & 2kg HORECA bulk bags.\n\nBUSINESS ADAPTATION RULES (MANDATORY):\n- IF PADANG / MINANG / HERITAGE RESTAURANT: Mention dishes like Rendang/Gulai/Soto. Pitch Grade S Murni (0% flour so it never clouds or thickens curry sauces).\n- IF AYAM PENYET / BEBEK GORENG / SAMBAL: Mention signature crispy mains/sambal. Pitch Grade A Crispy (crunch retention on hot rice + lower cost per portion).\n- IF BAKSO / MIE / CAFE / MODERN NUSANTARA: Pitch Combo Pack (Grade S for broth richness, Grade A for crispy garnish).\n- IF CATERING / BUFFET: Pitch bulk HORECA 2kg, direct supply stability, and official Halal compliance.\n\nCall-to-Action:\nOffer to courier a complimentary 1kg Chef's Tasting Sample Box directly to their kitchen in Singapore.\n\nOutput Format (Strict JSON):\n{\"selected_subject\": \"...\", \"body_html\": \"<p>...</p>\", \"body_text\": \"...\"}"
+            },
+            {
+              "role": "user",
+              "content": "=PROSPECT RESTAURANT DATA:\n- Name: {{ $json.clean_name || $json.name }}\n- Category / Specialty: {{ $json.category }}\n- City / Country: {{ $json.city }}, {{ $json.country }}\n- Address: {{ $json.address }}\n- Google Reputation: {{ $json.review_count }} reviews ({{ $json.rating }}★)\n- Website: {{ $json.website || 'N/A' }}\n- Instagram: {{ $json.instagram_url || 'N/A' }}\n- Past History: {{ JSON.stringify($json.past_pitch_history) }}\n\nIdentify the restaurant's culinary type and generate a customized B2B email pitching the exact matching shallot grade and offering a 1kg sample box."
+            }
+          ]
+        },
+        "jsonOutput": true
+      },
+      "id": "openai-memory-agent",
+      "name": "4. AI Pitch Generator with Memory",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1.4,
+      "position": [880, 200],
+      "credentials": {
+        "openAiApi": {
+          "id": "YOUR_OPENAI_CREDENTIAL_ID",
+          "name": "OpenAI API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const leadItem = $('3. Loop Leads Sequentially').item.json;\nconst aiContent = $input.first().json.message?.content || $input.first().json;\n\nlet parsed;\ntry {\n  parsed = typeof aiContent === 'string' ? JSON.parse(aiContent) : aiContent;\n} catch (e) {\n  parsed = {\n    selected_subject: `Authentic Boyolali Fried Shallots Supply for ${leadItem.clean_name}`,\n    body_html: `<p>Hi ${leadItem.clean_name} team,</p><p>We supply authentic Boyolali fried shallots (Grade S Murni 100% & Grade A Crispy), Halal certified (ID33110018517710724). Can we send a complimentary 1kg sample pack to your kitchen at ${leadItem.address}?</p><p>Best regards,<br>Fahru Hernan<br>Juragan by Anak Bawang (+62 821-3373-1213)</p>`,\n    body_text: `Hi ${leadItem.clean_name} team, we supply authentic Boyolali fried shallots. May we send a free 1kg sample to your kitchen at ${leadItem.address}?`\n  };\n}\n\nreturn [{\n  json: {\n    lead_id: leadItem.lead_id,\n    recipient_email: leadItem.email,\n    restaurant_name: leadItem.clean_name,\n    subject: parsed.selected_subject || `Shallot Supply for ${leadItem.clean_name}`,\n    body_html: parsed.body_html,\n    body_text: parsed.body_text\n  }\n}];"
+      },
+      "id": "code-validate-payload",
+      "name": "5. Format & Validate Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 200]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.recipient_email }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "html",
+        "message": "={{ $json.body_html }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "gmail-send-node",
+      "name": "6. Send Email (Gmail/SMTP/Resend)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1320, 200],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "YOUR_GMAIL_CREDENTIAL_ID",
+          "name": "Gmail Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=UPDATE b2b_leads\nSET \n    status_email = 'sent',\n    email_sent_count = email_sent_count + 1,\n    last_contacted_at = NOW(),\n    ai_generated_subject = '{{ $json.subject.replace(/'/g, \"''\") }}',\n    ai_generated_pitch = '{{ $json.body_text.replace(/'/g, \"''\") }}'\nWHERE id = '{{ $json.lead_id }}';"
+      },
+      "id": "supabase-update-lead",
+      "name": "7. Update b2b_leads in Database",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1540, 200],
+      "credentials": {
+        "postgres": {
+          "id": "YOUR_POSTGRES_CREDENTIAL_ID",
+          "name": "Supabase PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=INSERT INTO b2b_outreach_logs (\n    lead_id, \n    channel, \n    recipient, \n    subject, \n    message_body, \n    status\n) VALUES (\n    '{{ $json.lead_id }}',\n    'email',\n    '{{ $json.recipient_email }}',\n    '{{ $json.subject.replace(/'/g, \"''\") }}',\n    '{{ $json.body_text.replace(/'/g, \"''\") }}',\n    'sent'\n);"
+      },
+      "id": "supabase-insert-log",
+      "name": "8. Insert into b2b_outreach_logs",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1760, 200],
+      "credentials": {
+        "postgres": {
+          "id": "YOUR_POSTGRES_CREDENTIAL_ID",
+          "name": "Supabase PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": "={{ Math.floor(Math.random() * (300 - 180 + 1)) + 180 }}",
+        "unit": "seconds"
+      },
+      "id": "anti-spam-delay",
+      "name": "9. Anti-Spam Delay (3-5 Mins)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1980, 200]
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=✅ *B2B Cold Email Batch Completed*\n\nToday's scheduled outreach batch has finished sending personalized emails.\nCheck `b2b_outreach_logs` in Supabase for full history.",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "telegram-summary",
+      "name": "10. Telegram Completion Alert",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [880, 480],
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CREDENTIAL_ID",
+          "name": "Telegram Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "1. Schedule (Mon-Fri 09:30 SGT)": {
+      "main": [
+        [
+          {
+            "node": "2. Fetch Pending Leads & Interaction Memory",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. Fetch Pending Leads & Interaction Memory": {
+      "main": [
+        [
+          {
+            "node": "3. Loop Leads Sequentially",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. Loop Leads Sequentially": {
+      "main": [
+        [
+          {
+            "node": "10. Telegram Completion Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "4. AI Pitch Generator with Memory",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4. AI Pitch Generator with Memory": {
+      "main": [
+        [
+          {
+            "node": "5. Format & Validate Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5. Format & Validate Email": {
+      "main": [
+        [
+          {
+            "node": "6. Send Email (Gmail/SMTP/Resend)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "6. Send Email (Gmail/SMTP/Resend)": {
+      "main": [
+        [
+          {
+            "node": "7. Update b2b_leads in Database",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "7. Update b2b_leads in Database": {
+      "main": [
+        [
+          {
+            "node": "8. Insert into b2b_outreach_logs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "8. Insert into b2b_outreach_logs": {
+      "main": [
+        [
+          {
+            "node": "9. Anti-Spam Delay (3-5 Mins)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "9. Anti-Spam Delay (3-5 Mins)": {
+      "main": [
+        [
+          {
+            "node": "3. Loop Leads Sequentially",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

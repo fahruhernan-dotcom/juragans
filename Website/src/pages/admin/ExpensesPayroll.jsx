@@ -3,33 +3,29 @@ import { supabase, isSupabaseConfigured } from '../../lib/supabaseClient'
 import { Wallet, Plus, UserCheck } from 'lucide-react'
 
 export default function ExpensesPayroll() {
-  const [expenses, setExpenses] = useState([
-    { id: '1', category: 'Stiker', description: 'Pengadaan Cetak Stiker Label Kemasan Pouch', amount: 127000, paid_by: 'Didi', date: '2026-08-07', notes: 'Potongan/kredit stiker kemasan Didi' },
-    { id: '2', category: 'Kemasan', description: 'Pembelian Paket Kemasan Pouch Sdr. Fahru', amount: 35675, paid_by: 'Fahru', date: '2026-08-07', notes: 'Faktur pembelian kemasan pouch' },
-    { id: '3', category: 'Stok Pabrik', description: 'Pelunasan Tagihan Stok Pabrik Boyolali (Batch 1 - 3kg)', amount: 345000, paid_by: 'Fahru', date: '2026-08-10', notes: 'Pelunasan piutang Batch 1 menggunakan uang pribadi Fahru' },
-    { id: '4', category: 'Operasional', description: 'Pengeluaran Kas Operasional Tunai Didi', amount: 20000, paid_by: 'Didi', date: '2026-08-07', notes: 'Pengeluaran kas operasional Didi' }
-  ])
-
-  const [payrolls, setPayrolls] = useState([
-    { id: '1', member: 'Didi', type: 'pengeluaran_ops', amount: 20000, date: '2026-08-07', notes: 'Pengeluaran kas operasional dari Didi (belum ditukar)' },
-    { id: '2', member: 'Didi', type: 'klaim_stiker', amount: 127000, date: '2026-08-07', notes: 'Penukaran klaim stiker kemasan yang dibayarkan Didi (belum ditukar)' },
-    { id: '3', member: 'Fahru', type: 'talangan_stok', amount: 345000, date: '2026-08-10', notes: 'Talangan dana pribadi pelunasan tagihan pabrik Batch 1 (3kg)' },
-    { id: '4', member: 'Fahru', type: 'pembelian_kemasan', amount: 35675, date: '2026-08-07', notes: 'Pembelian kemasan pouch Sdr. Fahru' },
-    { id: '5', member: 'Reyhan', type: 'komisi', amount: 0, date: '2026-08-07', notes: 'Komisi penjualan ritel Jabodetabek & Semarang' }
-  ])
-
+  const [expenses, setExpenses] = useState([])
+  const [payrolls, setPayrolls] = useState([])
+  const [loading, setLoading] = useState(false)
   const [isAddExpenseModalOpen, setIsAddExpenseModalOpen] = useState(false)
   const [newExpense, setNewExpense] = useState({ category: 'stiker', description: '', amount: '', paid_by: 'Owner', notes: '' })
 
   const fetchExpensesAndPayroll = async () => {
+    setLoading(true)
     try {
+      if (!isSupabaseConfigured()) {
+        setLoading(false)
+        return
+      }
+
       const { data: expData, error: expErr } = await supabase
         .from('juragan_expenses')
         .select('*')
         .order('created_at', { ascending: false })
 
-      if (!expErr && expData && expData.length > 0) {
+      if (!expErr && expData) {
         setExpenses(expData)
+      } else {
+        setExpenses([])
       }
 
       const { data: payData, error: payErr } = await supabase
@@ -37,21 +33,22 @@ export default function ExpensesPayroll() {
         .select('*')
         .order('created_at', { ascending: false })
 
-      if (!payErr && payData && payData.length > 0) {
+      if (!payErr && payData) {
         setPayrolls(payData.map(p => ({ ...p, member: p.team_member, type: p.transaction_type })))
+      } else {
+        setPayrolls([])
       }
     } catch (e) {
-      console.warn('Fallback to local expenses/payroll:', e)
+      console.warn('Error fetching expenses/payroll:', e)
+      setExpenses([])
+      setPayrolls([])
+    } finally {
+      setLoading(false)
     }
   }
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (isSupabaseConfigured()) {
-        fetchExpensesAndPayroll()
-      }
-    }, 0)
-    return () => clearTimeout(timer)
+    fetchExpensesAndPayroll()
   }, [])
 
   const totalExpense = expenses.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0)
@@ -61,21 +58,44 @@ export default function ExpensesPayroll() {
   const totalReyhan = expenses.filter(e => e.paid_by === 'Reyhan').reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0)
   const totalTalanganTim = totalDidi + totalFahru + totalReyhan
 
-  const handleAddExpense = (e) => {
+  const handleAddExpense = async (e) => {
     e.preventDefault()
     if (!newExpense.description || !newExpense.amount) return
 
-    const item = {
-      id: Date.now().toString(),
-      category: newExpense.category,
-      description: newExpense.description,
-      amount: parseFloat(newExpense.amount) || 0,
-      paid_by: newExpense.paid_by,
-      date: new Date().toISOString().split('T')[0],
-      notes: newExpense.notes
+    const parsedAmount = parseFloat(newExpense.amount) || 0
+
+    try {
+      if (isSupabaseConfigured()) {
+        const { data, error } = await supabase
+          .from('juragan_expenses')
+          .insert([{
+            category: newExpense.category,
+            description: newExpense.description,
+            amount: parsedAmount,
+            paid_by: newExpense.paid_by,
+            notes: newExpense.notes
+          }])
+          .select()
+
+        if (!error && data) {
+          setExpenses([data[0], ...expenses])
+        }
+      } else {
+        const item = {
+          id: Date.now().toString(),
+          category: newExpense.category,
+          description: newExpense.description,
+          amount: parsedAmount,
+          paid_by: newExpense.paid_by,
+          created_at: new Date().toISOString(),
+          notes: newExpense.notes
+        }
+        setExpenses([item, ...expenses])
+      }
+    } catch (err) {
+      console.error('Failed to insert expense:', err)
     }
 
-    setExpenses([item, ...expenses])
     setIsAddExpenseModalOpen(false)
     setNewExpense({ category: 'stiker', description: '', amount: '', paid_by: 'Owner', notes: '' })
   }
