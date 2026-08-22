@@ -24,12 +24,13 @@
 * **Subtotal Produk**: `Rp 75,000`
 * **Ongkos Kirim**: `Rp 10,000`
 * **Total Tagihan**: **`Rp 85,000`**
-* **Terbilang**: *(Delapan Puluh Lima Ribu Rupiah)*
+* **Terbilang**: *(Delapan Puluh Lima Ribu  Rupiah)*
 * **Status Pembayaran**: ✅ **LUNAS**
+* **Kemasan Tambahan**: 📦 Kardus Box-M (Ya) | 💌 Kartu Ucapan (Tidak)
 
 ---
 
 ### 📝 Catatan & Alamat Pengiriman:
-1. **Catatan Transaksi**: Harga Resmi Grade A 250g Jakarta (2 pack @ Rp 37.500 + Ongkir Ekspedisi Flat Rp 10.000)
+1. **Catatan Transaksi**: Harga Resmi Jakarta (2 pack 250g Grade A @ Rp 37.500 + Ongkir Flat Rp 10.000 = Rp 85.000)
 2. **Metode Pembayaran**: Transfer Bank / Cash / E-Wallet.
 3. Terima kasih telah berbelanja produk **Juragan by Anak Bawang**! Kebersihan, kerenyahan, dan kemurnian rasa adalah prioritas utama kami.

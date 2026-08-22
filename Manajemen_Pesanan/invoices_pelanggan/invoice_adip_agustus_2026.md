@@ -24,12 +24,13 @@
 * **Subtotal Produk**: `Rp 43,500`
 * **Ongkos Kirim**: `Rp 0`
 * **Total Tagihan**: **`Rp 43,500`**
-* **Terbilang**: *(Empat Puluh Tiga Ribu Lima Ratus Rupiah)*
+* **Terbilang**: *(Empat Puluh Tiga Ribu Lima Ratus  Rupiah)*
 * **Status Pembayaran**: ✅ **LUNAS**
+* **Kemasan Tambahan**: 📦 Kardus Box-M (Ya) | 💌 Kartu Ucapan (Tidak)
 
 ---
 
 ### 📝 Catatan & Alamat Pengiriman:
-1. **Catatan Transaksi**: Rumah Kost Eksklusif Bulusan, Jl. Bulusan Selatan Raya No.9a, Tembalang, Semarang (Kamar 9)
+1. **Catatan Transaksi**: Rumah Kost Eksklusif Bulusan, Jl. Bulusan Selatan Raya No.9a, Bulusan, Kec. Tembalang, Kota Semarang, Jawa Tengah 50277 (Kamar 9)
 2. **Metode Pembayaran**: Transfer Bank / Cash / E-Wallet.
 3. Terima kasih telah berbelanja produk **Juragan by Anak Bawang**! Kebersihan, kerenyahan, dan kemurnian rasa adalah prioritas utama kami.

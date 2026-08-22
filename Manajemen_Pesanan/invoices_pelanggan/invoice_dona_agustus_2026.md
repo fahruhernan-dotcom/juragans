@@ -24,8 +24,9 @@
 * **Subtotal Produk**: `Rp 136,000`
 * **Ongkos Kirim**: `Rp 0`
 * **Total Tagihan**: **`Rp 136,000`**
-* **Terbilang**: *(Seratus Tiga Puluh Enam Ribu Rupiah)*
+* **Terbilang**: *(Seratus Tiga Puluh Enam Ribu  Rupiah)*
 * **Status Pembayaran**: ✅ **LUNAS**
+* **Kemasan Tambahan**: 📦 Kardus Box-M (Ya) | 💌 Kartu Ucapan (Tidak)
 
 ---
 

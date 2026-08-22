@@ -5,7 +5,7 @@
 **Penerbit Invoice**: **Juragan by Anak Bawang** (Produsen Bawang Goreng Boyolali Murni)  
 **Ditujukan Kepada**: **Mamah Didi**  
 **Status Pembayaran**: ⏳ **BELUM LUNAS (Menunggu Pelunasan)**  
-**Status Pengiriman**: 🚚 **Menunggu Pengiriman**  
+**Status Pengiriman**: 📦 **Menunggu Pengiriman**  
 
 ---
 
@@ -24,8 +24,9 @@
 * **Subtotal Produk**: `Rp 154,000`
 * **Ongkos Kirim**: `Rp 0`
 * **Total Tagihan**: **`Rp 154,000`**
-* **Terbilang**: *(Seratus Lima Puluh Empat Ribu Rupiah)*
+* **Terbilang**: *(Seratus Lima Puluh Empat Ribu  Rupiah)*
 * **Status Pembayaran**: ⏳ **BELUM LUNAS (Menunggu Pelunasan)**
+* **Kemasan Tambahan**: 📦 Kardus Box-M (Ya) | 💌 Kartu Ucapan (Tidak)
 
 ---
 

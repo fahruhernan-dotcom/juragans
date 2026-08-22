@@ -24,12 +24,13 @@
 * **Subtotal Produk**: `Rp 40,000`
 * **Ongkos Kirim**: `Rp 0`
 * **Total Tagihan**: **`Rp 40,000`**
-* **Terbilang**: *(Empat Puluh  Ribu Rupiah)*
+* **Terbilang**: *(Empat Puluh  Ribu  Rupiah)*
 * **Status Pembayaran**: ✅ **LUNAS**
+* **Kemasan Tambahan**: 📦 Kardus Box-M (Ya) | 💌 Kartu Ucapan (Tidak)
 
 ---
 
 ### 📝 Catatan & Alamat Pengiriman:
-1. **Catatan Transaksi**: Harga Resmi Regional Solo Raya (1 pack 250g @ Rp 40.000)
+1. **Catatan Transaksi**: Area: Solo Raya | Kemasan Kardus: Ya
 2. **Metode Pembayaran**: Transfer Bank / Cash / E-Wallet.
 3. Terima kasih telah berbelanja produk **Juragan by Anak Bawang**! Kebersihan, kerenyahan, dan kemurnian rasa adalah prioritas utama kami.

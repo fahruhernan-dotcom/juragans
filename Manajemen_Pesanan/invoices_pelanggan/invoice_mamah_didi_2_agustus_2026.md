@@ -25,12 +25,13 @@
 * **Subtotal Produk**: `Rp 239,000`
 * **Ongkos Kirim**: `Rp 0`
 * **Total Tagihan**: **`Rp 239,000`**
-* **Terbilang**: *(Dua Ratus Tiga Puluh Sembilan Ribu Rupiah)*
+* **Terbilang**: *(Dua Ratus Tiga Puluh Sembilan Ribu  Rupiah)*
 * **Status Pembayaran**: ✅ **LUNAS**
+* **Kemasan Tambahan**: 📦 Kardus Box-M (Ya) | 💌 Kartu Ucapan (Tidak)
 
 ---
 
 ### 📝 Catatan & Alamat Pengiriman:
-1. **Catatan Transaksi**: Harga Resmi Pricelist Solo Raya (10 pack 100g Grade S Murni @ Rp 22.000 & 1 pack 100g Grade A @ Rp 19.000)
+1. **Catatan Transaksi**: Harga Resmi Pricelist Solo Raya (10 pack 100g Grade S Murni @ Rp 22.000 + 1 pack 100g Grade A @ Rp 19.000)
 2. **Metode Pembayaran**: Transfer Bank / Cash / E-Wallet.
 3. Terima kasih telah berbelanja produk **Juragan by Anak Bawang**! Kebersihan, kerenyahan, dan kemurnian rasa adalah prioritas utama kami.

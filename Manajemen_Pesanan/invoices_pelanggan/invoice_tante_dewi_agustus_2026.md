@@ -24,8 +24,9 @@
 * **Subtotal Produk**: `Rp 44,000`
 * **Ongkos Kirim**: `Rp 0`
 * **Total Tagihan**: **`Rp 44,000`**
-* **Terbilang**: *(Empat Puluh Empat Ribu Rupiah)*
+* **Terbilang**: *(Empat Puluh Empat Ribu  Rupiah)*
 * **Status Pembayaran**: ✅ **LUNAS**
+* **Kemasan Tambahan**: 📦 Kardus Box-M (Ya) | 💌 Kartu Ucapan (Tidak)
 
 ---
 

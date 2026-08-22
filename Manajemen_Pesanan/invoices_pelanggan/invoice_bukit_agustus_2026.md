@@ -5,7 +5,7 @@
 **Penerbit Invoice**: **Juragan by Anak Bawang** (Produsen Bawang Goreng Boyolali Murni)  
 **Ditujukan Kepada**: **Bukit**  
 **Status Pembayaran**: ⏳ **BELUM LUNAS (Menunggu Pelunasan)**  
-**Status Pengiriman**: 🚚 **Menunggu Pengiriman**  
+**Status Pengiriman**: 📦 **Menunggu Pengiriman**  
 
 ---
 
@@ -24,12 +24,13 @@
 * **Subtotal Produk**: `Rp 87,000`
 * **Ongkos Kirim**: `Rp 0`
 * **Total Tagihan**: **`Rp 87,000`**
-* **Terbilang**: *(Delapan Puluh Tujuh Ribu Rupiah)*
+* **Terbilang**: *(Delapan Puluh Tujuh Ribu  Rupiah)*
 * **Status Pembayaran**: ⏳ **BELUM LUNAS (Menunggu Pelunasan)**
+* **Kemasan Tambahan**: 📦 Kardus Box-M (Ya) | 💌 Kartu Ucapan (Tidak)
 
 ---
 
 ### 📝 Catatan & Alamat Pengiriman:
-1. **Catatan Transaksi**: Harga Resmi Grade S 250g Jakarta/Semarang (2 pack @ Rp 43.500)
+1. **Catatan Transaksi**: Area: Jakarta / Jabodetabek | Kemasan Kardus: Ya
 2. **Metode Pembayaran**: Transfer Bank / Cash / E-Wallet.
 3. Terima kasih telah berbelanja produk **Juragan by Anak Bawang**! Kebersihan, kerenyahan, dan kemurnian rasa adalah prioritas utama kami.
