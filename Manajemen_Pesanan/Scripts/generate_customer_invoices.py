@@ -325,6 +325,24 @@ orders = [
         "delivery_status": "Terkirim",
         "notes": "Harga Resmi Grade A 250g Jakarta (2 pack @ Rp 37.500 + Ongkir Ekspedisi Flat Rp 10.000)",
         "file_slug": "ratukhandayu"
+    },
+    {
+        "no": 17,
+        "inv_no": "INV/2026/08/018",
+        "date": "2026-08-22",
+        "date_fmt": "22 Agustus 2026",
+        "customer": "Dona",
+        "variant": "Grade A Crispy",
+        "size": "1000g",
+        "packs": 1,
+        "weight_kg": 1.00,
+        "price_per_pack": 136000,
+        "total_price": 136000,
+        "shipping_fee": 0,
+        "payment_status": "Lunas",
+        "delivery_status": "Terkirim",
+        "notes": "Harga Resmi Solo Raya (1 pack 1000g Bal PE Grade A Crispy @ Rp 136.000)",
+        "file_slug": "dona"
     }
 ]
 
