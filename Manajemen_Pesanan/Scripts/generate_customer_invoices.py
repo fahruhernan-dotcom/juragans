@@ -31,20 +31,20 @@ OUTPUT_INVOICE_DIR = os.path.join(BASE_DIR, "invoices_pelanggan")
 
 os.makedirs(OUTPUT_INVOICE_DIR, exist_ok=True)
 
-# ─── MASTER PRICING & SKU MATRIX ──────────────────────────────────────────────
+# ─── MASTER PRICING & SKU MATRIX (Acuan Resmi: Clean PDF) ────────────────────
 SKU_CATALOG = {
-    # Grade S Murni (Tanpa Tepung)
+    # Grade S Murni (100% Bawang Merah Boyolali Murni - Tanpa Tepung)
     "murni_100":  {"name": "Trial Pack Murni 100g", "variant": "Grade S Murni", "size": "100g", "weight": 0.10, "solo": 22000, "luar": 23500, "hpp": 15400},
-    "murni_150":  {"name": "Murni Pouch 150g", "variant": "Grade S Murni", "size": "150g", "weight": 0.15, "solo": 26000, "luar": 26500, "hpp": 21700},
-    "murni_200":  {"name": "Murni Pouch 200g", "variant": "Grade S Murni", "size": "200g", "weight": 0.20, "solo": 34500, "luar": 37500, "hpp": 28200},
-    "murni_250":  {"name": "[HERO SKU] Murni Pouch 250g", "variant": "Grade S Murni", "size": "250g", "weight": 0.25, "solo": 40000, "luar": 43500, "hpp": 34700},
-    "murni_1000": {"name": "Murni Bal PE 1 Kg", "variant": "Grade S Murni", "size": "1000g", "weight": 1.00, "solo": 152000, "luar": 165500, "hpp": 127200},
+    "murni_150":  {"name": "Murni Pouch 150g", "variant": "Grade S Murni", "size": "150g", "weight": 0.15, "solo": 29000, "luar": 31000, "hpp": 21700},
+    "murni_200":  {"name": "Murni Pouch 200g", "variant": "Grade S Murni", "size": "200g", "weight": 0.20, "solo": 34500, "luar": 36500, "hpp": 28200},
+    "murni_250":  {"name": "[HERO SKU] Murni Pouch 250g", "variant": "Grade S Murni", "size": "250g", "weight": 0.25, "solo": 39500, "luar": 43500, "hpp": 34700},
+    "murni_1000": {"name": "Murni Bal PE 1 Kg", "variant": "Grade S Murni", "size": "1000g", "weight": 1.00, "solo": 156000, "luar": 165500, "hpp": 127200},
     
-    # Grade A Crispy (Tepung Tipis 5%)
-    "grade_a_100":  {"name": "Trial Pack Grade A 100g", "variant": "Grade A Crispy", "size": "100g", "weight": 0.10, "solo": 19000, "luar": 20500, "hpp": 13900},
-    "grade_a_150":  {"name": "Grade A Pouch 150g", "variant": "Grade A Crispy", "size": "150g", "weight": 0.15, "solo": 25000, "luar": 26500, "hpp": 19450},
-    "grade_a_200":  {"name": "Grade A Pouch 200g", "variant": "Grade A Crispy", "size": "200g", "weight": 0.20, "solo": 31000, "luar": 31500, "hpp": 25100},
-    "grade_a_250":  {"name": "[HERO SKU] Grade A Pouch 250g", "variant": "Grade A Crispy", "size": "250g", "weight": 0.25, "solo": 35000, "luar": 37500, "hpp": 30950},
+    # Grade A Crispy (Renyah Gurih Mantap - Tepung Tipis 5%)
+    "grade_a_100":  {"name": "Trial Pack Grade A 100g", "variant": "Grade A Crispy", "size": "100g", "weight": 0.10, "solo": 19000, "luar": 21000, "hpp": 13900},
+    "grade_a_150":  {"name": "Grade A Pouch 150g", "variant": "Grade A Crispy", "size": "150g", "weight": 0.15, "solo": 25500, "luar": 28000, "hpp": 19450},
+    "grade_a_200":  {"name": "Grade A Pouch 200g", "variant": "Grade A Crispy", "size": "200g", "weight": 0.20, "solo": 30500, "luar": 32500, "hpp": 25100},
+    "grade_a_250":  {"name": "[HERO SKU] Grade A Pouch 250g", "variant": "Grade A Crispy", "size": "250g", "weight": 0.25, "solo": 37500, "luar": 39500, "hpp": 30950},
     "grade_a_1000": {"name": "Grade A Bal PE 1 Kg", "variant": "Grade A Crispy", "size": "1000g", "weight": 1.00, "solo": 136000, "luar": 146000, "hpp": 112200},
 }
 

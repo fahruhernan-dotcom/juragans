@@ -43,35 +43,37 @@ Skill resmi untuk memproses pencatatan pesanan, validasi data transaksi, perhitu
 
 ---
 
-## 🏷️ ACUAN HARGA RESMI (CLEAN PRICELISTS)
+## 🏷️ ACUAN HARGA RESMI TUNGGAL (CLEAN PRICELISTS)
+
+*Acuan mutlak sesuai file resmi `pricelist_solo_raya_clean.pdf` dan `pricelist_jakarta_semarang_clean.pdf` tanpa variasi/ambiguitas.*
 
 ### 1. Pasar Solo Raya (Lokal) — Acuan: `pricelist_solo_raya_clean.pdf`
 * **Grade S Murni (Tanpa Tepung)**:
   - 100g Trial Pack : **Rp 22.000**
-  - 150g Pouch      : **Rp 26.000**
+  - 150g Pouch      : **Rp 29.000**
   - 200g Pouch      : **Rp 34.500**
-  - 250g Hero SKU   : **Rp 40.000** (atau Rp 39.500)
-  - 1.000g (1 kg Bal PE): **Rp 152.000** (atau Rp 156.000)
+  - 250g Hero SKU   : **Rp 39.500**
+  - 1.000g (1 kg Bal PE): **Rp 156.000**
 * **Grade A Crispy (Tepung 5%)**:
   - 100g Trial Pack : **Rp 19.000**
-  - 150g Pouch      : **Rp 25.000**
-  - 200g Pouch      : **Rp 31.000**
-  - 250g Hero SKU   : **Rp 35.000** (atau Rp 37.500)
-  - 1.000g (1 kg Bal PE): **Rp 136.000** (atau Rp 125.000)
+  - 150g Pouch      : **Rp 25.500**
+  - 200g Pouch      : **Rp 30.500**
+  - 250g Hero SKU   : **Rp 37.500**
+  - 1.000g (1 kg Bal PE): **Rp 136.000**
 
 ### 2. Pasar Jakarta & Semarang (Luar Kota) — Acuan: `pricelist_jakarta_semarang_clean.pdf`
 * **Grade S Murni (Tanpa Tepung)**:
   - 100g Trial Pack : **Rp 23.500**
-  - 150g Pouch      : **Rp 26.500** (atau Rp 31.000)
-  - 200g Pouch      : **Rp 37.500** (atau Rp 36.500)
+  - 150g Pouch      : **Rp 31.000**
+  - 200g Pouch      : **Rp 36.500**
   - 250g Hero SKU   : **Rp 43.500**
   - 1.000g (1 kg Bal PE): **Rp 165.500**
 * **Grade A Crispy (Tepung 5%)**:
-  - 100g Trial Pack : **Rp 20.500**
-  - 150g Pouch      : **Rp 26.500** (atau Rp 28.000)
-  - 200g Pouch      : **Rp 31.500** (atau Rp 32.500)
-  - 250g Hero SKU   : **Rp 37.500** / **Rp 39.500**
-  - 1.000g (1 kg Bal PE): **Rp 146.000** (atau Rp 135.500)
+  - 100g Trial Pack : **Rp 21.000**
+  - 150g Pouch      : **Rp 28.000**
+  - 200g Pouch      : **Rp 32.500**
+  - 250g Hero SKU   : **Rp 39.500**
+  - 1.000g (1 kg Bal PE): **Rp 146.000**
 
 ---
 
@@ -96,7 +98,7 @@ python "Manajemen_Pesanan/Scripts/generate_customer_invoices.py" --add \
 1. Menghitung HPP Bawang, biaya kardus, total omset, profit netto, dan persentase margin.
 2. Otomatis menambahkan baris transaksi ke `Manajemen_Pesanan/Database/daftar_pesanan_agustus_2026.csv`.
 3. Otomatis men-generate file PDF & Markdown di `Manajemen_Pesanan/invoices_pelanggan/`.
-4. Kode python **tetap ramping (~300 baris)** dan tidak akan pernah membengkak lagi.
+4. Database CSV menjadi **Single Source of Truth** yang bersih.
 
 ---
 
