@@ -21,7 +21,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT \n    l.id AS lead_id,\n    l.name,\n    l.clean_name,\n    l.category,\n    l.country,\n    l.city,\n    l.address,\n    l.email,\n    l.phone,\n    l.website,\n    l.instagram_url,\n    l.rating,\n    l.review_count,\n    l.lead_priority,\n    l.contactability_score,\n    COALESCE(\n        (SELECT json_agg(json_build_object('subject', log.subject, 'date', log.sent_at)) \n         FROM b2b_outreach_logs log \n         WHERE log.lead_id = l.id),\n        '[]'::json\n    ) AS past_pitch_history\nFROM b2b_leads l\nWHERE l.email IS NOT NULL \n  AND l.email != ''\n  AND l.status_email = 'pending'\nORDER BY \n    CASE l.lead_priority \n        WHEN 'hot' THEN 1 \n        WHEN 'warm' THEN 2 \n        ELSE 3 \n    END,\n    l.review_count DESC\nLIMIT 15;"
+        "query": "SELECT * FROM v_n8n_pending_emails LIMIT 15;"
       },
       "id": "supabase-fetch-leads-memory",
       "name": "2. Fetch Pending Leads & Interaction Memory",

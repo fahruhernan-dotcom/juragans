@@ -153,11 +153,11 @@ orders = [
         "size": "1000g",
         "packs": 2,
         "weight_kg": 2.00,
-        "price_per_pack": 135500,
-        "total_price": 271000,
+        "price_per_pack": 136000,
+        "total_price": 272000,
         "payment_status": "Belum Lunas",
         "delivery_status": "Menunggu Pengiriman",
-        "notes": "Harga Resmi Grade A Bal PE 1kg (2 pack @ Rp 135.500)",
+        "notes": "Harga Resmi Pricelist Solo Raya (Grade A Bal PE 1kg × 2 pack @ Rp 136.000)",
         "file_slug": "didi"
     },
     {
@@ -259,6 +259,72 @@ orders = [
         "delivery_status": "Menunggu Pengiriman",
         "notes": "Harga Resmi Regional Solo Raya (7 pack 100g Grade S Murni @ Rp 22.000)",
         "file_slug": "mamah_didi"
+    },
+    {
+        "no": 14,
+        "inv_no": "INV/2026/08/015",
+        "date": "2026-08-22",
+        "date_fmt": "22 Agustus 2026",
+        "customer": "Mamah Didi",
+        "items": [
+            {
+                "variant": "Grade S Murni",
+                "size": "100g",
+                "packs": 10,
+                "weight_kg": 1.00,
+                "price_per_pack": 22000,
+                "subtotal": 220000
+            },
+            {
+                "variant": "Grade A Crispy",
+                "size": "100g",
+                "packs": 1,
+                "weight_kg": 0.10,
+                "price_per_pack": 19000,
+                "subtotal": 19000
+            }
+        ],
+        "shipping_fee": 0,
+        "payment_status": "Lunas",
+        "delivery_status": "Terkirim",
+        "notes": "Harga Resmi Pricelist Solo Raya (10 pack 100g Grade S Murni @ Rp 22.000 & 1 pack 100g Grade A @ Rp 19.000)",
+        "file_slug": "mamah_didi_2"
+    },
+    {
+        "no": 15,
+        "inv_no": "INV/2026/08/016",
+        "date": "2026-08-22",
+        "date_fmt": "22 Agustus 2026",
+        "customer": "Tante Dewi",
+        "variant": "Grade S Murni",
+        "size": "100g",
+        "packs": 2,
+        "weight_kg": 0.20,
+        "price_per_pack": 22000,
+        "total_price": 44000,
+        "shipping_fee": 0,
+        "payment_status": "Lunas",
+        "delivery_status": "Terkirim",
+        "notes": "Harga Resmi Pricelist Solo Raya (2 pack 100g Grade S Murni @ Rp 22.000)",
+        "file_slug": "tante_dewi"
+    },
+    {
+        "no": 16,
+        "inv_no": "INV/2026/08/017",
+        "date": "2026-08-22",
+        "date_fmt": "22 Agustus 2026",
+        "customer": "Ratukhandayu",
+        "variant": "Grade A Crispy",
+        "size": "250g",
+        "packs": 2,
+        "weight_kg": 0.50,
+        "price_per_pack": 37500,
+        "total_price": 75000,
+        "shipping_fee": 10000,
+        "payment_status": "Lunas",
+        "delivery_status": "Terkirim",
+        "notes": "Harga Resmi Grade A 250g Jakarta (2 pack @ Rp 37.500 + Ongkir Ekspedisi Flat Rp 10.000)",
+        "file_slug": "ratukhandayu"
     }
 ]
 
@@ -273,13 +339,15 @@ def generate_markdown(order, output_dir):
     if 'items' in order:
         subtotal_produk = sum(item['subtotal'] for item in order['items'])
         for idx, item in enumerate(order['items'], 1):
-            items_rows.append(f"| {idx} | **Bawang Goreng {item['variant']}**<br/>*(100% Bawang Merah Boyolali Murni)* | {item['size']} | {item['packs']} pack | {item['weight_kg']:.2f} kg | Rp {item['price_per_pack']:,} | Rp {item['subtotal']:,} |")
+            sub_desc = "100% Bawang Merah Boyolali Murni - Tanpa Tepung" if "Murni" in item['variant'] else "Renyah Gurih Mantap (Tepung Tipis 5%)"
+            items_rows.append(f"| {idx} | **Bawang Goreng {item['variant']}**<br/>*({sub_desc})* | {item['size']} | {item['packs']} pack | {item['weight_kg']:.2f} kg | Rp {item['price_per_pack']:,} | Rp {item['subtotal']:,} |")
         total_size = " + ".join(item['size'] for item in order['items'])
         total_packs = sum(item['packs'] for item in order['items'])
         total_weight = sum(item['weight_kg'] for item in order['items'])
     else:
         subtotal_produk = order['total_price']
-        items_rows.append(f"| 1 | **Bawang Goreng {order['variant']}**<br/>*(100% Bawang Merah Boyolali Murni - Tanpa Tepung)* | {order['size']} | {order['packs']} pack | {order['weight_kg']:.2f} kg | Rp {order['price_per_pack']:,} | Rp {subtotal_produk:,} |")
+        sub_desc = "100% Bawang Merah Boyolali Murni - Tanpa Tepung" if "Murni" in order.get('variant', '') else "Renyah Gurih Mantap (Tepung Tipis 5%)"
+        items_rows.append(f"| 1 | **Bawang Goreng {order.get('variant', 'Grade S Murni')}**<br/>*({sub_desc})* | {order['size']} | {order['packs']} pack | {order['weight_kg']:.2f} kg | Rp {order['price_per_pack']:,} | Rp {subtotal_produk:,} |")
         total_size = order['size']
         total_packs = order['packs']
         total_weight = order['weight_kg']
@@ -448,7 +516,8 @@ def generate_pdf(order, output_dir):
     if 'items' in order:
         subtotal_produk = sum(item['subtotal'] for item in order['items'])
         for idx, item in enumerate(order['items'], 1):
-            item_desc = f"<b>Bawang Goreng {item['variant']}</b><br/><font size=7.5 color='#64748B'>100% Bawang Merah Boyolali Murni</font>"
+            sub_lbl = "100% Bawang Merah Boyolali Murni" if "Murni" in item['variant'] else "Renyah Gurih Mantap (Tepung 5%)"
+            item_desc = f"<b>Bawang Goreng {item['variant']}</b><br/><font size=7.5 color='#64748B'>{sub_lbl}</font>"
             price_str = f"Rp {item['price_per_pack']:,}".replace(',', '.')
             subtotal_str = f"Rp {item['subtotal']:,}".replace(',', '.')
             table_data.append([
@@ -461,7 +530,8 @@ def generate_pdf(order, output_dir):
             ])
     else:
         subtotal_produk = order['total_price']
-        item_desc = f"<b>Bawang Goreng {order['variant']}</b><br/><font size=7.5 color='#64748B'>100% Bawang Merah Boyolali Murni (Tanpa Tepung)</font>"
+        sub_lbl = "100% Bawang Merah Boyolali Murni (Tanpa Tepung)" if "Murni" in order.get('variant', '') else "Renyah Gurih (Tepung 5%)"
+        item_desc = f"<b>Bawang Goreng {order['variant']}</b><br/><font size=7.5 color='#64748B'>{sub_lbl}</font>"
         price_str = f"Rp {order['price_per_pack']:,}".replace(',', '.')
         subtotal_str = f"Rp {subtotal_produk:,}".replace(',', '.')
         table_data.append([
