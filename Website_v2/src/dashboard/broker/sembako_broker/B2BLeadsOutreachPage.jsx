@@ -21,7 +21,13 @@ import {
   RefreshCw,
   Sparkles,
   Layers,
-  ArrowUpRight
+  ArrowUpRight,
+  Calculator,
+  Store,
+  ChevronRight,
+  TrendingUp,
+  Building2,
+  X
 } from 'lucide-react'
 import {
   useB2BLeads,
@@ -56,7 +62,6 @@ export default function B2BLeadsOutreachPage() {
   // Modals
   const [leadModalOpen, setLeadModalOpen] = useState(false)
   const [editingLead, setEditingLead] = useState(null)
-  const [viewLeadDetails, setViewLeadDetails] = useState(null)
   const [queueModalOpen, setQueueModalOpen] = useState(false)
   const [selectedLeadForPitch, setSelectedLeadForPitch] = useState(null)
 
@@ -119,10 +124,10 @@ export default function B2BLeadsOutreachPage() {
   }, [leads])
 
   const summaryItems = [
-    { label: 'Total Prospek Resto', value: stats.total, color: 'amber' },
-    { label: 'Hot Leads (Prioritas)', value: stats.hot, color: 'green', subLabel: 'Kategori Restoran Utama' },
-    { label: 'Outreach Terkirim', value: `${stats.sent} email`, color: 'blue', subLabel: `${stats.hasEmail} kontak valid` },
-    { label: 'Respon / Balasan', value: stats.replied, color: 'purple', subLabel: 'Tindak lanjut negosiasi' },
+    { label: 'Total Prospek Resto', value: stats.total, color: 'amber', subLabel: 'Resto SG & MY terdaftar' },
+    { label: 'Hot Leads Prioritas', value: stats.hot, color: 'red', subLabel: 'Kategori Resto Utama' },
+    { label: 'Outreach Terkirim', value: `${stats.sent} email`, color: 'green', subLabel: `${stats.hasEmail} email valid` },
+    { label: 'Respon / Balasan', value: stats.replied, color: 'default', subLabel: 'Tindak lanjut negosiasi' },
   ]
 
   const openAddLead = () => {
@@ -196,7 +201,7 @@ export default function B2BLeadsOutreachPage() {
       }
       setLeadModalOpen(false)
     } catch (err) {
-      // handled
+      // handled by mutation
     }
   }
 
@@ -231,89 +236,79 @@ export default function B2BLeadsOutreachPage() {
   const expectedProfitPer10Samples = (10 * (targetConversionRate / 100) * trialBatchProfit) - (10 * sampleUnitCostTotal)
 
   return (
-    <div className="min-h-screen bg-[#0B1120] text-slate-100 pb-[max(140px,calc(110px+env(safe-area-inset-bottom,24px)))] text-left">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 pt-4">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-white/10">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                B2B Export Engine
-              </span>
-              <span className="text-xs text-slate-400">n8n + AI Agent + Supabase</span>
-            </div>
-            <h1 className="text-2xl font-black font-['Sora'] text-white">
-              B2B Leads & Cold Outreach
-            </h1>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Kelola prospek restoran Indonesia di Singapura & Malaysia, pantau status AI pitch email, dan jadwalkan antrean scraping.
-            </p>
-          </div>
-
-          {/* Action Buttons */}
+    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 pb-[max(140px,calc(110px+env(safe-area-inset-bottom,24px)))] text-left">
+      {/* Header Standard Juragan */}
+      <SembakoPageHeader
+        title="B2B Leads & Export Engine"
+        subtitle="Direktori prospek restoran Indonesia di Singapura & Malaysia, pantau AI pitch email, dan jadwalkan antrean scraper n8n."
+        isDesktop={isDesktop}
+        searchQuery={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Cari resto, alamat, email..."
+        actionButton={
           <div className="flex items-center gap-2">
             <button
-              onClick={() => refetch()}
-              className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 transition"
+              onClick={() => { refetch(); refetchQueue(); }}
+              className="p-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 shadow-sm transition"
               title="Refresh Data"
             >
-              <RefreshCw size={16} />
+              <RefreshCw size={15} />
             </button>
             <button
               onClick={() => setQueueModalOpen(true)}
-              className="flex items-center gap-1.5 px-3.5 h-10 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10 transition"
+              className="flex items-center gap-1.5 px-3 h-9 rounded-xl text-xs font-bold bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 shadow-sm transition"
             >
-              <Bot size={15} className="text-amber-400" />
-              <span>Antrean Scraping</span>
+              <Bot size={14} className="text-amber-500" />
+              <span className="hidden sm:inline">Antrean Scraper</span>
             </button>
             <button
               onClick={openAddLead}
-              className="flex items-center gap-2 px-4 h-10 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-lg shadow-amber-500/20 transition active:scale-95"
+              className="flex items-center gap-1.5 px-4 h-9 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-sm transition active:scale-95"
             >
-              <Plus size={16} />
+              <Plus size={15} />
               <span>Tambah Prospek</span>
             </button>
           </div>
-        </div>
+        }
+      />
 
-        {/* Summary Strip */}
-        <div className="py-4">
-          <SembakoSummaryStrip items={summaryItems} />
-        </div>
+      <div className="mx-auto max-w-7xl px-4 sm:px-6">
+        {/* KPI Strip */}
+        <SembakoSummaryStrip items={summaryItems} />
 
-        {/* Tab Navigation */}
-        <div className="flex items-center gap-2 border-b border-white/10 pb-3 mb-4">
+        {/* Sub-Tab Switcher */}
+        <div className="flex items-center gap-2 border-b border-slate-200 pb-3 mb-5 px-1 overflow-x-auto">
           <button
             onClick={() => setActiveTab('leads')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm ${
               activeTab === 'leads'
-                ? 'bg-amber-500 text-slate-950'
-                : 'text-slate-400 hover:bg-white/5'
+                ? 'bg-slate-900 text-white'
+                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900'
             }`}
           >
-            <Users size={15} />
+            <Users size={14} />
             <span>Daftar Prospek Restoran ({leads.length})</span>
           </button>
           <button
             onClick={() => setActiveTab('queue')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm ${
               activeTab === 'queue'
-                ? 'bg-amber-500 text-slate-950'
-                : 'text-slate-400 hover:bg-white/5'
+                ? 'bg-slate-900 text-white'
+                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900'
             }`}
           >
-            <Bot size={15} />
+            <Bot size={14} className={activeTab === 'queue' ? 'text-amber-400' : 'text-amber-500'} />
             <span>Antrean Auto-Scraper ({queue.length})</span>
           </button>
           <button
             onClick={() => setActiveTab('sample_calculator')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm ${
               activeTab === 'sample_calculator'
-                ? 'bg-amber-500 text-slate-950'
-                : 'text-slate-400 hover:bg-white/5'
+                ? 'bg-slate-900 text-white'
+                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900'
             }`}
           >
-            <Sparkles size={15} />
+            <Sparkles size={14} className={activeTab === 'sample_calculator' ? 'text-amber-400' : 'text-purple-500'} />
             <span>Kalkulator ROI Sample Pack</span>
           </button>
         </div>
@@ -321,16 +316,16 @@ export default function B2BLeadsOutreachPage() {
         {/* ── TAB 1: LEADS DIRECTORY ── */}
         {activeTab === 'leads' && (
           <div className="space-y-4">
-            {/* Filter & Search Bar */}
-            <div className="flex flex-col sm:flex-row gap-3 items-center justify-between bg-slate-900/60 p-3 rounded-2xl border border-white/10">
-              <div className="relative w-full sm:w-72">
-                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+            {/* Filter Bar */}
+            <div className="flex flex-col sm:flex-row gap-3 items-center justify-between bg-white p-3 rounded-2xl border border-slate-200/80 shadow-sm">
+              <div className="relative w-full sm:w-80">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Cari resto, PIC, atau email..."
+                  placeholder="Cari nama resto, menu, atau email..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 bg-slate-950/80 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                  className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-amber-500 focus:bg-white transition"
                 />
               </div>
 
@@ -338,7 +333,7 @@ export default function B2BLeadsOutreachPage() {
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  className="px-3 py-2 bg-slate-950/80 border border-white/10 rounded-xl text-xs text-slate-300 focus:outline-none focus:border-amber-400"
+                  className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 font-medium focus:outline-none focus:border-amber-500 focus:bg-white"
                 >
                   <option value="all">Semua Status Email</option>
                   <option value="pending">Pending (Belum Dikirim)</option>
@@ -349,7 +344,7 @@ export default function B2BLeadsOutreachPage() {
                 <select
                   value={cityFilter}
                   onChange={(e) => setCityFilter(e.target.value)}
-                  className="px-3 py-2 bg-slate-950/80 border border-white/10 rounded-xl text-xs text-slate-300 focus:outline-none focus:border-amber-400"
+                  className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 font-medium focus:outline-none focus:border-amber-500 focus:bg-white"
                 >
                   <option value="all">Semua Wilayah</option>
                   {cities.filter(c => c !== 'all').map(c => (
@@ -361,92 +356,103 @@ export default function B2BLeadsOutreachPage() {
 
             {/* Leads Cards Grid */}
             {isLoading ? (
-              <div className="p-12 text-center text-xs text-slate-500">Memuat data prospek...</div>
+              <div className="p-16 text-center text-xs text-slate-400 font-medium">Memuat data prospek B2B...</div>
             ) : filteredLeads.length === 0 ? (
-              <div className="p-12 text-center bg-slate-900/40 border border-white/10 rounded-2xl">
-                <Users size={36} className="mx-auto mb-2 text-slate-600" />
-                <p className="text-sm font-bold text-slate-300">Belum ada prospek B2B</p>
-                <p className="text-xs text-slate-500 mt-1">Tambahkan prospek secara manual atau jalankan workflow n8n scraper.</p>
+              <div className="p-16 text-center bg-white border border-slate-200 rounded-2xl shadow-sm">
+                <Building2 size={40} className="mx-auto mb-2 text-slate-300" />
+                <p className="text-sm font-bold text-slate-800">Belum Ada Prospek Restoran</p>
+                <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+                  Tambahkan prospek secara manual atau daftarkan antrean wilayah baru agar bot n8n men-scrape otomatis dari Google Maps.
+                </p>
+                <button
+                  onClick={openAddLead}
+                  className="mt-4 px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 text-slate-950 inline-flex items-center gap-1.5 shadow-sm"
+                >
+                  <Plus size={14} /> Tambah Prospek Manual
+                </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredLeads.map((lead) => {
                   const isSent = lead.status_email === 'sent'
                   const isReplied = lead.status_email === 'replied'
                   const isHot = lead.lead_priority === 'hot'
+                  const isCold = lead.lead_priority === 'cold'
 
                   return (
                     <motion.div
                       key={lead.id}
                       layout
-                      className="bg-slate-900/70 border border-white/10 hover:border-amber-500/40 rounded-2xl p-4 flex flex-col justify-between transition-all"
+                      className="bg-white border border-slate-200/90 hover:border-amber-400 hover:shadow-md rounded-2xl p-4 flex flex-col justify-between transition-all shadow-sm"
                     >
                       <div>
-                        {/* Badges */}
-                        <div className="flex items-center justify-between gap-2 mb-2">
-                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                            isHot ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 'bg-blue-500/20 text-blue-300'
+                        {/* Header Badges */}
+                        <div className="flex items-center justify-between gap-2 mb-2.5">
+                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${
+                            isHot ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                            isCold ? 'bg-slate-100 text-slate-600 border-slate-200' :
+                            'bg-blue-50 text-blue-700 border-blue-200'
                           }`}>
                             {lead.lead_priority?.toUpperCase() || 'WARM'} LEAD
                           </span>
-                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold flex items-center gap-1 ${
-                            isReplied ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' :
-                            isSent ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
-                            'bg-amber-500/20 text-amber-300'
+                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold flex items-center gap-1 border ${
+                            isReplied ? 'bg-purple-50 text-purple-700 border-purple-200' :
+                            isSent ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                            'bg-amber-50 text-amber-700 border-amber-200'
                           }`}>
                             {isReplied ? <CheckCircle2 size={10} /> : isSent ? <Send size={10} /> : <Clock size={10} />}
-                            {lead.status_email?.toUpperCase()}
+                            {lead.status_email?.toUpperCase() || 'PENDING'}
                           </span>
                         </div>
 
-                        {/* Title */}
-                        <h3 className="font-bold text-sm text-white line-clamp-1">
+                        {/* Title & Category */}
+                        <h3 className="font-bold text-sm text-slate-900 line-clamp-1">
                           {lead.clean_name || lead.name}
                         </h3>
-                        <p className="text-[11px] text-slate-400 mb-2">
-                          {lead.category || 'Indonesian restaurant'} · {lead.city || 'Singapore'}
+                        <p className="text-[11px] text-slate-500 font-medium mb-3">
+                          {lead.category || 'Indonesian restaurant'} · <span className="text-slate-700 font-semibold">{lead.city || 'Singapore'}</span>
                         </p>
 
                         {/* Details */}
-                        <div className="space-y-1 text-[11px] text-slate-300 mb-3">
+                        <div className="space-y-1.5 text-xs text-slate-600 mb-3 bg-slate-50/80 p-2.5 rounded-xl border border-slate-100">
                           {lead.email ? (
-                            <div className="flex items-center gap-1.5 text-amber-300 truncate">
-                              <Mail size={12} className="shrink-0" />
+                            <div className="flex items-center gap-2 text-slate-900 font-medium truncate">
+                              <Mail size={13} className="shrink-0 text-amber-600" />
                               <span className="truncate">{lead.email}</span>
                             </div>
                           ) : (
-                            <div className="flex items-center gap-1.5 text-slate-500">
-                              <Mail size={12} className="shrink-0" />
+                            <div className="flex items-center gap-2 text-slate-400 italic">
+                              <Mail size={13} className="shrink-0 text-slate-400" />
                               <span>Email belum tersedia</span>
                             </div>
                           )}
 
                           {lead.address && (
-                            <div className="flex items-start gap-1.5 text-slate-400 line-clamp-2">
-                              <MapPin size={12} className="shrink-0 mt-0.5" />
+                            <div className="flex items-start gap-2 text-slate-600 line-clamp-2">
+                              <MapPin size={13} className="shrink-0 mt-0.5 text-slate-400" />
                               <span>{lead.address}</span>
                             </div>
                           )}
 
                           {lead.rating && (
-                            <div className="flex items-center gap-1 text-amber-400 font-semibold pt-1">
-                              <Star size={12} className="fill-amber-400" />
+                            <div className="flex items-center gap-1.5 text-amber-600 font-bold pt-0.5">
+                              <Star size={12} className="fill-amber-500 text-amber-500" />
                               <span>{lead.rating}</span>
-                              <span className="text-slate-500 font-normal">({lead.review_count || 0} reviews)</span>
+                              <span className="text-slate-400 font-normal text-[11px]">({lead.review_count || 0} reviews)</span>
                             </div>
                           )}
                         </div>
                       </div>
 
                       {/* Footer Actions */}
-                      <div className="pt-3 border-t border-white/10 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
+                      <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
                           {lead.website && (
                             <a
                               href={lead.website.startsWith('http') ? lead.website : `https://${lead.website}`}
                               target="_blank"
                               rel="noreferrer"
-                              className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300"
+                              className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition"
                               title="Buka Website"
                             >
                               <Globe size={13} />
@@ -457,7 +463,7 @@ export default function B2BLeadsOutreachPage() {
                               href={lead.maps_url}
                               target="_blank"
                               rel="noreferrer"
-                              className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300"
+                              className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition"
                               title="Buka Google Maps"
                             >
                               <ExternalLink size={13} />
@@ -468,22 +474,23 @@ export default function B2BLeadsOutreachPage() {
                         <div className="flex items-center gap-1.5">
                           <button
                             onClick={() => setSelectedLeadForPitch(lead)}
-                            className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-semibold flex items-center gap-1 border border-amber-500/30 transition"
-                            title="Lihat AI Pitch & Outreach Copy"
+                            className="px-2.5 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold flex items-center gap-1 border border-amber-200 transition"
+                            title="Lihat AI Pitch & Copy"
                           >
-                            <Bot size={11} />
+                            <Bot size={12} className="text-amber-600" />
                             <span>AI Pitch</span>
                           </button>
                           <button
                             onClick={() => openEditLead(lead)}
-                            className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1"
+                            className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1 transition"
                           >
                             <Edit3 size={11} />
                             <span>Edit</span>
                           </button>
                           <button
                             onClick={() => handleDeleteLead(lead.id, lead.name)}
-                            className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400"
+                            className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 transition"
+                            title="Hapus"
                           >
                             <Trash2 size={13} />
                           </button>
@@ -500,58 +507,56 @@ export default function B2BLeadsOutreachPage() {
         {/* ── TAB 2: SCRAPING QUEUE ── */}
         {activeTab === 'queue' && (
           <div className="space-y-4">
-            <div className="bg-slate-900/60 p-4 rounded-2xl border border-white/10 flex items-center justify-between">
+            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h3 className="font-bold text-sm text-white">Antrean Scraping Google Maps</h3>
-                <p className="text-xs text-slate-400">
-                  Workflow n8n akan mengecek antrean berstatus <code>pending</code> setiap 5 hari sekali secara otomatis.
+                <h3 className="font-bold text-sm text-slate-900">Antrean Scraping Google Maps Resto</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Workflow bot n8n akan mengecek antrean berstatus <span className="font-bold text-amber-600">pending</span> secara berkala dan menyimpan leads langsung ke database.
                 </p>
               </div>
               <button
                 onClick={() => setQueueModalOpen(true)}
-                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-amber-500/20"
+                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold flex items-center gap-1.5 shadow-sm shrink-0"
               >
                 <Plus size={14} />
                 <span>Tambah Antrean Wilayah</span>
               </button>
             </div>
 
-            <div className="bg-slate-900/70 rounded-2xl border border-white/10 overflow-hidden">
-              <table className="w-full text-xs text-left text-slate-300">
-                <thead className="bg-slate-950/80 text-slate-400 border-b border-white/10 uppercase text-[10px] font-bold">
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <table className="w-full text-xs text-left text-slate-700">
+                <thead className="bg-slate-50 text-slate-600 border-b border-slate-200 uppercase text-[10px] font-bold">
                   <tr>
-                    <th className="p-3.5">Target Lokasi / Query</th>
+                    <th className="p-3.5">Target Lokasi / Wilayah</th>
                     <th className="p-3.5">Negara</th>
                     <th className="p-3.5">Status</th>
+                    <th className="p-3.5">Leads Ditemukan</th>
                     <th className="p-3.5">Catatan</th>
                     <th className="p-3.5">Dibuat</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/5">
+                <tbody className="divide-y divide-slate-100">
                   {queue.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="p-8 text-center text-slate-500">
-                        Belum ada antrean scraping. Tambahkan lokasi target baru seperti "Tanjong Pagar, Singapore" atau "Kuala Lumpur".
-                      </td>
+                      <td colSpan={6} className="p-8 text-center text-slate-400">Belum ada antrean wilayah. Tambahkan antrean target baru.</td>
                     </tr>
                   ) : (
                     queue.map((q) => (
-                      <tr key={q.id} className="hover:bg-white/[0.02]">
-                        <td className="p-3.5 font-bold text-white">{q.target_location}</td>
-                        <td className="p-3.5">{q.country}</td>
+                      <tr key={q.id} className="hover:bg-slate-50/70 transition">
+                        <td className="p-3.5 font-bold text-slate-900">{q.target_location}</td>
+                        <td className="p-3.5 text-slate-600 font-medium">{q.country}</td>
                         <td className="p-3.5">
-                          <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
-                            q.status === 'completed' ? 'bg-emerald-500/20 text-emerald-300' :
-                            q.status === 'in_progress' ? 'bg-blue-500/20 text-blue-300' :
-                            'bg-amber-500/20 text-amber-300'
+                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${
+                            q.status === 'completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                            q.status === 'in_progress' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                            'bg-amber-50 text-amber-700 border-amber-200'
                           }`}>
-                            {q.status?.toUpperCase()}
+                            {q.status?.toUpperCase() || 'PENDING'}
                           </span>
                         </td>
-                        <td className="p-3.5 text-slate-400">{q.notes || '-'}</td>
-                        <td className="p-3.5 text-slate-500">
-                          {q.created_at ? new Date(q.created_at).toLocaleDateString('id-ID') : '-'}
-                        </td>
+                        <td className="p-3.5 font-bold text-slate-900">{q.total_leads_collected || 0} resto</td>
+                        <td className="p-3.5 text-slate-500 max-w-xs truncate">{q.notes || '—'}</td>
+                        <td className="p-3.5 text-slate-400 font-mono text-[11px]">{new Date(q.created_at).toLocaleDateString('id-ID')}</td>
                       </tr>
                     ))
                   )}
@@ -561,222 +566,227 @@ export default function B2BLeadsOutreachPage() {
           </div>
         )}
 
-        {/* ── TAB 3: SAMPLE ROI CALCULATOR ── */}
+        {/* ── TAB 3: SAMPLE PACK CALCULATOR ── */}
         {activeTab === 'sample_calculator' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 bg-slate-900/60 p-6 rounded-3xl border border-white/10">
-            <div className="lg:col-span-2 space-y-5">
-              <div>
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <Sparkles size={18} className="text-amber-400" />
-                  Kalkulator Konversi Sample Pack Chef B2B (Export)
-                </h3>
-                <p className="text-xs text-slate-400 mt-1">
-                  Hitung estimasi pengembalian modal (ROI) dari strategi memberikan <strong>Complimentary Chef Tasting Sample Pack</strong> langsung ke alamat dapur resto di Singapura/Malaysia.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="p-4 rounded-2xl bg-slate-950/80 border border-white/10 space-y-3">
-                  <label className="text-xs font-bold text-amber-400 block">
-                    1. Biaya Sample Pack per Restoran
-                  </label>
-                  <div>
-                    <span className="text-[11px] text-slate-400 block mb-1">HPP Sample Pack (100g Pouch):</span>
-                    <input
-                      type="number"
-                      value={sampleHpp}
-                      onChange={(e) => setSampleHpp(Number(e.target.value))}
-                      className="w-full px-3 py-2 bg-slate-900 border border-white/10 rounded-xl text-xs text-white"
-                    />
-                  </div>
-                  <div>
-                    <span className="text-[11px] text-slate-400 block mb-1">Ongkir / Delivery ke Dapur SG:</span>
-                    <input
-                      type="number"
-                      value={sampleCourier}
-                      onChange={(e) => setSampleCourier(Number(e.target.value))}
-                      className="w-full px-3 py-2 bg-slate-900 border border-white/10 rounded-xl text-xs text-white"
-                    />
-                  </div>
-                  <p className="text-[11px] text-slate-400 pt-1 border-t border-white/10">
-                    Total Biaya / Sample: <strong className="text-white">{formatIDR(sampleUnitCostTotal)}</strong>
-                  </p>
-                </div>
-
-                <div className="p-4 rounded-2xl bg-slate-950/80 border border-white/10 space-y-3">
-                  <label className="text-xs font-bold text-emerald-400 block">
-                    2. Potensi Order Trial Batch (Low-MOQ)
-                  </label>
-                  <div>
-                    <span className="text-[11px] text-slate-400 block mb-1">Volume Trial Batch (Kg):</span>
-                    <input
-                      type="number"
-                      value={trialBatchKg}
-                      onChange={(e) => setTrialBatchKg(Number(e.target.value))}
-                      className="w-full px-3 py-2 bg-slate-900 border border-white/10 rounded-xl text-xs text-white"
-                    />
-                  </div>
-                  <div>
-                    <span className="text-[11px] text-slate-400 block mb-1">Harga Jual Grosir per Kg (Rp):</span>
-                    <input
-                      type="number"
-                      value={trialWholesalePrice}
-                      onChange={(e) => setTrialWholesalePrice(Number(e.target.value))}
-                      className="w-full px-3 py-2 bg-slate-900 border border-white/10 rounded-xl text-xs text-white"
-                    />
-                  </div>
-                  <div>
-                    <span className="text-[11px] text-slate-400 block mb-1">HPP Produksi per Kg (Rp):</span>
-                    <input
-                      type="number"
-                      value={trialHppKg}
-                      onChange={(e) => setTrialHppKg(Number(e.target.value))}
-                      className="w-full px-3 py-2 bg-slate-900 border border-white/10 rounded-xl text-xs text-white"
-                    />
-                  </div>
-                </div>
-              </div>
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6">
+            <div className="border-b border-slate-100 pb-4">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <Sparkles size={16} className="text-amber-500" />
+                <span>Simulasi ROI Pengiriman Chef Tasting Sample Pack ke Singapura / Malaysia</span>
+              </h3>
+              <p className="text-xs text-slate-500 mt-1">
+                Hitung estimasi modal kirim sample tester pack 100g gratis vs potensi keuntungan repeat order batch 10kg dari restoran luar negeri.
+              </p>
             </div>
 
-            {/* Output ROI Card */}
-            <div className="p-5 rounded-2xl bg-gradient-to-b from-amber-500/10 to-slate-900 border border-amber-500/20 flex flex-col justify-between">
-              <div>
-                <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400">
-                  Simulasi 10 Resto Diberi Sample
-                </span>
-                <div className="mt-3 space-y-2 text-xs">
-                  <div className="flex justify-between text-slate-300">
-                    <span>Biaya 10 Sample Kit:</span>
-                    <span className="text-rose-400 font-bold">-{formatIDR(10 * sampleUnitCostTotal)}</span>
-                  </div>
-                  <div className="flex justify-between text-slate-300">
-                    <span>Estimasi Resto Order ({targetConversionRate}%):</span>
-                    <span className="text-emerald-400 font-bold">{Math.round(10 * (targetConversionRate / 100))} Resto</span>
-                  </div>
-                  <div className="flex justify-between text-slate-300">
-                    <span>Laba Bersih Trial Batch:</span>
-                    <span className="text-emerald-400 font-bold">+{formatIDR(Math.round(10 * (targetConversionRate / 100)) * trialBatchProfit)}</span>
-                  </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              {/* Input Parameters */}
+              <div className="space-y-4 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                <h4 className="font-bold text-xs text-slate-700 uppercase tracking-wider">Parameter Biaya Sample</h4>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600 block mb-1">HPP Sample Pack (100g + Pouch + Stiker)</label>
+                  <input
+                    type="number"
+                    value={sampleHpp}
+                    onChange={(e) => setSampleHpp(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600 block mb-1">Ongkir Kurir Internasional / Pack</label>
+                  <input
+                    type="number"
+                    value={sampleCourier}
+                    onChange={(e) => setSampleCourier(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600 block mb-1">Target Closing / Konversi (%)</label>
+                  <input
+                    type="number"
+                    value={targetConversionRate}
+                    onChange={(e) => setTargetConversionRate(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900"
+                  />
                 </div>
               </div>
 
-              <div className="pt-4 border-t border-amber-500/20 mt-4">
-                <span className="text-[11px] text-slate-400 block mb-0.5">Estimasi Net Profit Kampanye:</span>
-                <span className={`text-xl font-black font-['Sora'] ${expectedProfitPer10Samples >= 0 ? 'text-amber-400' : 'text-rose-400'}`}>
-                  {formatIDR(expectedProfitPer10Samples)}
-                </span>
-                <p className="text-[10px] text-slate-400 mt-1">
-                  *Belum termasuk potensi repeat order bulanan reguler setelah resep resto cocok.
-                </p>
+              {/* Repeat Order Potential */}
+              <div className="space-y-4 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                <h4 className="font-bold text-xs text-slate-700 uppercase tracking-wider">Potensi Repeat Order Resto</h4>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600 block mb-1">Ukuran Batch Trial Pertama (Kg)</label>
+                  <input
+                    type="number"
+                    value={trialBatchKg}
+                    onChange={(e) => setTrialBatchKg(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600 block mb-1">Harga Jual Ekspor Grosir / Kg</label>
+                  <input
+                    type="number"
+                    value={trialWholesalePrice}
+                    onChange={(e) => setTrialWholesalePrice(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600 block mb-1">HPP Produksi / Kg</label>
+                  <input
+                    type="number"
+                    value={trialHppKg}
+                    onChange={(e) => setTrialHppKg(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900"
+                  />
+                </div>
+              </div>
+
+              {/* Simulation Result Card */}
+              <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200/80 rounded-2xl p-5 flex flex-col justify-between shadow-sm">
+                <div>
+                  <span className="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider bg-amber-200/60 text-amber-900 border border-amber-300">
+                    Proyeksi Tiap 10 Sample Dikirim
+                  </span>
+                  <div className="mt-4 space-y-2">
+                    <div className="flex justify-between text-xs text-slate-600">
+                      <span>Total Modal 10 Sample:</span>
+                      <span className="font-bold text-slate-900">{formatIDR(10 * sampleUnitCostTotal)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs text-slate-600">
+                      <span>Resto Jadi Pesan ({targetConversionRate}%):</span>
+                      <span className="font-bold text-emerald-700">{Math.round(10 * (targetConversionRate / 100))} Resto</span>
+                    </div>
+                    <div className="flex justify-between text-xs text-slate-600">
+                      <span>Laba Kotor Order Masuk:</span>
+                      <span className="font-bold text-emerald-700">{formatIDR(10 * (targetConversionRate / 100) * trialBatchProfit)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-amber-200/60 mt-4">
+                  <p className="text-[11px] font-bold text-slate-600">Estimasi Laba Bersih Bersih:</p>
+                  <p className="text-2xl font-black text-emerald-700 tracking-tight">
+                    {formatIDR(expectedProfitPer10Samples)}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
         )}
       </div>
 
-      {/* ── MODAL TAMBAH/EDIT PROSPEK B2B ── */}
+      {/* ── SHEET: TAMBAH / EDIT PROSPEK ── */}
       <Sheet open={leadModalOpen} onOpenChange={setLeadModalOpen}>
-        <SheetContent side="right" className="w-full sm:max-w-lg bg-[#0F172A] text-slate-100 border-l border-white/10 p-0 flex flex-col">
-          <SheetHeader className="p-5 border-b border-white/10 bg-slate-900/60">
-            <SheetTitle className="text-lg font-bold text-white">
-              {editingLead ? 'Edit Prospek B2B' : 'Tambah Prospek Restoran Baru'}
-            </SheetTitle>
-            <SheetDescription className="text-xs text-slate-400">
-              Data prospek untuk outreach penawaran bawang goreng Boyolali.
-            </SheetDescription>
+        <SheetContent side="right" className="w-full sm:max-w-lg bg-white border-l border-slate-200 text-slate-900 p-0 flex flex-col shadow-2xl">
+          <SheetHeader className="p-5 border-b border-slate-100 bg-slate-50/80">
+            <div className="flex items-center justify-between">
+              <div>
+                <SheetTitle className="text-base font-bold text-slate-900">
+                  {editingLead ? 'Edit Data Prospek Restoran' : 'Tambah Prospek Restoran Baru'}
+                </SheetTitle>
+                <SheetDescription className="text-xs text-slate-500">
+                  Masukkan detail restoran untuk ditargetkan dalam cold email / sample tasting pack.
+                </SheetDescription>
+              </div>
+            </div>
           </SheetHeader>
 
-          <form onSubmit={handleSaveLead} className="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
+          <form onSubmit={handleSaveLead} className="p-5 space-y-3.5 flex-1 overflow-y-auto text-xs">
             <div>
-              <label className="font-bold text-slate-300 mb-1 block">Nama Restoran / Usaha *</label>
+              <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">
+                Nama Restoran / Usaha <span className="text-rose-500">*</span>
+              </label>
               <input
                 type="text"
                 required
-                placeholder="Contoh: Chopstix & Rice Suntec City"
+                placeholder="Contoh: Tambuah Mas Orchard"
                 value={formName}
                 onChange={(e) => setFormName(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-900 border border-white/10 rounded-xl text-white focus:outline-none focus:border-amber-400 text-xs"
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs placeholder:text-slate-400 focus:bg-white focus:border-amber-500 focus:outline-none transition"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="font-bold text-slate-300 mb-1 block">Kategori Menu</label>
+                <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">Kategori Resto</label>
                 <input
                   type="text"
-                  placeholder="Padang / Penyet / Catering"
+                  placeholder="Contoh: Padang Restaurant"
                   value={formCategory}
                   onChange={(e) => setFormCategory(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-900 border border-white/10 rounded-xl text-white text-xs"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs focus:bg-white focus:border-amber-500 focus:outline-none"
                 />
               </div>
               <div>
-                <label className="font-bold text-slate-300 mb-1 block">Kota / Wilayah</label>
+                <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">Kota / Wilayah</label>
                 <input
                   type="text"
-                  placeholder="Singapore / KL"
+                  placeholder="Singapore / Kuala Lumpur"
                   value={formCity}
                   onChange={(e) => setFormCity(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-900 border border-white/10 rounded-xl text-white text-xs"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs focus:bg-white focus:border-amber-500 focus:outline-none"
                 />
               </div>
             </div>
 
             <div>
-              <label className="font-bold text-slate-300 mb-1 block">Alamat Dapur / Outlet</label>
+              <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">Alamat Outlet / Dapur</label>
               <textarea
                 rows={2}
-                placeholder="Alamat fisik untuk pengiriman tester pack"
+                placeholder="Alamat fisik restoran untuk kirim sample pack"
                 value={formAddress}
                 onChange={(e) => setFormAddress(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-900 border border-white/10 rounded-xl text-white text-xs resize-none"
+                className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs resize-none focus:bg-white focus:border-amber-500 focus:outline-none"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="font-bold text-slate-300 mb-1 block">Email PIC / Kitchen</label>
+                <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">Email PIC / Kitchen</label>
                 <input
                   type="email"
-                  placeholder="chef@restaurant.sg"
+                  placeholder="chef@restaurant.com"
                   value={formEmail}
                   onChange={(e) => setFormEmail(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-900 border border-white/10 rounded-xl text-white text-xs"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs focus:bg-white focus:border-amber-500 focus:outline-none"
                 />
               </div>
               <div>
-                <label className="font-bold text-slate-300 mb-1 block">No. Telp / WhatsApp</label>
+                <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">No. Telp / WhatsApp</label>
                 <input
                   type="text"
                   placeholder="+65 9123 4567"
                   value={formPhone}
                   onChange={(e) => setFormPhone(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-900 border border-white/10 rounded-xl text-white text-xs"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs focus:bg-white focus:border-amber-500 focus:outline-none"
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="font-bold text-slate-300 mb-1 block">Prioritas Lead</label>
+                <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">Prioritas Lead</label>
                 <select
                   value={formPriority}
                   onChange={(e) => setFormPriority(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-900 border border-white/10 rounded-xl text-white text-xs"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-semibold focus:bg-white focus:border-amber-500"
                 >
-                  <option value="hot">Hot (Sangat Potensial)</option>
-                  <option value="warm">Warm (Menengah)</option>
-                  <option value="cold">Cold (Biasa)</option>
+                  <option value="hot">🔥 Hot Lead (Prioritas)</option>
+                  <option value="warm">⚡ Warm Lead</option>
+                  <option value="cold">❄️ Cold Lead</option>
                 </select>
               </div>
               <div>
-                <label className="font-bold text-slate-300 mb-1 block">Status Outreach Email</label>
+                <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">Status Email</label>
                 <select
                   value={formStatusEmail}
                   onChange={(e) => setFormStatusEmail(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-900 border border-white/10 rounded-xl text-white text-xs"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-semibold focus:bg-white focus:border-amber-500"
                 >
-                  <option value="pending">Pending</option>
+                  <option value="pending">Pending (Belum Dikirim)</option>
                   <option value="sent">Sent (Terkirim)</option>
                   <option value="replied">Replied (Dibalas)</option>
                 </select>
@@ -784,80 +794,78 @@ export default function B2BLeadsOutreachPage() {
             </div>
 
             <div>
-              <label className="font-bold text-slate-300 mb-1 block">Website / Instagram URL</label>
+              <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">Website / Instagram URL</label>
               <input
                 type="text"
                 placeholder="https://instagram.com/resto"
                 value={formWebsite}
                 onChange={(e) => setFormWebsite(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-900 border border-white/10 rounded-xl text-white text-xs"
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs focus:bg-white focus:border-amber-500 focus:outline-none"
               />
             </div>
 
             <div>
-              <label className="font-bold text-slate-300 mb-1 block">Catatan Tambahan</label>
+              <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">Catatan Tambahan</label>
               <textarea
                 rows={2}
-                placeholder="Menu andalan, preferensi kemasan bal atau pouch, dll"
+                placeholder="Preferensi kemasan pouch/bal, menu andalan, kontak manager..."
                 value={formNotes}
                 onChange={(e) => setFormNotes(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-900 border border-white/10 rounded-xl text-white text-xs resize-none"
+                className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs resize-none focus:bg-white focus:border-amber-500 focus:outline-none"
               />
             </div>
-          </form>
 
-          <div className="p-4 border-t border-white/10 bg-slate-900/60 flex items-center justify-end gap-2.5">
-            <button
-              type="button"
-              onClick={() => setLeadModalOpen(false)}
-              className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5"
-            >
-              Batal
-            </button>
-            <button
-              type="button"
-              onClick={handleSaveLead}
-              className="px-5 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-lg shadow-amber-500/20"
-            >
-              {editingLead ? 'Simpan Perubahan' : 'Tambahkan Prospek'}
-            </button>
-          </div>
+            <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setLeadModalOpen(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition"
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                disabled={createLeadMut.isPending || updateLeadMut.isPending}
+                className="px-5 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-sm transition"
+              >
+                {editingLead ? 'Perbarui Prospek' : 'Tambahkan Prospek'}
+              </button>
+            </div>
+          </form>
         </SheetContent>
       </Sheet>
 
-      {/* ── MODAL TAMBAH ANTREAN SCRAPING ── */}
+      {/* ── SHEET: TAMBAH ANTREAN SCRAPER ── */}
       <Sheet open={queueModalOpen} onOpenChange={setQueueModalOpen}>
-        <SheetContent side="right" className="w-full sm:max-w-md bg-[#0F172A] text-slate-100 border-l border-white/10 p-0 flex flex-col">
-          <SheetHeader className="p-5 border-b border-white/10 bg-slate-900/60">
-            <SheetTitle className="text-lg font-bold text-white">
-              Tambah Target Lokasi Scraping
-            </SheetTitle>
-            <SheetDescription className="text-xs text-slate-400">
-              Antrean ini akan dijalankan otomatis oleh bot n8n Apify Google Maps Scraper.
+        <SheetContent side="right" className="w-full sm:max-w-md bg-white border-l border-slate-200 text-slate-900 p-0 flex flex-col shadow-2xl">
+          <SheetHeader className="p-5 border-b border-slate-100 bg-slate-50/80">
+            <SheetTitle className="text-base font-bold text-slate-900">Daftarkan Target Scraper Baru</SheetTitle>
+            <SheetDescription className="text-xs text-slate-500">
+              Bot n8n akan mengecek antrean ini dan men-scrape kontak restoran Indonesia secara otomatis.
             </SheetDescription>
           </SheetHeader>
 
-          <form onSubmit={handleCreateQueue} className="flex-1 p-5 space-y-4 text-xs">
+          <form onSubmit={handleCreateQueue} className="p-5 space-y-4 flex-1 overflow-y-auto text-xs">
             <div>
-              <label className="font-bold text-slate-300 mb-1 block">
-                Target Lokasi / Area <span className="text-rose-400">*</span>
+              <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">
+                Target Wilayah / Kota <span className="text-rose-500">*</span>
               </label>
               <input
                 type="text"
                 required
-                placeholder="Contoh: Orchard Road, Singapore / Bangsar, Kuala Lumpur"
+                placeholder="Contoh: Tanjong Pagar, Singapore"
                 value={qLocation}
                 onChange={(e) => setQLocation(e.target.value)}
-                className="w-full px-3 py-2.5 bg-slate-900 border border-white/10 rounded-xl text-white text-xs focus:outline-none focus:border-amber-400"
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs focus:bg-white focus:border-amber-500 focus:outline-none"
               />
             </div>
 
             <div>
-              <label className="font-bold text-slate-300 mb-1 block">Negara</label>
+              <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">Negara</label>
               <select
                 value={qCountry}
                 onChange={(e) => setQCountry(e.target.value)}
-                className="w-full px-3 py-2.5 bg-slate-900 border border-white/10 rounded-xl text-white text-xs"
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-semibold focus:bg-white focus:border-amber-500"
               >
                 <option value="Singapore">Singapore</option>
                 <option value="Malaysia">Malaysia</option>
@@ -868,58 +876,57 @@ export default function B2BLeadsOutreachPage() {
             </div>
 
             <div>
-              <label className="font-bold text-slate-300 mb-1 block">Catatan</label>
+              <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">Catatan Instruksi</label>
               <textarea
                 rows={3}
-                placeholder="Fokus pada resto Padang, Ayam Penyet, atau Warung Nusantara"
+                placeholder="Fokus pada resto Padang, Warung Nusantara, atau Nasi Lemak"
                 value={qNotes}
                 onChange={(e) => setQNotes(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-900 border border-white/10 rounded-xl text-white text-xs resize-none"
+                className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs resize-none focus:bg-white focus:border-amber-500 focus:outline-none"
               />
             </div>
-          </form>
 
-          <div className="p-4 border-t border-white/10 bg-slate-900/60 flex items-center justify-end gap-2.5">
-            <button
-              type="button"
-              onClick={() => setQueueModalOpen(false)}
-              className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5"
-            >
-              Batal
-            </button>
-            <button
-              type="button"
-              onClick={handleCreateQueue}
-              className="px-5 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950"
-            >
-              Daftarkan ke Antrean
-            </button>
-          </div>
+            <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setQueueModalOpen(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition"
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-sm transition"
+              >
+                Daftarkan ke Antrean
+              </button>
+            </div>
+          </form>
         </SheetContent>
       </Sheet>
 
       {/* ── SHEET: PREVIEW AI PITCH & OUTREACH ── */}
       <Sheet open={!!selectedLeadForPitch} onOpenChange={(open) => !open && setSelectedLeadForPitch(null)}>
-        <SheetContent side="right" className="w-full sm:max-w-xl bg-slate-950 border-l border-white/10 text-white p-0 flex flex-col">
-          <SheetHeader className="p-5 border-b border-white/10 bg-slate-900/50">
+        <SheetContent side="right" className="w-full sm:max-w-xl bg-white border-l border-slate-200 text-slate-900 p-0 flex flex-col shadow-2xl">
+          <SheetHeader className="p-5 border-b border-slate-100 bg-slate-50/80">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-amber-100 text-amber-800 border border-amber-200">
                   <Bot size={18} />
                 </div>
                 <div>
-                  <SheetTitle className="text-base font-bold text-white">
+                  <SheetTitle className="text-base font-bold text-slate-900">
                     {selectedLeadForPitch?.clean_name || selectedLeadForPitch?.name}
                   </SheetTitle>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-slate-500 font-medium">
                     {selectedLeadForPitch?.category} · {selectedLeadForPitch?.city}, {selectedLeadForPitch?.country}
                   </p>
                 </div>
               </div>
-              <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
+              <span className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${
                 selectedLeadForPitch?.status_email === 'sent'
-                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                  : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  : 'bg-amber-50 text-amber-700 border-amber-200'
               }`}>
                 {selectedLeadForPitch?.status_email?.toUpperCase() || 'PENDING'}
               </span>
@@ -928,41 +935,41 @@ export default function B2BLeadsOutreachPage() {
 
           <div className="p-5 flex-1 overflow-y-auto space-y-4 text-xs">
             {/* Target Contact Details */}
-            <div className="p-3.5 rounded-xl bg-slate-900/70 border border-white/10 space-y-2">
-              <div className="flex items-center justify-between text-slate-400">
-                <span className="font-semibold text-slate-300">Email Target:</span>
-                <span className="text-amber-300 font-mono">{selectedLeadForPitch?.email || 'Belum ada email'}</span>
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-slate-600">Email Target:</span>
+                <span className="text-slate-900 font-bold font-mono">{selectedLeadForPitch?.email || 'Belum ada email'}</span>
               </div>
               {selectedLeadForPitch?.phone && (
-                <div className="flex items-center justify-between text-slate-400">
-                  <span className="font-semibold text-slate-300">Nomor Telepon:</span>
-                  <span className="text-slate-200">{selectedLeadForPitch.phone}</span>
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-slate-600">Nomor Telepon:</span>
+                  <span className="text-slate-800 font-medium">{selectedLeadForPitch.phone}</span>
                 </div>
               )}
               {selectedLeadForPitch?.address && (
-                <div className="flex items-start justify-between gap-2 text-slate-400">
-                  <span className="font-semibold text-slate-300 shrink-0">Alamat:</span>
-                  <span className="text-slate-300 text-right">{selectedLeadForPitch.address}</span>
+                <div className="flex items-start justify-between gap-2">
+                  <span className="font-semibold text-slate-600 shrink-0">Alamat Outlet:</span>
+                  <span className="text-slate-700 text-right">{selectedLeadForPitch.address}</span>
                 </div>
               )}
             </div>
 
             {/* AI Custom Icebreaker / Menu Highlight */}
             {(selectedLeadForPitch?.ai_custom_icebreaker || selectedLeadForPitch?.ai_menu_highlight) && (
-              <div className="p-3.5 rounded-xl bg-purple-500/10 border border-purple-500/20 space-y-1.5">
-                <div className="flex items-center gap-1.5 text-purple-300 font-bold">
+              <div className="p-3.5 rounded-xl bg-purple-50 border border-purple-200 space-y-1.5">
+                <div className="flex items-center gap-1.5 text-purple-800 font-bold">
                   <Sparkles size={13} />
                   <span>AI Personalization & Menu Insights</span>
                 </div>
                 {selectedLeadForPitch?.ai_menu_highlight && (
-                  <p className="text-slate-300">
-                    <span className="text-purple-300 font-semibold">Menu Highlight: </span>
+                  <p className="text-slate-700">
+                    <span className="text-purple-700 font-semibold">Menu Highlight: </span>
                     {selectedLeadForPitch.ai_menu_highlight}
                   </p>
                 )}
                 {selectedLeadForPitch?.ai_custom_icebreaker && (
-                  <p className="text-slate-300">
-                    <span className="text-purple-300 font-semibold">Icebreaker: </span>
+                  <p className="text-slate-700">
+                    <span className="text-purple-700 font-semibold">Icebreaker: </span>
                     {selectedLeadForPitch.ai_custom_icebreaker}
                   </p>
                 )}
@@ -971,16 +978,20 @@ export default function B2BLeadsOutreachPage() {
 
             {/* AI Generated Pitch Subject */}
             <div>
-              <label className="font-bold text-slate-300 block mb-1">Subject Email (AI Generated):</label>
-              <div className="p-3 rounded-xl bg-slate-900 border border-white/10 text-amber-200 font-medium select-all">
+              <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider block mb-1">
+                Subject Email (AI Generated):
+              </label>
+              <div className="p-3 rounded-xl bg-amber-50/70 border border-amber-200 text-amber-950 font-semibold select-all">
                 {selectedLeadForPitch?.ai_generated_subject || selectedLeadForPitch?.pitch_subject || `Exclusive Taste Test for ${selectedLeadForPitch?.clean_name || 'Chef'}: Premium Boyolali Fried Shallots`}
               </div>
             </div>
 
             {/* AI Generated Pitch Body */}
             <div>
-              <label className="font-bold text-slate-300 block mb-1">Isi Body Email (AI Generated Pitch):</label>
-              <div className="p-3.5 rounded-xl bg-slate-900 border border-white/10 text-slate-200 leading-relaxed font-sans whitespace-pre-wrap select-all">
+              <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider block mb-1">
+                Isi Body Email (AI Generated Pitch):
+              </label>
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 leading-relaxed font-sans whitespace-pre-wrap select-all shadow-inner">
                 {selectedLeadForPitch?.ai_generated_pitch || selectedLeadForPitch?.pitch_email || `Dear Chef / Kitchen Manager at ${selectedLeadForPitch?.clean_name || 'Resto'},
 
 Kami melihat ulasan luar biasa tentang cita rasa masakan Nusantara di resto Anda.
@@ -995,17 +1006,17 @@ Fahrul Hernanda - Juragan by Anak Bawang`}
             </div>
 
             {/* Outreach Metadata */}
-            <div className="flex items-center justify-between text-[11px] text-slate-500 pt-2">
-              <span>Status: <strong className="text-slate-300">{selectedLeadForPitch?.status_email || 'pending'}</strong></span>
-              <span>Prioritas: <strong className="text-slate-300 uppercase">{selectedLeadForPitch?.lead_priority || 'warm'}</strong></span>
+            <div className="flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-100">
+              <span>Status Email: <strong className="text-slate-800 uppercase">{selectedLeadForPitch?.status_email || 'pending'}</strong></span>
+              <span>Prioritas: <strong className="text-slate-800 uppercase">{selectedLeadForPitch?.lead_priority || 'warm'}</strong></span>
             </div>
           </div>
 
-          <div className="p-4 border-t border-white/10 bg-slate-900/60 flex items-center justify-between">
+          <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
             <button
               type="button"
               onClick={() => setSelectedLeadForPitch(null)}
-              className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5"
+              className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition"
             >
               Tutup
             </button>
@@ -1013,7 +1024,7 @@ Fahrul Hernanda - Juragan by Anak Bawang`}
             {selectedLeadForPitch?.email && (
               <a
                 href={`mailto:${selectedLeadForPitch.email}?subject=${encodeURIComponent(selectedLeadForPitch?.ai_generated_subject || `Sample Tasting Pack for ${selectedLeadForPitch?.clean_name}`)}&body=${encodeURIComponent(selectedLeadForPitch?.ai_generated_pitch || '')}`}
-                className="px-5 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 flex items-center gap-1.5"
+                className="px-5 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 flex items-center gap-1.5 shadow-sm transition"
               >
                 <Send size={13} />
                 <span>Kirim via Email Client</span>

@@ -82,7 +82,7 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
     setLastEdited('totalSpent')
     const nTotal = parseFloat(val) || 0
     const nQty = parseFloat(qty) || 0
-    if (nTotal > 0 && nQty > 0) {
+    if (nQty > 0 && nTotal >= 0) {
       setUnitCost(String(Math.round(nTotal / nQty)))
     }
   }
@@ -92,7 +92,7 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
     setLastEdited('unitCost')
     const nUnit = parseFloat(val) || 0
     const nQty = parseFloat(qty) || 0
-    if (nUnit > 0 && nQty > 0) {
+    if (nQty > 0 && nUnit >= 0) {
       setTotalSpent(String(Math.round(nUnit * nQty)))
     }
   }
@@ -100,18 +100,18 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!name.trim()) {
-      toast.error('Nama bahan/kemasan wajib diisi')
+      toast.error('Nama bahan / kemasan wajib diisi')
       return
     }
 
     const payload = {
       material_name: name.trim(),
-      category,
-      unit,
+      category: category,
+      unit: unit,
       current_stock: parseFloat(qty) || 0,
       total_spent: parseFloat(totalSpent) || 0,
       unit_cost: parseFloat(unitCost) || 0,
-      min_stock_alert: parseFloat(minStockAlert) || 10,
+      min_stock_alert: parseFloat(minStockAlert) || 50,
       supplier_name: supplierName.trim() || null,
       notes: notes.trim() || null
     }
@@ -133,28 +133,28 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-lg bg-[#0F172A] text-slate-100 border-l border-white/10 p-0 flex flex-col">
-        <SheetHeader className="p-5 border-b border-white/10 bg-slate-900/60">
+      <SheetContent side="right" className="w-full sm:max-w-lg bg-white text-slate-900 border-l border-slate-200 p-0 flex flex-col shadow-2xl">
+        <SheetHeader className="p-5 border-b border-slate-100 bg-slate-50/80">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold">
+            <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold border border-amber-200">
               <Package size={18} />
             </div>
             <div>
-              <SheetTitle className="text-lg font-bold text-white">
+              <SheetTitle className="text-base font-bold text-slate-900">
                 {editItem ? 'Edit Bahan / Kemasan' : 'Tambah Bahan & Kemasan Baru'}
               </SheetTitle>
-              <SheetDescription className="text-xs text-slate-400">
+              <SheetDescription className="text-xs text-slate-500">
                 Catat pembelian pouch, stiker, kardus, atau bahan baku dengan auto-kalkulator HPP.
               </SheetDescription>
             </div>
           </div>
         </SheetHeader>
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 space-y-4">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
           {/* Nama Bahan */}
           <div>
-            <label className="text-xs font-semibold text-slate-300 mb-1.5 block">
-              Nama Bahan / Kemasan <span className="text-rose-400">*</span>
+            <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">
+              Nama Bahan / Kemasan <span className="text-rose-500">*</span>
             </label>
             <input
               type="text"
@@ -162,18 +162,18 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
               placeholder="Contoh: Pouch Standing Zipper 250g / Stiker Depan"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.05] border border-white/10 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-amber-400 transition"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400 text-xs focus:bg-white focus:border-amber-500 focus:outline-none transition"
             />
           </div>
 
           {/* Kategori & Satuan */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-semibold text-slate-300 mb-1.5 block">Kategori</label>
+              <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">Kategori</label>
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl bg-[#1E293B] border border-white/10 text-white text-sm focus:outline-none focus:border-amber-400"
+                className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-semibold focus:bg-white focus:border-amber-500"
               >
                 <option value="kemasan">Pouch & Plastik</option>
                 <option value="stiker">Stiker & Label</option>
@@ -183,11 +183,11 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
               </select>
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-300 mb-1.5 block">Satuan</label>
+              <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">Satuan</label>
               <select
                 value={unit}
                 onChange={(e) => setUnit(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl bg-[#1E293B] border border-white/10 text-white text-sm focus:outline-none focus:border-amber-400"
+                className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-semibold focus:bg-white focus:border-amber-500"
               >
                 <option value="pcs">pcs (buah)</option>
                 <option value="lembar">lembar</option>
@@ -199,19 +199,19 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
           </div>
 
           {/* Bi-directional Auto Calculator Box */}
-          <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 space-y-3">
+          <div className="p-4 rounded-2xl bg-amber-50/80 border border-amber-200/90 space-y-3 shadow-sm">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
-                <Calculator size={14} /> Auto Kalkulator HPP Satuan
+              <span className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+                <Calculator size={14} className="text-amber-600" /> Auto Kalkulator HPP Satuan
               </span>
-              <span className="text-[11px] text-slate-400 font-mono">
+              <span className="text-[10px] text-amber-800 font-mono font-semibold">
                 HPP = Total Bayar ÷ Qty
               </span>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-[11px] font-medium text-slate-300 mb-1 block">
+                <label className="text-[10px] font-bold text-slate-600 mb-1 block">
                   Jumlah Pembelian ({unit})
                 </label>
                 <input
@@ -221,11 +221,11 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
                   placeholder="Misal: 100"
                   value={qty}
                   onChange={(e) => handleQtyChange(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-slate-900/80 border border-white/10 text-white text-sm focus:outline-none focus:border-amber-400"
+                  className="w-full px-3 py-2 rounded-xl bg-white border border-amber-200 text-slate-900 text-xs font-bold focus:outline-none focus:border-amber-500"
                 />
               </div>
               <div>
-                <label className="text-[11px] font-medium text-slate-300 mb-1 block">
+                <label className="text-[10px] font-bold text-slate-600 mb-1 block">
                   Total Bayar / Nota (Rp)
                 </label>
                 <input
@@ -234,24 +234,24 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
                   placeholder="Misal: 85000"
                   value={totalSpent}
                   onChange={(e) => handleTotalSpentChange(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-slate-900/80 border border-white/10 text-white text-sm focus:outline-none focus:border-amber-400"
+                  className="w-full px-3 py-2 rounded-xl bg-white border border-amber-200 text-slate-900 text-xs font-bold focus:outline-none focus:border-amber-500"
                 />
               </div>
             </div>
 
             {/* Hasil HPP Satuan */}
-            <div className="pt-2 border-t border-amber-500/20 flex items-center justify-between">
-              <span className="text-xs text-slate-300 font-medium">HPP Beli per {unit}:</span>
-              <div className="flex items-center gap-2">
+            <div className="pt-2.5 border-t border-amber-200/70 flex items-center justify-between">
+              <span className="text-xs text-slate-700 font-semibold">HPP Beli per {unit}:</span>
+              <div className="flex items-center gap-1.5">
                 <input
                   type="number"
                   min="0"
                   placeholder="Rp per unit"
                   value={unitCost}
                   onChange={(e) => handleUnitCostChange(e.target.value)}
-                  className="w-28 px-2.5 py-1 text-right rounded-md bg-slate-900 border border-amber-400/40 text-amber-300 font-bold text-sm focus:outline-none"
+                  className="w-28 px-2.5 py-1 text-right rounded-lg bg-white border border-amber-300 text-amber-900 font-black text-xs focus:outline-none focus:border-amber-500"
                 />
-                <span className="text-xs text-amber-400 font-semibold">
+                <span className="text-xs text-amber-900 font-bold">
                   / {unit}
                 </span>
               </div>
@@ -261,7 +261,7 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
           {/* Minimum Stock Alert & Supplier */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-semibold text-slate-300 mb-1.5 block">
+              <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">
                 Peringatan Stok Menipis
               </label>
               <input
@@ -269,11 +269,11 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
                 min="0"
                 value={minStockAlert}
                 onChange={(e) => setMinStockAlert(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-white/[0.05] border border-white/10 text-white text-sm focus:outline-none focus:border-amber-400"
+                className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs focus:bg-white focus:border-amber-500 focus:outline-none"
               />
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-300 mb-1.5 block">
+              <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">
                 Supplier / Percetakan
               </label>
               <input
@@ -281,29 +281,29 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
                 placeholder="Misal: Percetakan Solo Jaya"
                 value={supplierName}
                 onChange={(e) => setSupplierName(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-white/[0.05] border border-white/10 text-white text-sm focus:outline-none focus:border-amber-400"
+                className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs focus:bg-white focus:border-amber-500 focus:outline-none"
               />
             </div>
           </div>
 
           {/* Catatan */}
           <div>
-            <label className="text-xs font-semibold text-slate-300 mb-1.5 block">Catatan / Spesifikasi</label>
+            <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">Catatan / Spesifikasi</label>
             <textarea
               rows={2}
               placeholder="Contoh: Bahan pouch matte ziplock tebal 100 micron"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl bg-white/[0.05] border border-white/10 text-white text-sm focus:outline-none focus:border-amber-400 resize-none"
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs focus:bg-white focus:border-amber-500 focus:outline-none resize-none"
             />
           </div>
         </form>
 
-        <div className="p-4 border-t border-white/10 bg-slate-900/60 flex items-center justify-end gap-2.5">
+        <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-2.5">
           <button
             type="button"
             onClick={handleClose}
-            className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5 transition"
+            className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition"
           >
             Batal
           </button>
@@ -311,7 +311,7 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
             type="button"
             onClick={handleSubmit}
             disabled={isSaving}
-            className="px-5 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-lg shadow-amber-500/20 transition disabled:opacity-50"
+            className="px-5 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-sm transition disabled:opacity-50"
           >
             {isSaving ? 'Menyimpan...' : activeItem ? 'Simpan Perubahan' : 'Tambahkan Bahan'}
           </button>
