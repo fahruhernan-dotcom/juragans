@@ -31,6 +31,9 @@ import {
   Power,
   Zap,
   ShieldCheck,
+  Radio,
+  Play,
+  Loader2,
   X
 } from 'lucide-react'
 import {
@@ -67,6 +70,10 @@ export default function B2BLeadsOutreachPage() {
   const [statusFilter, setStatusFilter] = useState('all') // 'all' | 'pending' | 'sent' | 'replied'
   const [cityFilter, setCityFilter] = useState('all')
   const [countryTabFilter, setCountryTabFilter] = useState('all') // 'all' | 'Indonesia' | 'Singapore'
+
+  // Webhook State
+  const [isTriggeringWebhook, setIsTriggeringWebhook] = useState(false)
+  const [webhookMode, setWebhookMode] = useState('prod') // 'prod' | 'test'
 
   // Modals
   const [leadModalOpen, setLeadModalOpen] = useState(false)
@@ -115,6 +122,44 @@ export default function B2BLeadsOutreachPage() {
       await updateSettingsMut.mutateAsync({ [field]: val })
     } catch (e) {
       // handled
+    }
+  }
+
+  // Trigger n8n Webhook
+  const handleTriggerN8nWebhook = async () => {
+    const prodUrl = import.meta.env.VITE_N8N_WEBHOOK_PROD_URL || 'https://n8n-2ccbyak1l3x6.jkt2.sumopod.my.id/webhook/ed8c6de6-78a5-4fdc-bc07-698f6c03a9f3'
+    const testUrl = import.meta.env.VITE_N8N_WEBHOOK_TEST_URL || 'https://n8n-2ccbyak1l3x6.jkt2.sumopod.my.id/webhook-test/ed8c6de6-78a5-4fdc-bc07-698f6c03a9f3'
+    const targetUrl = webhookMode === 'test' ? testUrl : prodUrl
+
+    setIsTriggeringWebhook(true)
+    try {
+      const response = await fetch(targetUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          country: currentCountry,
+          region: currentRegion,
+          action: 'trigger_outreach_and_scrape',
+          source: 'Juragan Web Dashboard',
+          timestamp: new Date().toISOString()
+        })
+      })
+
+      if (response.ok) {
+        toast.success(`⚡ Bot n8n (${webhookMode.toUpperCase()}) berhasil dipicu! Memproses antrean...`)
+        setTimeout(() => {
+          refetch()
+          refetchQueue()
+        }, 3000)
+      } else {
+        toast.error(`Webhook n8n merespons status ${response.status}. Pastikan workflow aktif.`)
+      }
+    } catch (err) {
+      toast.error(`Gagal memanggil webhook n8n: ${err.message}`)
+    } finally {
+      setIsTriggeringWebhook(false)
     }
   }
 
@@ -267,7 +312,7 @@ export default function B2BLeadsOutreachPage() {
       {/* Header Standard Juragan */}
       <SembakoPageHeader
         title="B2B Leads & Outreach Engine"
-        subtitle="Kelola prospek restoran kuliner (Solo Raya, Domestik & Ekspor), kontrol sakelar bot n8n, dan pantau AI email pitch."
+        subtitle="Kelola prospek restoran kuliner (Solo Raya, Domestik & Ekspor), kontrol sakelar bot n8n, dan picu webhook otomatis."
         isDesktop={isDesktop}
         searchQuery={search}
         onSearchChange={setSearch}
@@ -281,6 +326,27 @@ export default function B2BLeadsOutreachPage() {
             >
               <RefreshCw size={15} />
             </button>
+
+            {/* Direct Trigger n8n Button */}
+            <button
+              onClick={handleTriggerN8nWebhook}
+              disabled={isTriggeringWebhook}
+              className="flex items-center gap-1.5 px-3.5 h-9 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white shadow-sm transition active:scale-95 disabled:opacity-50"
+              title="Picu Webhook n8n Langsung"
+            >
+              {isTriggeringWebhook ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  <span>Memproses...</span>
+                </>
+              ) : (
+                <>
+                  <Zap size={14} className="fill-amber-300 text-amber-300" />
+                  <span>Picu n8n</span>
+                </>
+              )}
+            </button>
+
             <button
               onClick={() => setQueueModalOpen(true)}
               className="flex items-center gap-1.5 px-3 h-9 rounded-xl text-xs font-bold bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 shadow-sm transition"
@@ -303,7 +369,7 @@ export default function B2BLeadsOutreachPage() {
         {/* KPI Strip */}
         <SembakoSummaryStrip items={summaryItems} />
 
-        {/* 🎛️ SAKELAR KONTROL OUTREACH ENGINE n8n (Live Control Card) */}
+        {/* 🎛️ SAKELAR KONTROL OUTREACH ENGINE n8n (Live Control Card with Webhook) */}
         <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-sm mb-5">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             {/* Engine Status & Title */}
@@ -327,12 +393,12 @@ export default function B2BLeadsOutreachPage() {
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Pengaturan ini tersinkronisasi langsung ke n8n. Bot hanya akan mengirim email sesuai target negara & kuota di bawah ini.
+                  Pengaturan ini tersinkronisasi ke n8n. Klik <strong>Picu Bot n8n</strong> untuk menjalankan webhook sekarang juga.
                 </p>
               </div>
             </div>
 
-            {/* Quick Switch Actions */}
+            {/* Quick Switch Actions & Trigger */}
             <div className="flex items-center gap-2.5 flex-wrap">
               {/* Target Country Switcher */}
               <div className="flex items-center bg-slate-50 p-1 rounded-xl border border-slate-200 text-xs">
@@ -369,32 +435,56 @@ export default function B2BLeadsOutreachPage() {
                 </button>
               </div>
 
-              {/* Daily Limit Selector */}
-              <div className="flex items-center bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs gap-1.5">
-                <span className="text-slate-500 font-semibold text-[11px]">Batas/Hari:</span>
-                <select
-                  value={currentLimit}
-                  onChange={(e) => handleUpdateSetting('daily_email_limit', parseInt(e.target.value, 10))}
-                  className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-slate-900 font-bold text-xs focus:outline-none focus:border-amber-500"
+              {/* Webhook Mode Switcher (Prod vs Test) */}
+              <div className="flex items-center bg-slate-50 p-1 rounded-xl border border-slate-200 text-[11px]">
+                <button
+                  onClick={() => setWebhookMode('prod')}
+                  className={`px-2.5 py-1 rounded-lg font-bold transition ${
+                    webhookMode === 'prod' ? 'bg-purple-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                  }`}
                 >
-                  <option value={5}>5 email</option>
-                  <option value={10}>10 email</option>
-                  <option value={20}>20 email</option>
-                  <option value={50}>50 email</option>
-                </select>
+                  Prod URL
+                </button>
+                <button
+                  onClick={() => setWebhookMode('test')}
+                  className={`px-2.5 py-1 rounded-lg font-bold transition ${
+                    webhookMode === 'test' ? 'bg-amber-500 text-slate-950 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Test URL
+                </button>
               </div>
+
+              {/* Execute Webhook Button */}
+              <button
+                onClick={handleTriggerN8nWebhook}
+                disabled={isTriggeringWebhook}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white flex items-center gap-1.5 shadow-sm transition active:scale-95 disabled:opacity-50"
+              >
+                {isTriggeringWebhook ? (
+                  <>
+                    <Loader2 size={13} className="animate-spin" />
+                    <span>Memicu Webhook...</span>
+                  </>
+                ) : (
+                  <>
+                    <Play size={13} className="fill-white" />
+                    <span>Jalankan Bot Sekarang</span>
+                  </>
+                )}
+              </button>
 
               {/* Main Engine On/Off Button */}
               <button
                 onClick={() => handleUpdateSetting('is_auto_outreach_active', !isEngineActive)}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-sm ${
+                className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-sm ${
                   isEngineActive
                     ? 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
                     : 'bg-emerald-600 text-white hover:bg-emerald-500'
                 }`}
               >
                 <Power size={13} />
-                <span>{isEngineActive ? 'Jeda Engine' : 'Aktifkan Engine'}</span>
+                <span>{isEngineActive ? 'Jeda' : 'Aktifkan'}</span>
               </button>
             </div>
           </div>
@@ -409,10 +499,12 @@ export default function B2BLeadsOutreachPage() {
               <span className="text-slate-400">|</span>
               <span className="flex items-center gap-1">
                 <ShieldCheck size={13} className="text-emerald-600" />
-                <span>Tawaran Sample Tester Pack (100g): <strong>{isSampleOffered ? 'Aktif' : 'Nonaktif'}</strong></span>
+                <span>Batas Kuota: <strong>{currentLimit} email/hari</strong></span>
               </span>
             </div>
-            <span className="text-slate-400 font-mono text-[10px]">Sinkronisasi Supabase View: `v_n8n_active_pending_leads`</span>
+            <span className="text-slate-400 font-mono text-[10px] truncate max-w-xs">
+              Webhook: {webhookMode === 'prod' ? 'jkt2.sumopod.my.id/webhook/...' : 'jkt2.sumopod.my.id/webhook-test/...'}
+            </span>
           </div>
         </div>
 
@@ -534,14 +626,23 @@ export default function B2BLeadsOutreachPage() {
                 <Building2 size={40} className="mx-auto mb-2 text-slate-300" />
                 <p className="text-sm font-bold text-slate-800">Belum Ada Prospek Restoran</p>
                 <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-                  Tambahkan prospek secara manual atau daftarkan antrean wilayah Solo Raya baru agar bot n8n men-scrape otomatis dari Google Maps.
+                  Tambahkan prospek secara manual atau jalankan bot n8n untuk men-scrape otomatis dari Google Maps.
                 </p>
-                <button
-                  onClick={openAddLead}
-                  className="mt-4 px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 text-slate-950 inline-flex items-center gap-1.5 shadow-sm"
-                >
-                  <Plus size={14} /> Tambah Prospek Manual
-                </button>
+                <div className="mt-4 flex items-center justify-center gap-2">
+                  <button
+                    onClick={openAddLead}
+                    className="px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 text-slate-950 inline-flex items-center gap-1.5 shadow-sm"
+                  >
+                    <Plus size={14} /> Tambah Prospek Manual
+                  </button>
+                  <button
+                    onClick={handleTriggerN8nWebhook}
+                    disabled={isTriggeringWebhook}
+                    className="px-4 py-2 rounded-xl text-xs font-bold bg-purple-600 text-white inline-flex items-center gap-1.5 shadow-sm"
+                  >
+                    <Zap size={14} /> Picu n8n Sekarang
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -692,13 +793,23 @@ export default function B2BLeadsOutreachPage() {
                   Workflow bot n8n akan mengecek antrean berstatus <span className="font-bold text-amber-600">pending</span> secara berkala dan menyimpan leads langsung ke database.
                 </p>
               </div>
-              <button
-                onClick={() => setQueueModalOpen(true)}
-                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold flex items-center gap-1.5 shadow-sm shrink-0"
-              >
-                <Plus size={14} />
-                <span>Tambah Antrean Wilayah</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleTriggerN8nWebhook}
+                  disabled={isTriggeringWebhook}
+                  className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm shrink-0"
+                >
+                  <Zap size={14} />
+                  <span>Jalankan Scraper Sekarang</span>
+                </button>
+                <button
+                  onClick={() => setQueueModalOpen(true)}
+                  className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold flex items-center gap-1.5 shadow-sm shrink-0"
+                >
+                  <Plus size={14} />
+                  <span>Tambah Antrean Wilayah</span>
+                </button>
+              </div>
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -989,7 +1100,7 @@ export default function B2BLeadsOutreachPage() {
                 placeholder="Preferensi kemasan pouch/bal, menu andalan, kontak manager..."
                 value={formNotes}
                 onChange={(e) => setFormNotes(e.target.value)}
-                className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs resize-none focus:bg-white focus:border-amber-500 focus:outline-none"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs resize-none focus:bg-white focus:border-amber-500 focus:outline-none"
               />
             </div>
 
@@ -1170,18 +1281,20 @@ export default function B2BLeadsOutreachPage() {
                 Isi Body Email (AI Generated Pitch):
               </label>
               <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 leading-relaxed font-sans whitespace-pre-wrap select-all shadow-inner">
-                {selectedLeadForPitch?.ai_generated_pitch || selectedLeadForPitch?.pitch_email || `Halo Chef / Pengelola Dapur ${selectedLeadForPitch?.clean_name || 'Resto'},
+                {selectedLeadForPitch?.ai_generated_pitch || selectedLeadForPitch?.pitch_email || `Halo Chef & Pengelola Dapur ${selectedLeadForPitch?.clean_name || 'Resto'},
 
 Salam hangat dari kami di Juragan by Anak Bawang (Cepogo, Boyolali).
 
-Kami memproduksi Bawang Goreng Grade Super kualitas premium langsung dari sentra bawang Boyolali (aroma wangi khas tanah vulkanik, renyah tahan lama, 0% pengawet, dan sudah bersertifikat Halal resmi).
+Kami memproduksi Bawang Goreng Grade Super kualitas premium langsung dari sentra Boyolali (aroma wangi khas tanah vulkanik, renyah tahan lama, 0% pengawet, dan sudah bersertifikat Halal resmi).
 
 Untuk mendukung kualitas hidangan di ${selectedLeadForPitch?.clean_name || 'Resto Anda'}, apakah kami boleh mengirimkan 1 Box Sample Tester Gratis (100g Tasting Pack) langsung ke alamat dapur Anda di ${selectedLeadForPitch?.address || selectedLeadForPitch?.city || 'Solo'} untuk diuji langsung oleh Head Chef?
 
 Tanpa komitmen apapun, cukup dicoba rasa dan kerenyahannya.
 
-Salam hangat,
-Fahrul Hernanda - Juragan by Anak Bawang (Boyolali)`}
+Salam kuliner,
+Rey — Head of B2B Partnerships
+Juragan by Anak Bawang (Boyolali)
+Sertifikat Halal: ID33110018517710724`}
               </div>
             </div>
 
