@@ -1,8 +1,8 @@
 -- =========================================================================
--- JURAGAN B2B OUTREACH CONTROL SCHEMA & N8N DYNAMIC VIEW
+-- JURAGAN B2B DYNAMIC EMAIL QUEUE & SCRAPER VIEW (REALTIME WEB SYNC)
 -- =========================================================================
 
--- 1. Table for B2B Outreach Engine Settings
+-- 1. Table for B2B Settings (Singleton Config)
 CREATE TABLE IF NOT EXISTS public.juragan_b2b_settings (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
   tenant_id uuid,
@@ -16,40 +16,44 @@ CREATE TABLE IF NOT EXISTS public.juragan_b2b_settings (
   CONSTRAINT juragan_b2b_settings_pkey PRIMARY KEY (id)
 );
 
--- Insert default row if not exists
 INSERT INTO public.juragan_b2b_settings (active_target_country, active_target_region, is_auto_outreach_active, daily_email_limit, offer_tasting_sample)
 SELECT 'Indonesia', 'Solo Raya', true, 10, true
 WHERE NOT EXISTS (SELECT 1 FROM public.juragan_b2b_settings);
 
--- 2. Dynamic View for n8n Workflow Engine
--- n8n reads from this view directly to only process leads matching the web dashboard's active switches!
-CREATE OR REPLACE VIEW public.v_n8n_active_pending_leads AS
+-- 2. VIEW 1: ANTREAN EMAIL SIAP KIRIM (v_n8n_pending_emails)
+-- n8n node "Pharsing All Scarping Data with Contain Email" membaca view ini
+CREATE OR REPLACE VIEW public.v_n8n_pending_emails AS
 SELECT 
-  l.id,
-  l.place_id,
-  l.name,
-  l.clean_name,
-  l.category,
-  l.country,
-  l.city,
-  l.address,
-  l.phone,
-  l.email,
-  l.website,
-  l.maps_url,
-  l.rating,
-  l.review_count,
-  l.lead_priority,
-  l.status_email,
-  l.ai_menu_highlight,
-  l.ai_custom_icebreaker,
-  l.ai_generated_subject,
-  l.ai_generated_pitch,
-  s.active_target_country AS current_active_country,
-  s.is_auto_outreach_active,
-  s.daily_email_limit,
-  s.offer_tasting_sample,
-  s.sample_size_gram
+    l.id AS lead_id,
+    l.id,
+    l.place_id,
+    l.name AS restaurant_name,
+    l.name,
+    l.clean_name,
+    l.category,
+    l.country,
+    l.city,
+    l.address,
+    l.email,
+    l.phone,
+    l.rating,
+    l.review_count,
+    l.website,
+    l.instagram_url,
+    l.maps_url,
+    l.lead_priority,
+    l.status_email,
+    COALESCE(l.status_email, 'pending') AS status,
+    l.ai_menu_highlight,
+    l.ai_custom_icebreaker,
+    l.ai_generated_subject,
+    l.ai_generated_pitch,
+    l.created_at,
+    s.active_target_country AS current_active_country,
+    s.is_auto_outreach_active,
+    s.daily_email_limit,
+    s.offer_tasting_sample,
+    s.sample_size_gram
 FROM public.b2b_leads l
 CROSS JOIN (
   SELECT active_target_country, is_auto_outreach_active, daily_email_limit, offer_tasting_sample, sample_size_gram
@@ -57,8 +61,8 @@ CROSS JOIN (
   LIMIT 1
 ) s
 WHERE (s.is_auto_outreach_active = true)
-  AND (l.status_email = 'pending')
-  AND (l.email IS NOT NULL AND l.email <> '')
+  AND (l.status_email = 'pending' OR l.status_email IS NULL)
+  AND (l.email IS NOT NULL AND l.email LIKE '%@%')
   AND (l.is_deleted = false OR l.is_deleted IS NULL)
   AND (
     s.active_target_country = 'All' 
@@ -66,24 +70,47 @@ WHERE (s.is_auto_outreach_active = true)
     OR l.country ILIKE s.active_target_country
   )
 ORDER BY 
-  CASE WHEN l.lead_priority = 'hot' THEN 1 WHEN l.lead_priority = 'warm' THEN 2 ELSE 3 END,
-  l.rating DESC NULLS LAST;
+    CASE l.lead_priority 
+        WHEN 'hot' THEN 1 
+        WHEN 'warm' THEN 2 
+        ELSE 3 
+    END,
+    l.rating DESC NULLS LAST;
 
--- Enable RLS & open policy for authenticated users
-ALTER TABLE public.juragan_b2b_settings ENABLE ROW LEVEL SECURITY;
+-- Alias view for backward compatibility
+CREATE OR REPLACE VIEW public.v_n8n_active_pending_leads AS
+SELECT * FROM public.v_n8n_pending_emails;
 
-DO $$ 
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies 
-    WHERE tablename = 'juragan_b2b_settings' 
-    AND policyname = 'Allow all access to juragan_b2b_settings'
-  ) THEN
-    CREATE POLICY "Allow all access to juragan_b2b_settings" 
-    ON public.juragan_b2b_settings 
-    FOR ALL 
-    TO public 
-    USING (true) 
-    WITH CHECK (true);
-  END IF;
-END $$;
+-- 3. VIEW 2: ANTREAN SCRAPER WILAYAH (v_n8n_active_scraping_queue)
+-- n8n node "Get Location Sraping Queue" membaca view ini
+CREATE OR REPLACE VIEW public.v_n8n_active_scraping_queue AS
+SELECT 
+    q.id AS queue_id,
+    q.id,
+    q.country,
+    q.city_or_region,
+    q.target_location,
+    q.status,
+    q.total_leads_collected,
+    q.notes,
+    q.created_at,
+    s.active_target_country AS current_active_country
+FROM public.b2b_scraping_queue q
+CROSS JOIN (
+  SELECT active_target_country, is_auto_outreach_active 
+  FROM public.juragan_b2b_settings 
+  LIMIT 1
+) s
+WHERE (s.is_auto_outreach_active = true)
+  AND (q.status = 'pending')
+  AND (
+    s.active_target_country = 'All' 
+    OR s.active_target_country = 'Semua' 
+    OR q.country ILIKE s.active_target_country
+  )
+ORDER BY q.created_at ASC;
+
+-- Grant permissions
+GRANT SELECT ON public.v_n8n_pending_emails TO anon, authenticated, service_role;
+GRANT SELECT ON public.v_n8n_active_pending_leads TO anon, authenticated, service_role;
+GRANT SELECT ON public.v_n8n_active_scraping_queue TO anon, authenticated, service_role;
