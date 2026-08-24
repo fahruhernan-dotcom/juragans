@@ -1,0 +1,1148 @@
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
+
+html,
+body {
+  overflow-x: hidden;
+  max-width: 100vw;
+  overscroll-behavior-x: none;
+  font-family: var(--font-sans);
+}
+
+:root {
+  --safe-area-top: max(24px, env(safe-area-inset-top, 24px));
+  --safe-area-bottom: max(16px, env(safe-area-inset-bottom, 16px));
+}
+
+#root {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+/* ===== Landing Page Section Utilities ===== */
+.section-padding {
+  padding: 2.5rem clamp(1rem, 4vw, 5rem);
+}
+@media (min-width: 768px) {
+  .section-padding {
+    padding: 6rem clamp(2rem, 5vw, 5rem);
+  }
+}
+
+.section-fade-bottom {
+  position: relative;
+}
+.section-fade-bottom::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 80px;
+  background: linear-gradient(to bottom, transparent, var(--bg-base-val));
+  pointer-events: none;
+}
+
+.section-h2 {
+  font-family: 'Sora', 'Inter', sans-serif;
+  font-size: clamp(24px, 4.5vw, 38px);
+  font-weight: 400;
+  letter-spacing: -1px;
+  line-height: 1.2;
+  color: var(--text-primary-val);
+  user-select: none;
+  cursor: default;
+}
+
+.section-subtitle {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  color: var(--text-secondary-val);
+  line-height: 1.7;
+  user-select: none;
+  cursor: default;
+}
+
+/* Hero headline rows — anime.js target + cursor guard */
+.hero-headline-row {
+  user-select: none;
+  cursor: default;
+}
+
+/* All section headings on public landing pages: no I-beam cursor on marketing text */
+section h1, section h2, section h3 {
+  user-select: none;
+  cursor: default;
+}
+@media (min-width: 768px) {
+  .section-subtitle {
+    font-size: 16px;
+  }
+}
+
+/* Card hover accent line */
+.group:hover .card-top-line,
+*:hover > .card-top-line {
+  opacity: 1 !important;
+}
+
+/* Featured pricing card border */
+.featured-card-border {
+  background: linear-gradient(135deg, rgba(2, 26, 2,0.25) 0%, rgba(2, 26, 2,0.05) 100%);
+  border-radius: 20px;
+  padding: 1px;
+}
+
+/* Pulse glow animation for pricing */
+@keyframes pulse-glow-kf {
+  0%, 100% { box-shadow: 0 0 20px rgba(2, 26, 2,0.08); }
+  50% { box-shadow: 0 0 35px rgba(2, 26, 2,0.15); }
+}
+.animate-pulse-glow {
+  animation: pulse-glow-kf 3s ease-in-out infinite;
+}
+
+/* Shimmer pass for Hero headline */
+@keyframes shimmer-pass {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+/* Scale in for testimonial stars */
+@keyframes scale-in {
+  0% { transform: scale(0); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* Border accent alias */
+.border-border-acc {
+  border-color: rgba(2, 26, 2, 0.35);
+}
+
+/* Card shadow override - premium soft shadow (increased contrast) */
+.shadow-card {
+  box-shadow: 0 8px 30px -4px rgba(15, 23, 42, 0.08), 0 4px 12px -2px rgba(15, 23, 42, 0.04), 0 1px 2px rgba(15, 23, 42, 0.03);
+  transition: all 0.2s ease;
+}
+.dark .shadow-card {
+  box-shadow: 0 12px 40px -8px rgba(0, 0, 0, 0.6), 0 4px 16px -4px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+/* Premium badge style */
+.badge-premium {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: rgba(2, 26, 2, 0.08);
+  border: 1px solid rgba(2, 26, 2, 0.25);
+  color: #021a02; /* emerald-700 for high contrast in light mode */
+  border-radius: 9999px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.dark .badge-premium {
+  background-color: rgba(78, 115, 78, 0.15); /* #4e734e/15 */
+  border: 1px solid rgba(78, 115, 78, 0.35); /* #4e734e/35 */
+  color: #8cb88c; /* emerald-300 forest tone — readable on dark bg */
+}
+
+
+@layer base {
+  :root {
+    /* Shadcn defaults for light mode */
+    --background: 0 0% 98%; /* warm off-white — bukan sage gray yang aneh */
+    --foreground: 222.2 84% 4.9%; /* slate-950 text */
+    --card: 0 0% 100%; /* white cards */
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 120 67% 14.3%; /* forest green (#0c3d0c) */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 217.2 19% 32.5%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 87.4%; /* slightly darker slate-200 for border contrast */
+    --input: 214.3 31.8% 87.4%;
+    --ring: 120 67% 14.3%;
+    --radius: 0.75rem;
+    --chart-1: 120 67% 14.3%;
+    --chart-2: 217 91% 60%;
+    --chart-3: 38 92% 50%;
+    --chart-4: 262 83% 58%;
+    --chart-5: 0 72% 70%;
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 222.2 84% 4.9%;
+    --sidebar-primary: 120 67% 14.3%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 40% 96.1%;
+    --sidebar-accent-foreground: 222.2 47.4% 11.2%;
+    --sidebar-border: 214.3 31.8% 87.4%;
+    --sidebar-ring: 120 67% 14.3%;
+
+    /* Extended Color Variables for Light Mode */
+    --emerald-50: #f0f7f0;
+    --emerald-300: #8cb88c;
+    --emerald-400: #4d9e4d;
+    --emerald-500: #0c3d0c; /* #0c3d0c forest green */
+    --emerald-600: #063306; /* #063306 forest green */
+    --em-500: #0c3d0c;
+  
+    --bg-base-val: #FAFAFA; /* off-white bersih */
+    --bg-1-val: #FFFFFF;    /* white panels */
+    --bg-2-val: #F6F9F5;    /* warm sage-50 cards */
+    --bg-3-val: #DFE5DF;    /* sage-200 inputs */
+    --text-primary-val: #0F172A;   /* slate-900 */
+    --text-secondary-val: #273041; /* slate-800 - darker for 15% more contrast */
+    --text-muted-val: #4A5568;     /* slate-600 - darker for more contrast */
+    --text-accent-val: #0c3d0c;    /* forest-500 */
+    
+    --border-sub-val: rgba(15, 23, 42, 0.08); /* bumped contrast */
+    --border-def-val: rgba(15, 23, 42, 0.13); /* bumped contrast */
+    --border-strong-val: rgba(15, 23, 42, 0.22); /* bumped contrast */
+    --border-acc-val: rgba(2, 26, 2, 0.35); /* bumped contrast */
+
+    --grid-color-val: rgba(15, 23, 42, 0.04);
+    --watermark-color-val: rgba(15, 23, 42, 0.02);
+
+    /* Mobile Views Light Mode */
+    --mobile-card-bg: rgba(255, 255, 255, 0.75);
+    --mobile-card-border: rgba(0, 0, 0, 0.08);
+    --mobile-header-bg: radial-gradient(circle at 15% 15%, #021a02 0%, #FAFAFA 100%);
+    --mobile-input-bg: rgba(255, 255, 255, 0.85);
+    --mobile-input-border: rgba(0, 0, 0, 0.08);
+    --mobile-input-border-hover: rgba(0, 0, 0, 0.18);
+    --mobile-button-secondary-bg: rgba(0, 0, 0, 0.04);
+    --mobile-button-secondary-border: rgba(0, 0, 0, 0.08);
+    --mobile-button-secondary-text: #334155;
+    --mobile-button-secondary-hover-bg: rgba(0, 0, 0, 0.08);
+
+    /* Fonts */
+    --font-sans: "Sora", "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+    /* Colors - Forest Palette */
+    --forest-900: #052E16;
+    --forest-950: #021a02;
+
+    /* Colors - Brand Palette */
+    --brand-50:  #f0f7f0;
+    --brand-100: #dceddc;
+    --brand-200: #b3dfb3;
+    --brand-300: #8cb88c;
+    --brand-400: #4d9e4d;
+    --brand-500: #0c3d0c;
+    --brand-600: #063306;
+    --brand-700: #042004;
+
+    /* Semantic Variables */
+    --bg-page: #FBFCF8;
+    --bg-surface: #FFFFFF;
+    --bg-subtle: #F8FAFC;
+    --text-primary: #0F172A;
+    --text-secondary: #334155;
+    --text-muted: #64748B;
+    --border-soft: #E2E8F0;
+    --border-muted: #EDF2F7;
+
+    /* Status Colors */
+    --success: #22c55e;
+    --info: #0EA5E9;
+    --warning: #F59E0B;
+    --danger: #EF4444;
+    --purple: #8B5CF6;
+
+    /* Typography Scale */
+    --text-display-size: clamp(3rem, 7vw, 5.5rem);
+    --text-display-line: 0.95;
+    --text-display-letter: -0.055em;
+    --text-h1-size: clamp(2.5rem, 5vw, 4.5rem);
+    --text-h1-line: 1;
+    --text-h1-letter: -0.045em;
+    --text-h2-size: clamp(2rem, 4vw, 3rem);
+    --text-h2-line: 1.1;
+    --text-h2-letter: -0.035em;
+    --text-h3-size: 1.5rem;
+    --text-h3-line: 1.25;
+    --text-body-lg-size: 1.125rem;
+    --text-body-lg-line: 1.75;
+    --text-body-size: 1rem;
+    --text-body-line: 1.625;
+    --text-small-size: 0.875rem;
+    --text-small-line: 1.5;
+    --text-caption-size: 0.75rem;
+    --text-caption-line: 1.4;
+
+    /* Radius System */
+    --radius-tko-xs: 6px;
+    --radius-tko-sm: 8px;
+    --radius-tko-md: 12px;
+    --radius-tko-lg: 16px;
+    --radius-tko-xl: 20px;
+    --radius-tko-2xl: 24px;
+    --radius-tko-3xl: 32px;
+    --radius-tko-full: 999px;
+
+    /* Shadow System */
+    --shadow-tko-xs: 0 1px 2px rgba(15, 23, 42, 0.06);
+    --shadow-tko-sm: 0 4px 12px rgba(15, 23, 42, 0.08);
+    --shadow-tko-md: 0 12px 32px rgba(15, 23, 42, 0.10);
+    --shadow-tko-lg: 0 24px 60px rgba(15, 23, 42, 0.14);
+    --shadow-tko-brand: 0 12px 28px rgba(2, 26, 2, 0.24);
+  }
+
+  .dark {
+    /* Shadcn defaults for dark mode */
+    --background: 220 14% 4%; /* original dark */
+    --foreground: 210 40% 96%;
+    --card: 215 22% 8%;
+    --card-foreground: 210 40% 96%;
+    --popover: 215 22% 8%;
+    --popover-foreground: 210 40% 96%;
+    --primary: 120 22% 63.5%; /* forest green (#8cb88c) */
+    --primary-foreground: 222.2 47.4% 11.2%; /* dark text on light primary */
+    --secondary: 215 19% 11%;
+    --secondary-foreground: 210 40% 96%;
+    --muted: 215 19% 11%;
+    --muted-foreground: 215 16% 40%;
+    --accent: 215 19% 14%;
+    --accent-foreground: 210 40% 96%;
+    --destructive: 0 72% 70%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 215 20% 13%;
+    --input: 215 19% 11%;
+    --ring: 120 22% 63.5%;
+    --sidebar-background: 215 25% 6%;
+    --sidebar-foreground: 210 40% 96%;
+    --sidebar-primary: 120 22% 63.5%;
+    --sidebar-primary-foreground: 222.2 47.4% 11.2%;
+    --sidebar-accent: 215 19% 11%;
+    --sidebar-accent-foreground: 210 40% 96%;
+    --sidebar-border: 215 20% 10%;
+    --sidebar-ring: 120 22% 63.5%;
+
+    /* Semantic Variable Overrides for Dark Mode */
+    --bg-page: #021a02;
+    --bg-surface: #061A0A;
+    --bg-subtle: #0B2410;
+    --border-soft: rgba(255, 255, 255, 0.10);
+    --border-muted: rgba(255, 255, 255, 0.06);
+    --text-primary: #F8FAFC;
+    --text-secondary: rgba(248, 250, 252, 0.72);
+    --text-muted: rgba(248, 250, 252, 0.52);
+    --brand-500: #8cb88c; /* main brand forest green for dark mode */
+    --brand-600: #749e74; /* CTA hover override for dark mode */
+
+    /* Extended Color Variables for Dark Mode — based on forest green scale */
+    --emerald-50:  #f0f7f0; /* lightest tint */
+    --emerald-300: #8cb88c; /* light accent */
+    --emerald-400: #a2e0a2; /* icon / text accent */
+    --emerald-500: #8cb88c; /* base brand green */
+    --emerald-600: #749e74; /* darker — hover backgrounds */
+    --em-500: #8cb88c;
+  
+    --bg-base-val: #06090F;
+    --bg-1-val: #0C1319;
+    --bg-2-val: #111C24;
+    --bg-3-val: #162230;
+    --text-primary-val: #F1F5F9;
+    --text-secondary-val: #94A3B8;
+    --text-muted-val: #4B6478;
+    --text-accent-val: #8cb88c;  /* forest green 500 — readable on dark bg */
+    
+    --border-sub-val: rgba(255, 255, 255, 0.05);
+    --border-def-val: rgba(255, 255, 255, 0.09);
+    --border-strong-val: rgba(255, 255, 255, 0.16);
+    --border-acc-val: rgba(2, 26, 2, 0.35);
+
+    --grid-color-val: rgba(255, 255, 255, 0.025);
+    --watermark-color-val: rgba(255, 255, 255, 0.02);
+
+    /* Mobile Views Dark Mode */
+    --mobile-card-bg: rgba(6, 9, 15, 0.4);
+    --mobile-card-border: rgba(255, 255, 255, 0.05);
+    --mobile-header-bg: radial-gradient(circle at 15% 15%, #021a02 0%, #0d1117 80%);
+    --mobile-input-bg: rgba(13, 17, 23, 0.7);
+    --mobile-input-border: rgba(255, 255, 255, 0.03);
+    --mobile-input-border-hover: rgba(255, 255, 255, 0.12);
+    --mobile-button-secondary-bg: rgba(255, 255, 255, 0.03);
+    --mobile-button-secondary-border: rgba(255, 255, 255, 0.08);
+    --mobile-button-secondary-text: #e2e8f0;
+    --mobile-button-secondary-hover-bg: rgba(255, 255, 255, 0.07);
+
+    /* Shadows Overrides for Dark Mode */
+    --shadow-tko-xs: 0 1px 2px rgba(0, 0, 0, 0.5);
+    --shadow-tko-sm: 0 4px 12px rgba(0, 0, 0, 0.6), 0 2px 4px rgba(255, 255, 255, 0.02);
+    --shadow-tko-md: 0 12px 32px rgba(0, 0, 0, 0.7), 0 4px 8px rgba(255, 255, 255, 0.03);
+    --shadow-tko-lg: 0 24px 60px rgba(0, 0, 0, 0.8), 0 8px 16px rgba(255, 255, 255, 0.04);
+    --shadow-tko-brand: 0 12px 28px rgba(140, 184, 140, 0.15);
+  }
+}
+
+* {
+  box-sizing: border-box;
+  border-color: hsl(var(--border));
+}
+
+body {
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  margin: 0;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Inter', sans-serif;
+}
+
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(2, 26, 2, 0.2);
+  border-radius: 99px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(2, 26, 2, 0.4);
+}
+
+::selection {
+  background-color: #0c3d0c !important;
+  color: #FFFFFF !important;
+}
+::-moz-selection {
+  background-color: #0c3d0c !important;
+  color: #FFFFFF !important;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.7); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes shimmer-text {
+  0% { background-position: 200% center; }
+  100% { background-position: -200% center; }
+}
+
+/* Custom Number Input Spinners Hide */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* Hide Spline watermark */
+#logo-bottom-right,
+a[href*="spline.design"],
+canvas ~ div > a {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+@layer utilities {
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+.is-dragging-over {
+  border-color: #021a02 !important;
+  box-shadow: 0 0 30px rgba(2, 26, 2, 0.2), inset 0 0 0 4px rgba(2, 26, 2, 0.1) !important;
+  background-color: rgba(2, 26, 2, 0.08) !important;
+  transition: all 0.2s ease-out !important;
+}
+.is-parent-of-dragged {
+  z-index: 50 !important;
+}
+
+.is-parent-of-dragged > div:last-child {
+  overflow: visible !important;
+}
+
+/* ===================================================================
+   LIGHT MODE OVERRIDES FOR LANDING PAGES
+   Aktif ketika html TIDAK punya class .dark
+   =================================================================== */
+
+/* ── Comparison slider mockup — selalu dark (intentional demo visual) ── */
+html:not(.dark) .comparison-dark-preserve,
+html:not(.dark) .comparison-dark-preserve * {
+  background-color: revert !important;
+  color: revert !important;
+  border-color: revert !important;
+}
+
+/* Only apply when NOT in dark mode */
+html:not(.dark) .bg-\[\#06090F\]  { background-color: #FAFAFA !important; }
+html:not(.dark) .bg-\[\#080D13\]  { background-color: #F5F5F5 !important; }
+html:not(.dark) .bg-\[\#0C1319\]  { background-color: #FFFFFF !important; }
+html:not(.dark) .bg-\[\#111C24\]  { background-color: #F8F8F8 !important; }
+html:not(.dark) .bg-\[\#162230\]  { background-color: #F0F0F0 !important; }
+
+html:not(.dark) .text-\[\#F1F5F9\] { color: #0F172A !important; }
+html:not(.dark) .text-\[\#94A3B8\] { color: #475569 !important; }
+html:not(.dark) .text-\[\#CBD5E1\] { color: #64748B !important; }
+html:not(.dark) .text-\[\#4B6478\] { color: #6B7280 !important; }
+html:not(.dark) .text-\[\#64748B\] { color: #6B7280 !important; }
+html:not(.dark) .text-\[\#8899A6\] { color: #6B7280 !important; }
+html:not(.dark) .text-\[\#7F8EA0\] { color: #6B7280 !important; }
+
+
+
+/* ── EXCEPTION: Button/link/span/div dengan text-white tetap putih HANYA jika memiliki background solid ── */
+html:not(.dark) .text-white[class*="bg-emerald"],
+html:not(.dark) .text-white[class*="bg-em-"],
+html:not(.dark) .text-white.bg-\[\#021a02\],
+html:not(.dark) .text-white.bg-primary,
+html:not(.dark) .text-white.bg-secondary,
+html:not(.dark) .text-white.bg-destructive,
+html:not(.dark) .text-white[class*="bg-amber"],
+html:not(.dark) .text-white[class*="bg-blue"],
+html:not(.dark) .text-white[class*="bg-indigo"],
+html:not(.dark) .text-white[class*="bg-violet"],
+html:not(.dark) .text-white[class*="bg-purple"],
+html:not(.dark) .text-white[class*="bg-rose"],
+html:not(.dark) .text-white[class*="bg-red"],
+html:not(.dark) .text-white[class*="bg-slate"],
+html:not(.dark) .text-white[class*="bg-[#0F172A]"],
+html:not(.dark) .text-white[class*="bg-[#0f172a]"],
+html:not(.dark) .text-white[class*="bg-[#EA580C]"],
+html:not(.dark) .text-white[class*="bg-[#ea580c]"],
+html:not(.dark) a.text-white.bg-emerald-500,
+html:not(.dark) button.text-white.bg-emerald-500,
+html:not(.dark) a.text-white.bg-emerald-600,
+html:not(.dark) button.text-white.bg-emerald-600,
+html:not(.dark) a.text-white.bg-emerald-700,
+html:not(.dark) button.text-white.bg-emerald-700,
+html:not(.dark) a.text-white.bg-em-500,
+html:not(.dark) button.text-white.bg-em-500,
+html:not(.dark) a.text-white.bg-em-600,
+html:not(.dark) button.text-white.bg-em-600,
+html:not(.dark) a.text-white.bg-\[\#021a02\],
+html:not(.dark) button.text-white.bg-\[\#021a02\],
+html:not(.dark) a.text-white.bg-primary,
+html:not(.dark) button.text-white.bg-primary,
+html:not(.dark) a.text-white.bg-secondary,
+html:not(.dark) button.text-white.bg-secondary,
+html:not(.dark) a.text-white.bg-destructive,
+html:not(.dark) button.text-white.bg-destructive,
+html:not(.dark) a.text-white[class*="bg-emerald"],
+html:not(.dark) button.text-white[class*="bg-emerald"],
+html:not(.dark) a.text-white[class*="bg-amber"],
+html:not(.dark) button.text-white[class*="bg-amber"],
+html:not(.dark) a.text-white[class*="bg-blue"],
+html:not(.dark) button.text-white[class*="bg-blue"],
+html:not(.dark) a.text-white[class*="bg-indigo"],
+html:not(.dark) button.text-white[class*="bg-indigo"],
+html:not(.dark) a.text-white[class*="bg-violet"],
+html:not(.dark) button.text-white[class*="bg-violet"],
+html:not(.dark) a.text-white[class*="bg-purple"],
+html:not(.dark) button.text-white[class*="bg-purple"],
+html:not(.dark) a.text-white[class*="bg-rose"],
+html:not(.dark) button.text-white[class*="bg-rose"],
+html:not(.dark) a.text-white[class*="bg-red"],
+html:not(.dark) button.text-white[class*="bg-red"],
+html:not(.dark) a.text-white[class*="bg-slate"],
+html:not(.dark) button.text-white[class*="bg-slate"],
+html:not(.dark) a.text-white[class*="bg-[#0F172A]"],
+html:not(.dark) button.text-white[class*="bg-[#0F172A]"],
+html:not(.dark) a.text-white[class*="bg-[#0f172a]"],
+html:not(.dark) button.text-white[class*="bg-[#0f172a]"],
+html:not(.dark) a.text-white[class*="bg-[#EA580C]"],
+html:not(.dark) button.text-white[class*="bg-[#EA580C]"],
+html:not(.dark) a.text-white[class*="bg-[#ea580c]"],
+html:not(.dark) button.text-white[class*="bg-[#ea580c]"],
+html:not(.dark) a.text-white[class*="data-[state=active]:bg"],
+html:not(.dark) button.text-white[class*="data-[state=active]:bg"] {
+  color: #FFFFFF !important;
+}
+
+/* Jika button/link tidak memiliki class bg solid di atas, text-white-nya berubah jadi gelap di light mode */
+html:not(.dark) a.text-white:not([class*="bg-emerald"]):not([class*="bg-em-"]):not([class*="bg-primary"]):not([class*="bg-[#021a02]"]):not([class*="bg-amber"]):not([class*="bg-blue"]):not([class*="bg-indigo"]):not([class*="bg-violet"]):not([class*="bg-purple"]):not([class*="bg-rose"]):not([class*="bg-red"]):not([class*="bg-slate"]):not([class*="bg-[#0F172A]"]):not([class*="bg-[#0f172a]"]):not([class*="bg-[#EA580C]"]):not([class*="bg-[#ea580c]"]):not([class*="data-[state=active]:bg"]):not(.dark *):not(.dark-preserve *),
+html:not(.dark) button.text-white:not([class*="bg-emerald"]):not([class*="bg-em-"]):not([class*="bg-primary"]):not([class*="bg-[#021a02]"]):not([class*="bg-amber"]):not([class*="bg-blue"]):not([class*="bg-indigo"]):not([class*="bg-violet"]):not([class*="bg-purple"]):not([class*="bg-rose"]):not([class*="bg-red"]):not([class*="bg-slate"]):not([class*="bg-[#0F172A]"]):not([class*="bg-[#0f172a]"]):not([class*="bg-[#EA580C]"]):not([class*="bg-[#ea580c]"]):not([class*="data-[state=active]:bg"]):not(.dark *):not(.dark-preserve *) {
+  color: #0F172A !important;
+}
+
+/* Span/p di dalam button atau link dengan background solid tetap putih */
+html:not(.dark) a[class*="bg-emerald"] span.text-white,
+html:not(.dark) button[class*="bg-emerald"] span.text-white,
+html:not(.dark) a[class*="bg-em-"] span.text-white,
+html:not(.dark) button[class*="bg-em-"] span.text-white,
+html:not(.dark) a.bg-primary span.text-white,
+html:not(.dark) button.bg-primary span.text-white,
+html:not(.dark) a.bg-\[\#021a02\] span.text-white,
+html:not(.dark) button.bg-\[\#021a02\] span.text-white,
+html:not(.dark) a[class*="bg-amber"] span.text-white,
+html:not(.dark) button[class*="bg-amber"] span.text-white,
+html:not(.dark) a[class*="bg-blue"] span.text-white,
+html:not(.dark) button[class*="bg-blue"] span.text-white,
+html:not(.dark) a[class*="bg-indigo"] span.text-white,
+html:not(.dark) button[class*="bg-indigo"] span.text-white,
+html:not(.dark) a[class*="bg-violet"] span.text-white,
+html:not(.dark) button[class*="bg-violet"] span.text-white,
+html:not(.dark) a[class*="bg-purple"] span.text-white,
+html:not(.dark) button[class*="bg-purple"] span.text-white,
+html:not(.dark) a[class*="bg-rose"] span.text-white,
+html:not(.dark) button[class*="bg-rose"] span.text-white,
+html:not(.dark) a[class*="bg-red"] span.text-white,
+html:not(.dark) button[class*="bg-red"] span.text-white,
+html:not(.dark) a[class*="bg-slate"] span.text-white,
+html:not(.dark) button[class*="bg-slate"] span.text-white,
+html:not(.dark) a[class*="bg-[#0F172A]"] span.text-white,
+html:not(.dark) button[class*="bg-[#0F172A]"] span.text-white,
+html:not(.dark) a[class*="bg-[#0f172a]"] span.text-white,
+html:not(.dark) button[class*="bg-[#0f172a]"] span.text-white,
+html:not(.dark) a[class*="bg-[#EA580C]"] span.text-white,
+html:not(.dark) button[class*="bg-[#EA580C]"] span.text-white,
+html:not(.dark) a[class*="bg-[#ea580c]"] span.text-white,
+html:not(.dark) button[class*="bg-[#ea580c]"] span.text-white,
+html:not(.dark) a[class*="data-[state=active]:bg"] span.text-white,
+html:not(.dark) button[class*="data-[state=active]:bg"] span.text-white,
+
+html:not(.dark) a[class*="bg-emerald"] p.text-white,
+html:not(.dark) button[class*="bg-emerald"] p.text-white,
+html:not(.dark) a[class*="bg-em-"] p.text-white,
+html:not(.dark) button[class*="bg-em-"] p.text-white,
+html:not(.dark) a.bg-primary p.text-white,
+html:not(.dark) button.bg-primary p.text-white,
+html:not(.dark) a.bg-\[\#021a02\] p.text-white,
+html:not(.dark) button.bg-\[\#021a02\] p.text-white,
+html:not(.dark) a[class*="bg-amber"] p.text-white,
+html:not(.dark) button[class*="bg-amber"] p.text-white,
+html:not(.dark) a[class*="bg-blue"] p.text-white,
+html:not(.dark) button[class*="bg-blue"] p.text-white,
+html:not(.dark) a[class*="bg-indigo"] p.text-white,
+html:not(.dark) button[class*="bg-indigo"] p.text-white,
+html:not(.dark) a[class*="bg-violet"] p.text-white,
+html:not(.dark) button[class*="bg-violet"] p.text-white,
+html:not(.dark) a[class*="bg-purple"] p.text-white,
+html:not(.dark) button[class*="bg-purple"] p.text-white,
+html:not(.dark) a[class*="bg-rose"] p.text-white,
+html:not(.dark) button[class*="bg-rose"] p.text-white,
+html:not(.dark) a[class*="bg-red"] p.text-white,
+html:not(.dark) button[class*="bg-red"] p.text-white,
+html:not(.dark) a[class*="bg-slate"] p.text-white,
+html:not(.dark) button[class*="bg-slate"] p.text-white,
+html:not(.dark) a[class*="bg-[#0F172A]"] p.text-white,
+html:not(.dark) button[class*="bg-[#0F172A]"] p.text-white,
+html:not(.dark) a[class*="bg-[#0f172a]"] p.text-white,
+html:not(.dark) button[class*="bg-[#0f172a]"] p.text-white,
+html:not(.dark) a[class*="bg-[#EA580C]"] p.text-white,
+html:not(.dark) button[class*="bg-[#EA580C]"] p.text-white,
+html:not(.dark) a[class*="bg-[#ea580c]"] p.text-white,
+html:not(.dark) button[class*="bg-[#ea580c]"] p.text-white,
+html:not(.dark) a[class*="data-[state=active]:bg"] p.text-white,
+html:not(.dark) button[class*="data-[state=active]:bg"] p.text-white {
+  color: #FFFFFF !important;
+}
+
+/* Jika tidak ada background solid di atas, span/p di dalam button/link berubah jadi gelap di light mode */
+html:not(.dark) a:not([class*="bg-emerald"]):not([class*="bg-em-"]):not([class*="bg-primary"]):not([class*="bg-[#021a02]"]):not([class*="bg-amber"]):not([class*="bg-blue"]):not([class*="bg-indigo"]):not([class*="bg-violet"]):not([class*="bg-purple"]):not([class*="bg-rose"]):not([class*="bg-red"]):not([class*="bg-slate"]):not([class*="bg-[#0F172A]"]):not([class*="bg-[#0f172a]"]):not([class*="bg-[#EA580C]"]):not([class*="bg-[#ea580c]"]):not([class*="data-[state=active]:bg"]) span.text-white:not(.dark *):not(.dark-preserve *),
+html:not(.dark) button:not([class*="bg-emerald"]):not([class*="bg-em-"]):not([class*="bg-primary"]):not([class*="bg-[#021a02]"]):not([class*="bg-amber"]):not([class*="bg-blue"]):not([class*="bg-indigo"]):not([class*="bg-violet"]):not([class*="bg-purple"]):not([class*="bg-rose"]):not([class*="bg-red"]):not([class*="bg-slate"]):not([class*="bg-[#0F172A]"]):not([class*="bg-[#0f172a]"]):not([class*="bg-[#EA580C]"]):not([class*="bg-[#ea580c]"]):not([class*="data-[state=active]:bg"]) span.text-white:not(.dark *):not(.dark-preserve *),
+html:not(.dark) a:not([class*="bg-emerald"]):not([class*="bg-em-"]):not([class*="bg-primary"]):not([class*="bg-[#021a02]"]):not([class*="bg-amber"]):not([class*="bg-blue"]):not([class*="bg-indigo"]):not([class*="bg-violet"]):not([class*="bg-purple"]):not([class*="bg-rose"]):not([class*="bg-red"]):not([class*="bg-slate"]):not([class*="bg-[#0F172A]"]):not([class*="bg-[#0f172a]"]):not([class*="bg-[#EA580C]"]):not([class*="bg-[#ea580c]"]):not([class*="data-[state=active]:bg"]) p.text-white:not(.dark *):not(.dark-preserve *),
+html:not(.dark) button:not([class*="bg-emerald"]):not([class*="bg-em-"]):not([class*="bg-primary"]):not([class*="bg-[#021a02]"]):not([class*="bg-amber"]):not([class*="bg-blue"]):not([class*="bg-indigo"]):not([class*="bg-violet"]):not([class*="bg-purple"]):not([class*="bg-rose"]):not([class*="bg-red"]):not([class*="bg-slate"]):not([class*="bg-[#0F172A]"]):not([class*="bg-[#0f172a]"]):not([class*="bg-[#EA580C]"]):not([class*="bg-[#ea580c]"]):not([class*="data-[state=active]:bg"]) p.text-white:not(.dark *):not(.dark-preserve *) {
+  color: #0F172A !important;
+}
+
+/* Teks di dalam element dengan bg emerald tetap putih */
+html:not(.dark) .bg-emerald-500 span,
+html:not(.dark) .bg-emerald-600 span,
+html:not(.dark) .bg-em-500 span,
+html:not(.dark) .bg-\[\#021a02\] span,
+html:not(.dark) .bg-emerald-500 p,
+html:not(.dark) .bg-emerald-600 p {
+  color: #FFFFFF !important;
+}
+
+/* ── Border overrides (Comprehensive) ── */
+html:not(.dark) [class*="border-white/"] { border-color: rgba(15, 23, 42, 0.08) !important; }
+html:not(.dark) [class*="border-white/5"]  { border-color: rgba(0, 0, 0, 0.05) !important; }
+html:not(.dark) [class*="border-white/8"]  { border-color: rgba(0, 0, 0, 0.08) !important; }
+html:not(.dark) [class*="border-white/10"] { border-color: rgba(0, 0, 0, 0.10) !important; }
+html:not(.dark) [class*="border-white/15"] { border-color: rgba(0, 0, 0, 0.12) !important; }
+html:not(.dark) [class*="border-white/20"] { border-color: rgba(0, 0, 0, 0.16) !important; }
+html:not(.dark) [class*="border-white/30"] { border-color: rgba(0, 0, 0, 0.24) !important; }
+
+/* ── Background opacity overrides (Comprehensive) ── */
+html:not(.dark) [class*="bg-white/"] { background-color: rgba(0, 0, 0, 0.03) !important; }
+html:not(.dark) [class*="bg-white/5"]   { background-color: rgba(0, 0, 0, 0.04) !important; }
+html:not(.dark) [class*="bg-white/10"]  { background-color: rgba(0, 0, 0, 0.06) !important; }
+html:not(.dark) [class*="bg-white/20"]  { background-color: rgba(0, 0, 0, 0.10) !important; }
+
+/* ── Hover backgrounds override for white transparent classes ── */
+html:not(.dark) [class*="hover:bg-white/"]:hover {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+/* ── Navbar/header sticky backgrounds ── */
+html:not(.dark) .bg-\[\#0C1319\]\/60 { background-color: rgba(255, 255, 255, 0.90) !important; }
+html:not(.dark) .bg-\[\#06090F\]\/90 { background-color: rgba(250, 250, 250, 0.92) !important; }
+html:not(.dark) .bg-\[\#06090F\]\/95 { background-color: rgba(250, 250, 250, 0.96) !important; }
+
+/* ── Color accent colors — gelap di light mode ── */
+html:not(.dark) .text-emerald-300 { color: #8cb88c !important; }
+html:not(.dark) .text-emerald-400 { color: #4d9e4d !important; }
+html:not(.dark) .text-emerald-500 { color: #0c3d0c !important; }
+html:not(.dark) .text-\[\#021a02\] { color: #021a02 !important; }
+html:not(.dark) .text-\[\#021a02\] { color: #021a02 !important; }
+html:not(.dark) .text-amber-300   { color: #D97706 !important; }
+html:not(.dark) .text-amber-400   { color: #D97706 !important; }
+html:not(.dark) .text-amber-500   { color: #B45309 !important; }
+html:not(.dark) .text-blue-400    { color: #2563EB !important; }
+html:not(.dark) .text-blue-500    { color: #1D4ED8 !important; }
+html:not(.dark) .text-purple-400  { color: #7C3AED !important; }
+html:not(.dark) .text-purple-500  { color: #6D28D9 !important; }
+html:not(.dark) .text-rose-400    { color: #E11D48 !important; }
+html:not(.dark) .text-rose-500    { color: #BE123C !important; }
+html:not(.dark) .text-teal-400    { color: #0D9488 !important; }
+html:not(.dark) .text-teal-500    { color: #0F766E !important; }
+
+/* ── Input fields ── */
+html:not(.dark) input:not([type="range"]),
+html:not(.dark) textarea,
+html:not(.dark) select {
+  background-color: #FFFFFF !important;
+  color: #0F172A !important;
+  border-color: rgba(0, 0, 0, 0.18) !important;
+}
+html:not(.dark) input::placeholder,
+html:not(.dark) textarea::placeholder {
+  color: #9CA3AF !important;
+}
+
+/* ===================================================================
+   FITUR PAGE & COMPONENTS — Hard-coded dark color overrides
+   Halaman /fitur menggunakan color hex langsung, bukan CSS variables
+   =================================================================== */
+
+/* ── Background containers ── */
+html:not(.dark) .bg-\[\#06090F\] { background-color: #FAFAFA !important; }
+html:not(.dark) .bg-\[\#080D13\] { background-color: #F5F5F5 !important; }
+html:not(.dark) .bg-\[\#0C1319\] { background-color: #FFFFFF !important; }
+html:not(.dark) .bg-\[\#0C1319\]\/80 { background-color: rgba(255, 255, 255, 0.80) !important; }
+html:not(.dark) .bg-\[\#0C1319\]\/60 { background-color: rgba(255, 255, 255, 0.60) !important; }
+html:not(.dark) .bg-\[\#0C1319\]\/50 { background-color: rgba(255, 255, 255, 0.50) !important; }
+html:not(.dark) .bg-\[\#0C1319\]\/30 { background-color: rgba(255, 255, 255, 0.30) !important; }
+
+html:not(.dark) .bg-\[\#111C24\] { background-color: #F0F4F8 !important; }
+html:not(.dark) .bg-\[\#111c24\] { background-color: #F0F4F8 !important; }
+html:not(.dark) .bg-\[\#111C24\]\/80 { background-color: rgba(240, 244, 248, 0.80) !important; }
+
+/* ── Tab bar container (FiturPage sticky top) ── */
+html:not(.dark) .bg-\[\#06090F\]\/95 { background-color: rgba(250,250,250,0.96) !important; }
+
+/* ── text-white and other hardcoded text color variants ── */
+html:not(.dark) .text-\[\#F1F5F9\] { color: #0F172A !important; }
+html:not(.dark) .text-\[\#CBD5E1\] { color: #1E293B !important; }
+html:not(.dark) .text-\[\#94A3B8\] { color: #475569 !important; }
+html:not(.dark) .text-\[\#4B6478\] { color: #475569 !important; }
+html:not(.dark) .text-\[\#64748B\] { color: #334155 !important; }
+
+html:not(.dark) .text-white\/40 { color: rgba(15,23,42,0.45) !important; }
+html:not(.dark) .text-white\/50 { color: rgba(15,23,42,0.55) !important; }
+html:not(.dark) .text-white\/60 { color: rgba(15,23,42,0.65) !important; }
+html:not(.dark) .text-white\/70 { color: rgba(15,23,42,0.75) !important; }
+html:not(.dark) .text-white\/80 { color: rgba(15,23,42,0.85) !important; }
+
+/* ── bg-white opacity variants ── */
+html:not(.dark) .bg-white\/\[0\.08\] { background-color: rgba(0,0,0,0.07) !important; }
+html:not(.dark) .bg-white\/\[0\.05\] { background-color: rgba(0,0,0,0.04) !important; }
+html:not(.dark) .bg-white\/5        { background-color: rgba(0,0,0,0.04) !important; }
+html:not(.dark) .bg-white\/\[0\.03\]  { background-color: rgba(0,0,0,0.03) !important; }
+html:not(.dark) .bg-white\/\[0\.02\]  { background-color: rgba(0,0,0,0.02) !important; }
+html:not(.dark) .bg-white\/\[0\.015\] { background-color: rgba(0,0,0,0.02) !important; }
+
+/* ── border-white opacity variants ── */
+html:not(.dark) .border-white\/8  { border-color: rgba(0,0,0,0.08) !important; }
+html:not(.dark) .border-white\/10 { border-color: rgba(0,0,0,0.10) !important; }
+html:not(.dark) .border-white\/15 { border-color: rgba(0,0,0,0.12) !important; }
+html:not(.dark) .border-white\/20 { border-color: rgba(0,0,0,0.20) !important; }
+html:not(.dark) .border-white\/30 { border-color: rgba(0,0,0,0.30) !important; }
+
+/* ── GroupCard background (linear-gradient with rgba white) ── */
+/* GroupCard: bg-[linear-gradient(135deg,rgba(255,255,255,0.05),...)] */
+/* Di light mode, gradient putih di background putih = invisible card */
+html:not(.dark) [class*="bg-[linear-gradient(135deg,rgba(255,255,255"] {
+  background: rgba(0,0,0,0.04) !important;
+  border-color: rgba(0,0,0,0.10) !important;
+}
+
+/* ── Global text-white Overrides (except inside buttons, links, solid colors) ── */
+html:not(.dark) h1.text-white:not(.dark *):not(.dark-preserve *),
+html:not(.dark) h2.text-white:not(.dark *):not(.dark-preserve *),
+html:not(.dark) h3.text-white:not(.dark *):not(.dark-preserve *),
+html:not(.dark) h4.text-white:not(.dark *):not(.dark-preserve *),
+html:not(.dark) h5.text-white:not(.dark *):not(.dark-preserve *),
+html:not(.dark) h6.text-white:not(.dark *):not(.dark-preserve *),
+html:not(.dark) strong.text-white:not(.dark *):not(.dark-preserve *),
+html:not(.dark) div.text-white:not(button *):not(a *):not([class*="bg-emerald"]):not([class*="bg-amber"]):not([class*="bg-violet"]):not(.dark *):not(.dark-preserve *),
+html:not(.dark) p.text-white:not(button *):not(a *):not([class*="bg-emerald"]):not([class*="bg-amber"]):not([class*="bg-violet"]):not(.dark *):not(.dark-preserve *),
+html:not(.dark) span.text-white:not(button *):not(a *):not(.badge *):not([class*="bg-emerald"]):not([class*="bg-emerald"] *):not([class*="bg-amber"]):not([class*="bg-amber"] *):not([class*="bg-violet"]):not([class*="bg-violet"] *):not(.dark *):not(.dark-preserve *) {
+  color: #0F172A !important;
+}
+
+/* ── Hover Text/Opacity Overrides ── */
+html:not(.dark) .hover\:text-white:hover {
+  color: #0F172A !important;
+}
+html:not(.dark) .group:hover .group-hover\:text-white {
+  color: #0F172A !important;
+}
+html:not(.dark) .hover\:text-emerald-400:hover {
+  color: #059669 !important;
+}
+html:not(.dark) .hover\:text-amber-400:hover {
+  color: #D97706 !important;
+}
+
+/* ── Solid Accent Background Text Protection ── */
+html:not(.dark) .bg-emerald-500 .text-white,
+html:not(.dark) .bg-emerald-600 .text-white,
+html:not(.dark) .bg-emerald-700 .text-white,
+html:not(.dark) .bg-amber-500 .text-white,
+html:not(.dark) .bg-amber-600 .text-white {
+  color: #FFFFFF !important;
+}
+
+/* ── FAQItem / Accordion headers ── */
+html:not(.dark) summary span.text-white { color: #1E293B !important; }
+
+
+/* ===================================================================
+   TARGETED .fitur-page OVERRIDES
+   Menggunakan class 'fitur-page' sebagai namespace agar override
+   tidak mencemari komponen lain yang sengaja pakai dark styling
+   =================================================================== */
+
+/* Root page background & text */
+html:not(.dark) .fitur-page {
+  background-color: #FAFAFA !important;
+  color: #0F172A !important;
+}
+
+/* Semua heading putih di dalam fitur-page */
+html:not(.dark) .fitur-page h1,
+html:not(.dark) .fitur-page h2,
+html:not(.dark) .fitur-page h3 {
+  color: #0F172A !important;
+}
+
+/* Semua span/p yang pakai text-white di dalam fitur-page menjadi gelap */
+html:not(.dark) .fitur-page .text-white { color: #0F172A !important; }
+html:not(.dark) .fitur-page .text-white\/40 { color: rgba(15,23,42,0.45) !important; }
+html:not(.dark) .fitur-page .text-white\/50 { color: rgba(15,23,42,0.55) !important; }
+/* Exception: button di dalam emerald bg tetap putih */
+html:not(.dark) .fitur-page .bg-emerald-500 .text-white,
+html:not(.dark) .fitur-page .bg-emerald-500 { color: #FFFFFF !important; }
+html:not(.dark) .fitur-page a.bg-emerald-500 { color: #FFFFFF !important; }
+
+/* Sticky tab bar */
+html:not(.dark) .fitur-page .sticky {
+  background-color: rgba(250,250,250,0.96) !important;
+  border-color: rgba(0,0,0,0.08) !important;
+}
+
+/* Tab button container pill */
+html:not(.dark) .fitur-page .inline-flex.bg-\[\#111C24\],
+html:not(.dark) .fitur-page .inline-flex.rounded-full {
+  background-color: #E8EDF2 !important;
+  border-color: rgba(0,0,0,0.10) !important;
+}
+
+/* GroupCard cards */
+html:not(.dark) .fitur-page .rounded-2xl,
+html:not(.dark) .fitur-page .rounded-3xl {
+  background-color: #FFFFFF !important;
+  border-color: rgba(0,0,0,0.08) !important;
+}
+
+/* Section backgrounds */
+html:not(.dark) .fitur-page section {
+  background-color: #FAFAFA !important;
+}
+
+/* Before/After dark section */
+html:not(.dark) .fitur-page .py-20.bg-\[\#080D13\] {
+  background-color: #F0F4F8 !important;
+}
+
+/* CTA section */
+html:not(.dark) .fitur-page .py-24 {
+  background-color: #FAFAFA !important;
+}
+
+
+/* ===================================================================
+   DARK THEME PRESERVATION (DARK PRESERVE SYSTEM)
+   Restores original dark colors inside .dark-preserve containers 
+   even when the main page is in light mode.
+   =================================================================== */
+
+/* backgrounds */
+.dark-preserve,
+.dark-preserve.bg-\[\#06090F\],
+.dark-preserve .bg-\[\#06090F\] { background-color: #06090F !important; }
+.dark-preserve.bg-\[\#080D13\],
+.dark-preserve .bg-\[\#080D13\] { background-color: #080D13 !important; }
+.dark-preserve.bg-\[\#0C1319\],
+.dark-preserve .bg-\[\#0C1319\] { background-color: #0C1319 !important; }
+.dark-preserve.bg-\[\#111C24\],
+.dark-preserve .bg-\[\#111C24\] { background-color: #111C24 !important; }
+.dark-preserve.bg-\[\#162230\],
+.dark-preserve .bg-\[\#162230\] { background-color: #162230 !important; }
+.dark-preserve .bg-\[\#0C1319\]\/80 { background-color: rgba(12, 19, 25, 0.8) !important; }
+
+/* text colors */
+.dark-preserve.text-white,
+.dark-preserve .text-white { color: #FFFFFF !important; }
+.dark-preserve.text-\[\#F1F5F9\],
+.dark-preserve .text-\[\#F1F5F9\] { color: #F1F5F9 !important; }
+.dark-preserve.text-\[\#CBD5E1\],
+.dark-preserve .text-\[\#CBD5E1\] { color: #CBD5E1 !important; }
+.dark-preserve.text-\[\#94A3B8\],
+.dark-preserve .text-\[\#94A3B8\] { color: #94A3B8 !important; }
+.dark-preserve.text-\[\#4B6478\],
+.dark-preserve .text-\[\#4B6478\] { color: #4B6478 !important; }
+.dark-preserve.text-\[\#64748B\],
+.dark-preserve .text-\[\#64748B\] { color: #64748B !important; }
+.dark-preserve.text-\[\#8899A6\],
+.dark-preserve .text-\[\#8899A6\] { color: #8899A6 !important; }
+.dark-preserve.text-\[\#7F8EA0\],
+.dark-preserve .text-\[\#7F8EA0\] { color: #7F8EA0 !important; }
+
+/* headings & tags inside dark preserve */
+.dark-preserve h1, .dark-preserve h1.text-white,
+.dark-preserve h2, .dark-preserve h2.text-white,
+.dark-preserve h3, .dark-preserve h3.text-white,
+.dark-preserve h4, .dark-preserve h4.text-white,
+.dark-preserve h5, .dark-preserve h5.text-white,
+.dark-preserve h6, .dark-preserve h6.text-white,
+.dark-preserve p, .dark-preserve p.text-white,
+.dark-preserve span, .dark-preserve span.text-white,
+.dark-preserve strong, .dark-preserve strong.text-white {
+  color: #FFFFFF !important;
+}
+
+/* transparent borders & background opacities */
+.dark-preserve [class*="border-white/"] { border-color: revert !important; }
+.dark-preserve [class*="bg-white/"] { background-color: revert !important; }
+.dark-preserve .border-white\/5 { border-color: rgba(255, 255, 255, 0.05) !important; }
+.dark-preserve .border-white\/8 { border-color: rgba(255, 255, 255, 0.08) !important; }
+.dark-preserve .border-white\/10 { border-color: rgba(255, 255, 255, 0.10) !important; }
+.dark-preserve .border-white\/20 { border-color: rgba(255, 255, 255, 0.20) !important; }
+.dark-preserve .bg-white\/5 { background-color: rgba(255, 255, 255, 0.04) !important; }
+.dark-preserve .bg-white\/10 { background-color: rgba(255, 255, 255, 0.06) !important; }
+.dark-preserve .bg-white\/20 { background-color: rgba(255, 255, 255, 0.10) !important; }
+
+/* emerald/accent text in dark preserve */
+.dark-preserve .text-emerald-300 { color: #6EE7B7 !important; }
+.dark-preserve .text-emerald-400 { color: #34D399 !important; }
+.dark-preserve .text-emerald-500 { color: #22c55e !important; }
+.dark-preserve .text-emerald-600 { color: #16a34a !important; }
+.dark-preserve .text-em-400 { color: #4ade80 !important; }
+.dark-preserve .text-em-500 { color: #22c55e !important; }
+.dark-preserve .text-em-600 { color: #16a34a !important; }
+
+
+
+
+/* Theme-Adaptive Brand utility classes */
+.text-brand-500 {
+  color: var(--brand-500) !important;
+}
+.bg-brand-500 {
+  background-color: var(--brand-500) !important;
+}
+
+/* ── SMOOTH THEME SWITCHING TRANSITION ── */
+/* Applying high-performance CSS transition to elements affected by dark/light mode toggles */
+body,
+.bg-bg-base,
+.bg-bg-1,
+.bg-bg-2,
+.bg-bg-3,
+.border-border-default,
+.border-border-subtle,
+.border-border-strong,
+.text-text-primary,
+.text-text-secondary,
+.text-text-muted,
+.text-text-accent,
+input,
+label,
+span:not(.dark-preserve *),
+p:not(.dark-preserve *),
+h1:not(.dark-preserve *),
+h2:not(.dark-preserve *),
+h3:not(.dark-preserve *),
+h4:not(.dark-preserve *) {
+  transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+              color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+              backdrop-filter 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Custom Selection Styles ── */
+/* Default (Light Mode / Light Containers) */
+html:not(.dark) ::selection {
+  background-color: #0c3d0c !important;
+  color: #FFFFFF !important;
+}
+html:not(.dark) ::-moz-selection {
+  background-color: #0c3d0c !important;
+  color: #FFFFFF !important;
+}
+
+/* Dark Mode / Dark Containers (.dark or .dark-preserve) */
+html.dark ::selection,
+.dark ::selection,
+.dark-preserve ::selection {
+  background-color: #8cb88c !important;
+  color: #0F172A !important;
+}
+html.dark ::-moz-selection,
+.dark ::-moz-selection,
+.dark-preserve ::-moz-selection {
+  background-color: #8cb88c !important;
+  color: #0F172A !important;
+}
+
+/* ===== Juragan Landing Page Utilities & Animations ===== */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+@keyframes floatSlow {
+  0%, 100% { 
+    transform: translateY(0); 
+    box-shadow: 0 10px 25px -5px rgba(122, 30, 49, 0.1), 0 8px 10px -6px rgba(122, 30, 49, 0.1);
+  }
+  50% { 
+    transform: translateY(-8px); 
+    box-shadow: 0 20px 25px -5px rgba(122, 30, 49, 0.15), 0 10px 10px -5px rgba(122, 30, 49, 0.12);
+  }
+}
+
+.animate-float-slow {
+  animation: floatSlow 6s ease-in-out infinite;
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.glass-card-maroon {
+  background: rgba(122, 30, 49, 0.05);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(122, 30, 49, 0.1);
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
+}
+
+.reveal-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.premium-card-hover {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.premium-card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 25px -5px rgba(122, 30, 49, 0.08), 0 10px 10px -5px rgba(122, 30, 49, 0.04);
+}
+
+.premium-button-hover {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.premium-button-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px -5px rgba(197, 168, 128, 0.4);
+}
+.premium-button-hover:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .reveal {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+  .animate-scale-in {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
+

@@ -1,0 +1,15 @@
+{
+  "name": "Broker Dashboard - Manajemen Sembako",
+  "short_name": "Broker Dashboard",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#090d16",
+  "theme_color": "#16a34a",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}

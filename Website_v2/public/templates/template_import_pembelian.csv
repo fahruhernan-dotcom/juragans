@@ -1,0 +1,4 @@
+batch_number,purchase_date,supplier_name,product_name,qty_masuk,buy_price,notes
+BATCH-20260801-A1,2026-08-01,PT Wilmar Nabati Indonesia,Minyak Goreng Bimoli 2L,200,34000,Restock awal bulan
+BATCH-20260801-A2,2026-08-01,PT Indofood Sukses Makmur,Indomie Goreng Original,500,2700,Pengadaan dari pabrik
+BATCH-20260802-A3,2026-08-02,CV Distributor Sembako Nusantara,Gula Pasir Gulaku 1kg,300,15500,Restock gula pasir

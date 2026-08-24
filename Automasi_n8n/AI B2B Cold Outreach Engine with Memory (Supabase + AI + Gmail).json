@@ -1,0 +1,781 @@
+{
+  "name": "AI B2B Cold Outreach Engine with Memory (Supabase + AI + Gmail)",
+  "nodes": [
+    {
+      "parameters": {
+        "model": "z-ai/glm-5.2:free",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        624,
+        816
+      ],
+      "id": "bc793a1c-f020-421c-865a-57156bfb93e0",
+      "name": "OpenRouter Chat Model",
+      "credentials": {
+        "openRouterApi": {
+          "id": "FQA0RkJyjJrD4TsO",
+          "name": "OpenRouter account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.country }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.4,
+      "position": [
+        608,
+        960
+      ],
+      "id": "61678a09-781c-4e4b-a608-6c251c80aefd",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "model": "qwen3.8-max",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAlibabaCloud",
+      "typeVersion": 1,
+      "position": [
+        896,
+        944
+      ],
+      "id": "2a4fe4d1-8089-4472-b66a-597cb9eac439",
+      "name": "Qwen Cloud Chat Model",
+      "credentials": {
+        "alibabaCloudApi": {
+          "id": "DfjZ12RGfOCKYm8P",
+          "name": "Qwen Cloud account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "b2b_scraping_queue",
+        "limit": 1,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "pending"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        240,
+        -64
+      ],
+      "id": "f2d53717-5289-4886-bbc5-eac399025a3e",
+      "name": "Get Location Sraping Queue",
+      "credentials": {
+        "supabaseApi": {
+          "id": "6nmQKNcFlilYBKHR",
+          "name": "anakbawangstore"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.apify.com/v2/acts/berkaydev~google-maps-email-scraper-business-leads/run-sync-get-dataset-items?token=YOUR_APIFY_API_TOKEN",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"enrichLeads\": true,\n  \"extractEmail\": true,\n  \"location\": \"{{ $json.target_location }}\",\n  \"maxResults\": 1,\n  \"onlyWithPhone\": true,\n  \"onlyWithWebsite\": true,\n  \"proxyConfiguration\": {\n    \"useApifyProxy\": true,\n    \"apifyProxyGroups\": []\n  },\n  \"searchTerms\": [\n    \"Indonesian restaurant\",\n    \"Indonesian food\",\n    \"Indonesian cuisine\",\n    \"Indonesian restaurant {{ $json.target_location }}\",\n    \"Nusantara restaurant\",\n    \"Nusantara cuisine\",\n    \"Indonesian cafe\",\n    \"Indonesian halal restaurant\",\n    \"Indonesian catering\",\n    \"Padang restaurant\",\n    \"Nasi Padang\",\n    \"Warung Indonesia\"\n  ]\n}",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "a80ae1ae-ccbb-4a0c-a4c1-ffc52cdae160",
+      "name": "Scrape Google Maps (Apify Sync)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        464,
+        -64
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 2 */5 * *"
+            }
+          ]
+        }
+      },
+      "id": "cab6b3c3-72fa-4263-b04a-b0064d65d50d",
+      "name": "Schedule Every 5 Days",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        32,
+        -64
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst cleanedData = [];\n\nfunction cleanRestoName(raw) {\n  if (!raw) return '';\n  let n = raw.split('|')[0].split('@')[0].trim();\n  n = n.replace(/\\s*-\\s*Kandahar Street/gi, '');\n  n = n.replace(/\\((.*?)\\)/g, '').trim();\n  n = n.replace(/Restaurant|Singapore|Malaysia|SG|KL/gi, '').trim();\n  return n || raw.trim();\n}\n\nlet targetCountry = 'Malaysia';\nlet targetCity = 'Kuala Lumpur';\nlet queueId = null;\n\ntry {\n  const q = $('2. Cek Antrian Negara di Supabase').item.json;\n  targetCountry = q.country || 'Malaysia';\n  targetCity = q.city_or_region || 'Kuala Lumpur';\n  queueId = q.queue_id || null;\n} catch (e) {}\n\nfor (const item of items) {\n  const row = item.json;\n  if (!row.name && !row.title) continue;\n\n  const rawName = row.name || row.title;\n  const cleanName = cleanRestoName(rawName);\n  \n  const socials = row.social_links || {};\n  const instagram = socials.instagram || row['social_links/instagram'] || null;\n  const facebook = socials.facebook || row['social_links/facebook'] || null;\n  const tiktok = socials.tiktok || row['social_links/tiktok'] || null;\n  const linkedin = socials.linkedin || row['social_links/linkedin'] || null;\n\n  const email = (row.email && typeof row.email === 'string' && row.email.includes('@')) \n    ? row.email.trim().toLowerCase() \n    : null;\n    \n  const phone = row.phone ? String(row.phone).trim() : null;\n\n  cleanedData.push({\n    json: {\n      queue_id: queueId,\n      place_id: row.place_id || `temp_${cleanName.replace(/\\s+/g, '_')}`,\n      name: rawName,\n      clean_name: cleanName,\n      category: row.category || 'Indonesian restaurant',\n      country: row.country || targetCountry,\n      city: row.city || targetCity,\n      address: row.address || '',\n      latitude: row.latitude ? parseFloat(row.latitude) : null,\n      longitude: row.longitude ? parseFloat(row.longitude) : null,\n      maps_url: row.maps_url || row.url || null,\n      phone: phone,\n      email: email,\n      email_source: row.email_source || (email ? 'apify_scraper' : null),\n      website: row.website || null,\n      cms: row.cms || null,\n      has_contact_form: row.has_contact_form === true || row.has_contact_form === 'true',\n      instagram_url: instagram,\n      facebook_url: facebook,\n      tiktok_url: tiktok,\n      linkedin_url: linkedin,\n      rating: row.rating ? parseFloat(row.rating) : 4.5,\n      review_count: row.review_count ? parseInt(row.review_count, 10) : 0,\n      contactability_score: row.contactability_score ? parseInt(row.contactability_score, 10) : (email ? 85 : 50),\n      lead_priority: (row.lead_priority || (email ? 'hot' : 'warm')).toLowerCase(),\n      status_email: 'pending',\n      status_whatsapp: 'pending'\n    }\n  });\n}\n\nreturn cleanedData;"
+      },
+      "id": "2fadc7a4-e787-48a7-be3d-7eb8c3a60402",
+      "name": "Normalize & Standardize Leads",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        688,
+        -64
+      ]
+    },
+    {
+      "parameters": {
+        "tableId": "b2b_leads",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "place_id",
+              "fieldValue": "={{ $json.place_id }}"
+            },
+            {
+              "fieldId": "name",
+              "fieldValue": "={{ $json.name }}"
+            },
+            {
+              "fieldId": "clean_name",
+              "fieldValue": "={{ $json.clean_name }}"
+            },
+            {
+              "fieldId": "category",
+              "fieldValue": "={{ $json.category }}"
+            },
+            {
+              "fieldId": "country",
+              "fieldValue": "={{ $json.country }}"
+            },
+            {
+              "fieldId": "city",
+              "fieldValue": "={{ $json.city }}"
+            },
+            {
+              "fieldId": "address",
+              "fieldValue": "={{ $json.address }}"
+            },
+            {
+              "fieldId": "latitude",
+              "fieldValue": "={{ $json.latitude }}"
+            },
+            {
+              "fieldId": "longitude",
+              "fieldValue": "={{ $json.longitude }}"
+            },
+            {
+              "fieldId": "maps_url",
+              "fieldValue": "={{ $json.maps_url }}"
+            },
+            {
+              "fieldId": "phone",
+              "fieldValue": "={{ $json.phone }}"
+            },
+            {
+              "fieldId": "email",
+              "fieldValue": "={{ $json.email }}"
+            },
+            {
+              "fieldId": "email_source",
+              "fieldValue": "={{ $json.email_source }}"
+            },
+            {
+              "fieldId": "website",
+              "fieldValue": "={{ $json.website }}"
+            },
+            {
+              "fieldId": "cms",
+              "fieldValue": "={{ $json.cms }}"
+            },
+            {
+              "fieldId": "has_contact_form",
+              "fieldValue": "={{ $json.has_contact_form }}"
+            },
+            {
+              "fieldId": "instagram_url",
+              "fieldValue": "={{ $json.instagram_url }}"
+            },
+            {
+              "fieldId": "facebook_url",
+              "fieldValue": "={{ $json.facebook_url }}"
+            },
+            {
+              "fieldId": "tiktok_url",
+              "fieldValue": "={{ $json.tiktok_url }}"
+            },
+            {
+              "fieldId": "linkedin_url",
+              "fieldValue": "={{ $json.linkedin_url }}"
+            },
+            {
+              "fieldId": "rating",
+              "fieldValue": "={{ $json.rating }}"
+            },
+            {
+              "fieldId": "review_count",
+              "fieldValue": "={{ $json.review_count }}"
+            },
+            {
+              "fieldId": "contactability_score",
+              "fieldValue": "={{ $json.contactability_score }}"
+            },
+            {
+              "fieldId": "lead_priority",
+              "fieldValue": "={{ $json.lead_priority }}"
+            },
+            {
+              "fieldId": "status_email",
+              "fieldValue": "={{ $json.status_email }}"
+            },
+            {
+              "fieldId": "status_whatsapp",
+              "fieldValue": "={{ $json.status_whatsapp }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        896,
+        -64
+      ],
+      "id": "5747de21-2f11-479b-8e9d-eb902f25454d",
+      "name": "Submit Result Scraping Buissness",
+      "credentials": {
+        "supabaseApi": {
+          "id": "6nmQKNcFlilYBKHR",
+          "name": "anakbawangstore"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "fahruhernansakti@gmail.com",
+        "subject": "N8n Automation",
+        "emailType": "text",
+        "message": "Apify Auto Scraping Sudah Selesai",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1104,
+        -64
+      ],
+      "id": "0b94801b-19bc-47f6-8bbe-902ba5eec35a",
+      "name": "Send Confirm message to my account",
+      "webhookId": "f67e4d72-1a32-4a69-b629-8fa9cac6b26f",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "ofeaXyv30OQCcEH5",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "v_n8n_pending_emails",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "pending"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1408,
+        -64
+      ],
+      "id": "def6e78e-5df0-470f-b045-8631e0f73f16",
+      "name": "Pharsing All Scarping Data with Contain Email",
+      "credentials": {
+        "supabaseApi": {
+          "id": "6nmQKNcFlilYBKHR",
+          "name": "anakbawangstore"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "c096b9d0-7b4a-4d64-bbe3-3c05abb16975",
+      "name": "3. Loop Leads Sequentially",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        32,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "fahruhernansakti@gmail.com",
+        "subject": "Done",
+        "message": "Email Bulk Done",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        704,
+        256
+      ],
+      "id": "79a40f02-c302-4b8b-808b-e204ad994785",
+      "name": "Send a message",
+      "webhookId": "39375657-a235-438d-ab28-4c73bccb05d6",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "ofeaXyv30OQCcEH5",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        496,
+        256
+      ],
+      "id": "37092be4-24b2-4f86-932d-198f2491c610",
+      "name": "Limit"
+    },
+    {
+      "parameters": {
+        "model": "z-ai/glm-5.2:free",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        368,
+        560
+      ],
+      "id": "431eafa2-1bfe-4fb2-aae8-99752c94267a",
+      "name": "OpenRouter Chat Model1",
+      "credentials": {
+        "openRouterApi": {
+          "id": "FQA0RkJyjJrD4TsO",
+          "name": "OpenRouter account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "qwen3.8-max",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAlibabaCloud",
+      "typeVersion": 1,
+      "position": [
+        512,
+        656
+      ],
+      "id": "ee06f44c-55b4-413e-bda2-7ab6c74c202c",
+      "name": "Qwen Cloud Chat Model1",
+      "credentials": {
+        "alibabaCloudApi": {
+          "id": "DfjZ12RGfOCKYm8P",
+          "name": "Qwen Cloud account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "=orenhoki01@gmail.com",
+        "subject": "={{ $json.subject.replace(/\\b\\w/g, l => l.toUpperCase()) }}",
+        "message": "={{ $json.body_html }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "a07a2d03-f302-4fe9-98a5-cdc897d4504e",
+      "name": "Send Outreach Email (Gmail/SMTP)1",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1168,
+        448
+      ],
+      "webhookId": "413401d9-0531-4e39-9c99-0c062a63eaf3",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "ofeaXyv30OQCcEH5",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"subject_options\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"string\"\n      }\n    },\n    \"recommended_grade\": {\n      \"type\": \"string\"\n    },\n    \"full_email_text\": {\n      \"type\": \"string\"\n    }\n  },\n  \"required\": [\n    \"subject_options\",\n    \"recommended_grade\",\n    \"full_email_text\"\n  ]\n}\n",
+        "autoFix": true
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        624,
+        672
+      ],
+      "id": "072d9b4f-f204-4b96-a37c-88416da99c43",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=PROSPECT INFORMATION:\n- Business Name: {{ $json.clean_name }}\n- Contact Person: {{ $json.contact_person || 'Not specified' }}\n- Category: {{ $json.category }}\n- Location: {{ $json.address }}\n- Specialties / Menu Highlights: {{ $json.restaurant_name }}\n- Website / Instagram: {{ $json.website }}\n- Observed Signals / Notes: {{ $json.lead_priority }}\n- Review Rating and Count : {{ $json.rating }} Reviewed {{ $json.review_count }}\n\n\nSENDER & OFFER DETAILS:\n- Sender: Rey (Juragan Bawang Goreng)\n- Target Market: Singapore F&B / HORECA\n- Offering:\n  1. Complimentary Chef's Tasting Sample Pack sent to their kitchen address.\n  2. Option to order a dedicated low-MOQ kitchen trial batch (5kg–10kg) at factory wholesale rates for full kitchen test runs.\n- Accreditations: SFA Export Standard, Official Halal Certified\nTask:\nGenerate a personalized English B2B cold email tailored specifically to their cuisine profile, proposing the sample/trial options directly to their kitchen address.\n",
+        "hasOutputParser": true,
+        "needsFallback": true,
+        "options": {
+          "systemMessage": "# IDENTITY & OBJECTIVE\nYou are an elite B2B Sales Outreach Copywriter representing Rey (Head of B2B Partnerships at Juragan Bawang Goreng), a premier direct producer of authentic Boyolali Fried Shallots (Bawang Goreng Cepogo) and Indonesian heritage spices based in Central Java.\n\nYour mission is to generate concise, professional, persuasive, and custom-tailored outreach emails for prospects in the Indonesian Food & Beverage (F&B) industry in Singapore (restaurants, cafes, catering services, cloud kitchens, and food distributors).\n\nYour goal is NOT to write mass marketing blasts. Your goal is to write 1-to-1 emails that make the recipient feel deeply understood, respect their kitchen time, and present a low-friction, compelling reason to reply.\n\n---\n\n# CORE PRODUCT LINEUP & VALUE PROPOSITIONS\n1. Direct Producer Sourcing: Sourced directly from Boyolali volcanic slopes, cutting out multi-layer distributor markups in Singapore.\n2. Two Distinct Culinary Grades:\n   - Grade S Murni (100% Pure Shallots, 0% Flour): Maximum aroma & natural oil release. Formulated for heritage curries (Rendang, Gulai) and rich broths (Soto, Bakso) without making soups cloudy or thickening sauces.\n   - Grade A Crispy (~5% Flour dusted): High-volume dining formulation with extended 6+ hour crunch retention on hot rice, Ayam Penyet, and sambal dishes under tropical humidity.\n3. Official Halal & Export Certifications:\n   - Official Halal Certified: ID33110018517710724 (BPJPH / Halal Indonesia recognized internationally).\n   - Singapore Food Agency (SFA) export standard compliant packaging, phytosanitary clearance, and full farm-to-pack batch traceability.\n4. Flexible Sample & Trial Options:\n   - Option A: Complimentary Chef's Tasting Sample Pack delivered directly to their kitchen address.\n   - Option B: Low-MOQ Kitchen Operational Trial Batch (5kg–10kg) at direct factory wholesale rates for full recipe testing before any regular bulk commitment.\n\n---\n\n# CORE CONSTRAINTS & DATA HANDLING\n1. ZERO HALLUCINATION: Strictly base all observations on the provided prospect data. Never invent awards, imaginary customer counts, unverified claims, or personal connections.\n2. MISSING DATA HANDLING: If certain details (e.g., contact person name, specific menu items) are absent, write naturally around them without mentioning that the information was missing (e.g., use \"Hi [Business Name] team,\").\n3. WORD COUNT TARGET: 100 – 160 words. Keep it razor-sharp and mobile-friendly.\n\n---\n\n# PERSONALIZATION METHODOLOGY\nDo NOT use surface-level placeholders or empty flattery (e.g., \"Your food looks delicious!\").\n\nIdentify and leverage authentic culinary signals from the input:\n- Padang / Minang / Malay Heritage: Highlight Grade S Murni (100% pure shallot aroma without thickening curries or clouding broth).\n- Ayam Penyet / Fried Chicken / Sambal / Indo Street Food: Highlight Grade A Crispy (6+ hour crunch longevity on hot rice + cost-per-portion efficiency).\n- Buffet / Catering / Multi-outlet / Cafe: Highlight bulk 1kg/2kg HORECA packaging, supply stability, official Halal ID33110018517710724, and SFA compliance.\n- Operational Context: Incorporate their physical Singapore location/address naturally into the delivery proposal.\n\n---\n\n# EMAIL ARCHITECTURE & FLOW\nConstruct every email strictly following this sequential structure:\n1. Personalized Opening: Direct, warm, and establishes immediate local context.\n2. Relevant Observation: A specific, observable detail about their business/cuisine/signature dishes.\n3. Specific Opportunity / Pain Point: The challenge of fried shallot quality in Singapore (inconsistent aroma, sogginess from humidity, high distributor markups, or starch fillers).\n4. Proposed Solution & Credibility: Factory-direct Boyolali supply, tailored grade, Halal Certified (ID33110018517710724), and SFA compliance.\n5. Flexible Low-Friction CTA: Offer a complimentary chef sample pack to their kitchen address or a small 5kg–10kg wholesale trial batch.\n6. Sign-off: Professional signature.\n\n---\n\n# TONE & STYLE GUIDELINES\n- Tone: Human, respectful, chef-to-chef peer tone, confident, and direct. Sounds like a seasoned food producer, NOT an AI or a generic marketer.\n- Language: Professional English (tailored to Singapore F&B managers and executive chefs).\n- Salutation: \"Hi [Name],\" or \"Hi [Business Name] culinary team,\". Never use \"Dear Sir/Madam\".\n- Prohibited Phrases: Never use spam triggers (\"URGENT\", \"100% GUARANTEED\", \"LIMITED TIME OFFER\", \"Revolutionary\", \"Game-changer\", \"Synergy\", \"Hope this email finds you well\").\n- Formatting: Short paragraphs (1–2 sentences each) for effortless mobile reading.\n\n---\n\n# SUBJECT LINE RULES\nAlways provide exactly 3 subject line variations that are:\n- Short (3–7 words)\n- Natural and lowercase/sentence-case (e.g., \"shallot supply for [Business Name] kitchen\")\n- Intriguing and relevant without being clickbaity\n- Free of emojis, fake tags ([URGENT]), and ALL CAPS\n\n---\n\n# OUTPUT FORMAT\nRespond strictly in JSON format as defined by the output parser. Do not wrap with markdown backticks or include conversational filler.\n\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        512,
+        448
+      ],
+      "id": "adf66f08-b1e6-40cc-b4de-7356bc1edd85",
+      "name": "AI Generate Pitching EMail"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "b2b_leads",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Pharsing All Scarping Data with Contain Email').item.json.lead_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status_email",
+              "fieldValue": "sent"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1376,
+        448
+      ],
+      "id": "c99eb367-82b6-4e5b-b866-e7808cf9ee20",
+      "name": "Update Sent Email",
+      "credentials": {
+        "supabaseApi": {
+          "id": "6nmQKNcFlilYBKHR",
+          "name": "anakbawangstore"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst output = item.output || item;\n\n// 1. Ekstrak Isi Teks Email (Body Text)\nlet emailBodyText = '';\nif (typeof output === 'string') {\n  const match = output.match(/EMAIL:\\s*([\\s\\S]+)/i);\n  emailBodyText = match ? match[1].trim() : output;\n} else if (output?.properties?.full_email_text?.type) {\n  // Format bersarang (seperti output saat ini)\n  emailBodyText = output.properties.full_email_text.type;\n} else if (output?.full_email_text) {\n  // Format JSON bersih standar\n  emailBodyText = output.full_email_text;\n} else {\n  emailBodyText = JSON.stringify(output);\n}\n\n// 2. Ekstrak Subjek Email (Mengambil opsi subject pertama)\nlet selectedSubject = '';\ntry {\n  let rawSubjects = output?.properties?.subject_options?.items?.type || output?.subject_options;\n  \n  // Jika tersimpan sebagai string JSON array \"[\\\"...\\\", \\\"...\\\"]\"\n  if (typeof rawSubjects === 'string' && rawSubjects.trim().startsWith('[')) {\n    rawSubjects = JSON.parse(rawSubjects);\n  }\n  \n  if (Array.isArray(rawSubjects) && rawSubjects.length > 0) {\n    selectedSubject = rawSubjects[0];\n  }\n} catch (e) {\n  // Ignore parsing error jika ada\n}\n\n// Fallback jika subject tidak ditemukan di JSON\nif (!selectedSubject) {\n  selectedSubject = `Shallot supply for ${item.clean_name || item.restaurant_name || 'your kitchen'}`;\n}\n\n// 3. Ekstrak Rekomendasi Grade (Grade S / Grade A)\nconst recommendedGrade = output?.properties?.recommended_grade?.type || output?.recommended_grade || '';\n\n// 4. Konversi Baris Baru ke HTML yang Cantik & Rapi untuk Gmail\nconst emailBodyHtml = emailBodyText\n  .split(/\\n\\s*\\n/) // Pisahkan per paragraf\n  .filter(p => p.trim())\n  .map(p => `<p style=\"font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #222; margin-bottom: 14px;\">${p.replace(/\\n/g, '<br>')}</p>`)\n  .join('');\n\n// 5. Kembalikan data lengkap untuk Node Gmail / Email Sender\nreturn [{\n  json: {\n    recipient_email: item.email || item.recipient_email,\n    restaurant_name: item.clean_name || item.restaurant_name,\n    recommended_grade: recommendedGrade,\n    subject: selectedSubject,\n    body_text: emailBodyText,\n    body_html: emailBodyHtml\n  }\n}];\n"
+      },
+      "id": "f1865236-184a-40dd-a20b-10ca69f5941b",
+      "name": "Format & Validate Email Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        944,
+        448
+      ]
+    }
+  ],
+  "pinData": {
+    "AI Generate Pitching EMail": [
+      {
+        "json": {
+          "output": {
+            "type": "object",
+            "properties": {
+              "subject_options": {
+                "type": "array",
+                "items": {
+                  "type": "[\"shallots for Chopstix & Rice kitchen\", \"padang-style bawang goreng sample\", \"boyolali shallots for Suntec kitchen\"]"
+                }
+              },
+              "recommended_grade": {
+                "type": "Grade S Murni (100% pure shallots, 0% flour) for Padang-style curries and broths"
+              },
+              "full_email_text": {
+                "type": "Hi Chopstix & Rice culinary team,\n\nYour Padang-style Indonesian menu at Suntec City puts fried shallot aroma where it matters: rich halal curries and rice plates.\n\nMany Singapore kitchens struggle with bawang goreng that loses fragrance, softens in humidity, or carries too much flour filler.\n\nWe are Juragan Bawang Goreng, a direct Boyolali producer. For Padang cooking, I would suggest Grade S Murni: 100% pure shallots, 0% flour, so it adds aroma without clouding broth or thickening sauces. We are Halal certified (ID33110018517710724) and SFA export-standard compliant.\n\nCould we send a complimentary chef tasting pack to your kitchen at 3 Temasek Blvd? If you want a fuller recipe test, we can also arrange a 5kg–10kg trial batch at factory wholesale rates.\n\nBest regards,\nRey\nHead of B2B Partnerships\nJuragan Bawang Goreng / PT Juragan Anak Bawang"
+              }
+            },
+            "required": [
+              "subject_options",
+              "recommended_grade",
+              "full_email_text"
+            ]
+          }
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Structured Output Parser",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Generate Pitching EMail",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qwen Cloud Chat Model": {
+      "ai_languageModel": [
+        []
+      ]
+    },
+    "Get Location Sraping Queue": {
+      "main": [
+        [
+          {
+            "node": "Scrape Google Maps (Apify Sync)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scrape Google Maps (Apify Sync)": {
+      "main": [
+        [
+          {
+            "node": "Normalize & Standardize Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Every 5 Days": {
+      "main": [
+        [
+          {
+            "node": "Get Location Sraping Queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize & Standardize Leads": {
+      "main": [
+        [
+          {
+            "node": "Submit Result Scraping Buissness",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Submit Result Scraping Buissness": {
+      "main": [
+        [
+          {
+            "node": "Send Confirm message to my account",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Confirm message to my account": {
+      "main": [
+        [
+          {
+            "node": "Pharsing All Scarping Data with Contain Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pharsing All Scarping Data with Contain Email": {
+      "main": [
+        [
+          {
+            "node": "3. Loop Leads Sequentially",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. Loop Leads Sequentially": {
+      "main": [
+        [
+          {
+            "node": "Limit",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AI Generate Pitching EMail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Generate Pitching EMail",
+            "type": "ai_languageModel",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Qwen Cloud Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Generate Pitching EMail",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Outreach Email (Gmail/SMTP)1": {
+      "main": [
+        [
+          {
+            "node": "Update Sent Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Generate Pitching EMail",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Generate Pitching EMail": {
+      "main": [
+        [
+          {
+            "node": "Format & Validate Email Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Sent Email": {
+      "main": [
+        [
+          {
+            "node": "3. Loop Leads Sequentially",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format & Validate Email Payload": {
+      "main": [
+        [
+          {
+            "node": "Send Outreach Email (Gmail/SMTP)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "24cd9fff-be7d-4618-9e47-bdee447e5fe0",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "dc96f10ae7dc95d3c138575ba243a0a167923dbcb524841d451aadf9135d5fb3"
+  },
+  "nodeGroups": [],
+  "id": "8qhBNhINuvhiWLU3",
+  "tags": []
+}

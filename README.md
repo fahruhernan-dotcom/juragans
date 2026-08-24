@@ -53,9 +53,10 @@ Juragan by Anak Bawang/
 │   └── 📂 01_Penetapan_Harga_dan_SKU/
 │       └── 📝 master_strategi_penetapan_harga_dan_bisnis.md
 │
-├── 📂 Website/                            <-- [MODUL WEBSITE & DASHBOARD ADMIN]
-│   ├── 📁 src/pages/admin/                <-- Dashboard Web Admin (ProductPricing, CustomerOrders, etc.)
-│   └── 📁 src/components/                 <-- PriceCalculator & Header/Footer
+├── 📂 Website_v2/                         <-- [SINGLE APP: LANDING PAGE + ADMIN ERP]
+│   ├── 📁 src/landing/                    <-- Company Profile Publik (LandingPage, AboutUs, BioLinks)
+│   ├── 📁 src/dashboard/                  <-- Admin ERP Dashboard (POS, Batch FIFO, Laporan, Gudang)
+│   └── 📁 src/pages/                      <-- Auth Module (Login, Register, Forgot Password)
 │
 ├── 📂 Aset_Konten/                        <-- [MODUL MEDIA & FOTO PRODUK]
 ├── 📂 Marketplace_Templates/             <-- [MODUL MASS UPLOAD SHOPEE & TIKTOK]
