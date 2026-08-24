@@ -173,3 +173,75 @@ export const useCreateScrapingQueueItem = () => {
     onError: (err) => toast.error(normalizeSupabaseError(err).message),
   })
 }
+
+export const useB2BSettings = () => {
+  return useQuery({
+    queryKey: ['juragan-b2b-settings'],
+    staleTime: STALE_1M,
+    queryFn: async () => {
+      try {
+        const { data, error } = await supabase
+          .from('juragan_b2b_settings')
+          .select('*')
+          .limit(1)
+          .maybeSingle()
+
+        if (error) {
+          console.warn('[useB2BSettings]', error.message)
+          return null
+        }
+        return data || null
+      } catch (e) {
+        console.warn('[useB2BSettings]', e)
+        return null
+      }
+    }
+  })
+}
+
+export const useUpdateB2BSettings = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (updates) => {
+      const tenant_id = await getTenantId()
+      const cleanUpdates = sanitizeDBPayload(
+        { ...updates, tenant_id, updated_at: new Date().toISOString() },
+        'juragan_b2b_settings'
+      )
+
+      // Check existing row
+      const { data: existing } = await supabase
+        .from('juragan_b2b_settings')
+        .select('id')
+        .limit(1)
+        .maybeSingle()
+
+      if (existing?.id) {
+        const { data, error } = await supabase
+          .from('juragan_b2b_settings')
+          .update(cleanUpdates)
+          .eq('id', existing.id)
+          .select()
+          .single()
+
+        if (error) throw error
+        return data
+      } else {
+        const { data, error } = await supabase
+          .from('juragan_b2b_settings')
+          .insert(cleanUpdates)
+          .select()
+          .single()
+
+        if (error) throw error
+        return data
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['juragan-b2b-settings'] })
+      toast.success('Pengaturan target outreach B2B diperbarui')
+    },
+    onError: (err) => toast.error(normalizeSupabaseError(err).message),
+  })
+}
+

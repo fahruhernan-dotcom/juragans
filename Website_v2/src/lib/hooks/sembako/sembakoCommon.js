@@ -35,6 +35,10 @@ export const ALLOWED_COLUMNS = {
   b2b_scraping_queue: [
     'target_location', 'country', 'city_or_region', 'status', 'total_leads_collected', 'last_scraped_at', 'notes'
   ],
+  juragan_b2b_settings: [
+    'tenant_id', 'active_target_country', 'active_target_region', 'is_auto_outreach_active',
+    'daily_email_limit', 'offer_tasting_sample', 'sample_size_gram'
+  ],
   sembako_stock_batches: [
     'tenant_id', 'product_id', 'supplier_id', 'batch_code', 'qty_masuk',
     'qty_sisa', 'buy_price', 'purchase_date', 'expiry_date', 'notes', 'is_deleted'

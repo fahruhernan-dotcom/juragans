@@ -27,6 +27,10 @@ import {
   ChevronRight,
   TrendingUp,
   Building2,
+  Sliders,
+  Power,
+  Zap,
+  ShieldCheck,
   X
 } from 'lucide-react'
 import {
@@ -35,7 +39,9 @@ import {
   useCreateB2BLead,
   useUpdateB2BLead,
   useDeleteB2BLead,
-  useCreateScrapingQueueItem
+  useCreateScrapingQueueItem,
+  useB2BSettings,
+  useUpdateB2BSettings
 } from '@/lib/hooks/useSembakoData'
 import { SembakoPageHeader } from '@/dashboard/broker/sembako_broker/components/SembakoPageHeader'
 import { SembakoSummaryStrip } from '@/dashboard/broker/sembako_broker/components/SembakoSummaryStrip'
@@ -48,16 +54,19 @@ export default function B2BLeadsOutreachPage() {
   const isDesktop = useMediaQuery('(min-width: 1024px)')
   const { data: leads = [], isLoading, refetch } = useB2BLeads()
   const { data: queue = [], refetch: refetchQueue } = useB2BScrapingQueue()
+  const { data: settings, refetch: refetchSettings } = useB2BSettings()
 
   const createLeadMut = useCreateB2BLead()
   const updateLeadMut = useUpdateB2BLead()
   const deleteLeadMut = useDeleteB2BLead()
   const createQueueMut = useCreateScrapingQueueItem()
+  const updateSettingsMut = useUpdateB2BSettings()
 
   const [activeTab, setActiveTab] = useState('leads') // 'leads' | 'queue' | 'sample_calculator'
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all') // 'all' | 'pending' | 'sent' | 'replied'
   const [cityFilter, setCityFilter] = useState('all')
+  const [countryTabFilter, setCountryTabFilter] = useState('all') // 'all' | 'Indonesia' | 'Singapore'
 
   // Modals
   const [leadModalOpen, setLeadModalOpen] = useState(false)
@@ -69,8 +78,8 @@ export default function B2BLeadsOutreachPage() {
   const [formName, setFormName] = useState('')
   const [formCleanName, setFormCleanName] = useState('')
   const [formCategory, setFormCategory] = useState('Indonesian restaurant')
-  const [formCountry, setFormCountry] = useState('Singapore')
-  const [formCity, setFormCity] = useState('Singapore')
+  const [formCountry, setFormCountry] = useState('Indonesia')
+  const [formCity, setFormCity] = useState('Surakarta')
   const [formAddress, setFormAddress] = useState('')
   const [formEmail, setFormEmail] = useState('')
   const [formPhone, setFormPhone] = useState('')
@@ -83,16 +92,31 @@ export default function B2BLeadsOutreachPage() {
 
   // Queue Form State
   const [qLocation, setQLocation] = useState('')
-  const [qCountry, setQCountry] = useState('Singapore')
+  const [qCountry, setQCountry] = useState('Indonesia')
   const [qNotes, setQNotes] = useState('')
 
   // Sample Pack Calculator State
   const [sampleHpp, setSampleHpp] = useState(15000) // HPP 100g sample pack
-  const [sampleCourier, setSampleCourier] = useState(45000) // Ongkir kirim sample ke SG
-  const [targetConversionRate, setTargetConversionRate] = useState(20) // 20% order batch 10kg
+  const [sampleCourier, setSampleCourier] = useState(12000) // Ongkir lokal Solo/Jateng
+  const [targetConversionRate, setTargetConversionRate] = useState(25) // 25% order batch
   const [trialBatchKg, setTrialBatchKg] = useState(10) // 10kg trial
   const [trialWholesalePrice, setTrialWholesalePrice] = useState(135000) // Rp 135.000 / kg
   const [trialHppKg, setTrialHppKg] = useState(112000) // Rp 112.000 / kg
+
+  // Current active settings with safe fallbacks
+  const currentCountry = settings?.active_target_country || 'Indonesia'
+  const currentRegion = settings?.active_target_region || 'Solo Raya'
+  const isEngineActive = settings?.is_auto_outreach_active !== false
+  const currentLimit = settings?.daily_email_limit || 10
+  const isSampleOffered = settings?.offer_tasting_sample !== false
+
+  const handleUpdateSetting = async (field, val) => {
+    try {
+      await updateSettingsMut.mutateAsync({ [field]: val })
+    } catch (e) {
+      // handled
+    }
+  }
 
   const cities = useMemo(() => {
     const set = new Set(leads.map(l => l.city).filter(Boolean))
@@ -101,6 +125,7 @@ export default function B2BLeadsOutreachPage() {
 
   const filteredLeads = useMemo(() => {
     return leads.filter(l => {
+      if (countryTabFilter !== 'all' && l.country?.toLowerCase() !== countryTabFilter.toLowerCase()) return false
       if (statusFilter !== 'all' && l.status_email !== statusFilter) return false
       if (cityFilter !== 'all' && l.city !== cityFilter) return false
       if (search) {
@@ -112,21 +137,23 @@ export default function B2BLeadsOutreachPage() {
       }
       return true
     })
-  }, [leads, statusFilter, cityFilter, search])
+  }, [leads, countryTabFilter, statusFilter, cityFilter, search])
 
   const stats = useMemo(() => {
     const total = leads.length
+    const indoTotal = leads.filter(l => (l.country || '').toLowerCase() === 'indonesia').length
+    const sgTotal = leads.filter(l => (l.country || '').toLowerCase() === 'singapore').length
     const hot = leads.filter(l => l.lead_priority === 'hot').length
     const sent = leads.filter(l => l.status_email === 'sent').length
     const replied = leads.filter(l => l.status_email === 'replied').length
     const hasEmail = leads.filter(l => l.email && l.email.includes('@')).length
-    return { total, hot, sent, replied, hasEmail }
+    return { total, indoTotal, sgTotal, hot, sent, replied, hasEmail }
   }, [leads])
 
   const summaryItems = [
-    { label: 'Total Prospek Resto', value: stats.total, color: 'amber', subLabel: 'Resto SG & MY terdaftar' },
-    { label: 'Hot Leads Prioritas', value: stats.hot, color: 'red', subLabel: 'Kategori Resto Utama' },
-    { label: 'Outreach Terkirim', value: `${stats.sent} email`, color: 'green', subLabel: `${stats.hasEmail} email valid` },
+    { label: 'Total Prospek Kuliner', value: stats.total, color: 'amber', subLabel: `${stats.indoTotal} Indo · ${stats.sgTotal} SG` },
+    { label: 'Hot Leads Prioritas', value: stats.hot, color: 'red', subLabel: 'Kategori Restoran Utama' },
+    { label: 'Outreach Terkirim', value: `${stats.sent} email`, color: 'green', subLabel: `${stats.hasEmail} kontak valid` },
     { label: 'Respon / Balasan', value: stats.replied, color: 'default', subLabel: 'Tindak lanjut negosiasi' },
   ]
 
@@ -135,8 +162,8 @@ export default function B2BLeadsOutreachPage() {
     setFormName('')
     setFormCleanName('')
     setFormCategory('Indonesian restaurant')
-    setFormCountry('Singapore')
-    setFormCity('Singapore')
+    setFormCountry(currentCountry === 'Singapore' ? 'Singapore' : 'Indonesia')
+    setFormCity(currentCountry === 'Singapore' ? 'Singapore' : 'Surakarta')
     setFormAddress('')
     setFormEmail('')
     setFormPhone('')
@@ -154,8 +181,8 @@ export default function B2BLeadsOutreachPage() {
     setFormName(l.name || '')
     setFormCleanName(l.clean_name || '')
     setFormCategory(l.category || 'Indonesian restaurant')
-    setFormCountry(l.country || 'Singapore')
-    setFormCity(l.city || 'Singapore')
+    setFormCountry(l.country || 'Indonesia')
+    setFormCity(l.city || 'Surakarta')
     setFormAddress(l.address || '')
     setFormEmail(l.email || '')
     setFormPhone(l.phone || '')
@@ -239,16 +266,16 @@ export default function B2BLeadsOutreachPage() {
     <div className="min-h-screen bg-[#F8FAFC] text-slate-900 pb-[max(140px,calc(110px+env(safe-area-inset-bottom,24px)))] text-left">
       {/* Header Standard Juragan */}
       <SembakoPageHeader
-        title="B2B Leads & Export Engine"
-        subtitle="Direktori prospek restoran Indonesia di Singapura & Malaysia, pantau AI pitch email, dan jadwalkan antrean scraper n8n."
+        title="B2B Leads & Outreach Engine"
+        subtitle="Kelola prospek restoran kuliner (Solo Raya, Domestik & Ekspor), kontrol sakelar bot n8n, dan pantau AI email pitch."
         isDesktop={isDesktop}
         searchQuery={search}
         onSearchChange={setSearch}
-        searchPlaceholder="Cari resto, alamat, email..."
+        searchPlaceholder="Cari resto, menu, alamat, email..."
         actionButton={
           <div className="flex items-center gap-2">
             <button
-              onClick={() => { refetch(); refetchQueue(); }}
+              onClick={() => { refetch(); refetchQueue(); refetchSettings(); }}
               className="p-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 shadow-sm transition"
               title="Refresh Data"
             >
@@ -276,41 +303,186 @@ export default function B2BLeadsOutreachPage() {
         {/* KPI Strip */}
         <SembakoSummaryStrip items={summaryItems} />
 
+        {/* 🎛️ SAKELAR KONTROL OUTREACH ENGINE n8n (Live Control Card) */}
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-sm mb-5">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            {/* Engine Status & Title */}
+            <div className="flex items-start gap-3">
+              <div className={`p-2.5 rounded-xl border ${
+                isEngineActive 
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                  : 'bg-slate-100 text-slate-500 border-slate-200'
+              }`}>
+                <Sliders size={18} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-bold text-sm text-slate-900">Sakelar Kontrol Engine Outreach n8n</h3>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                    isEngineActive
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 flex items-center gap-1'
+                      : 'bg-slate-100 text-slate-600 border-slate-200'
+                  }`}>
+                    {isEngineActive ? <><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Engine Aktif</> : '⏸️ Engine Dijeda'}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Pengaturan ini tersinkronisasi langsung ke n8n. Bot hanya akan mengirim email sesuai target negara & kuota di bawah ini.
+                </p>
+              </div>
+            </div>
+
+            {/* Quick Switch Actions */}
+            <div className="flex items-center gap-2.5 flex-wrap">
+              {/* Target Country Switcher */}
+              <div className="flex items-center bg-slate-50 p-1 rounded-xl border border-slate-200 text-xs">
+                <span className="px-2 text-slate-500 font-semibold text-[11px]">Target:</span>
+                <button
+                  onClick={() => handleUpdateSetting('active_target_country', 'Indonesia')}
+                  className={`px-3 py-1.5 rounded-lg font-bold transition ${
+                    currentCountry === 'Indonesia'
+                      ? 'bg-amber-500 text-slate-950 shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  🇮🇩 Indonesia (Solo Raya)
+                </button>
+                <button
+                  onClick={() => handleUpdateSetting('active_target_country', 'Singapore')}
+                  className={`px-3 py-1.5 rounded-lg font-bold transition ${
+                    currentCountry === 'Singapore'
+                      ? 'bg-amber-500 text-slate-950 shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  🇸🇬 Singapore
+                </button>
+                <button
+                  onClick={() => handleUpdateSetting('active_target_country', 'All')}
+                  className={`px-2.5 py-1.5 rounded-lg font-bold transition ${
+                    currentCountry === 'All'
+                      ? 'bg-slate-900 text-white shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Semua
+                </button>
+              </div>
+
+              {/* Daily Limit Selector */}
+              <div className="flex items-center bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs gap-1.5">
+                <span className="text-slate-500 font-semibold text-[11px]">Batas/Hari:</span>
+                <select
+                  value={currentLimit}
+                  onChange={(e) => handleUpdateSetting('daily_email_limit', parseInt(e.target.value, 10))}
+                  className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-slate-900 font-bold text-xs focus:outline-none focus:border-amber-500"
+                >
+                  <option value={5}>5 email</option>
+                  <option value={10}>10 email</option>
+                  <option value={20}>20 email</option>
+                  <option value={50}>50 email</option>
+                </select>
+              </div>
+
+              {/* Main Engine On/Off Button */}
+              <button
+                onClick={() => handleUpdateSetting('is_auto_outreach_active', !isEngineActive)}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-sm ${
+                  isEngineActive
+                    ? 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
+                    : 'bg-emerald-600 text-white hover:bg-emerald-500'
+                }`}
+              >
+                <Power size={13} />
+                <span>{isEngineActive ? 'Jeda Engine' : 'Aktifkan Engine'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Context Summary Pill */}
+          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-600 flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-slate-700">Fokus Wilayah Aktif:</span>
+              <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 font-bold">
+                {currentCountry === 'Indonesia' ? '📍 Solo Raya, Jogja, & Domestik' : currentCountry === 'Singapore' ? '📍 Singapore & ASEAN' : '📍 Global'}
+              </span>
+              <span className="text-slate-400">|</span>
+              <span className="flex items-center gap-1">
+                <ShieldCheck size={13} className="text-emerald-600" />
+                <span>Tawaran Sample Tester Pack (100g): <strong>{isSampleOffered ? 'Aktif' : 'Nonaktif'}</strong></span>
+              </span>
+            </div>
+            <span className="text-slate-400 font-mono text-[10px]">Sinkronisasi Supabase View: `v_n8n_active_pending_leads`</span>
+          </div>
+        </div>
+
         {/* Sub-Tab Switcher */}
-        <div className="flex items-center gap-2 border-b border-slate-200 pb-3 mb-5 px-1 overflow-x-auto">
-          <button
-            onClick={() => setActiveTab('leads')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm ${
-              activeTab === 'leads'
-                ? 'bg-slate-900 text-white'
-                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-            }`}
-          >
-            <Users size={14} />
-            <span>Daftar Prospek Restoran ({leads.length})</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('queue')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm ${
-              activeTab === 'queue'
-                ? 'bg-slate-900 text-white'
-                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-            }`}
-          >
-            <Bot size={14} className={activeTab === 'queue' ? 'text-amber-400' : 'text-amber-500'} />
-            <span>Antrean Auto-Scraper ({queue.length})</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('sample_calculator')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm ${
-              activeTab === 'sample_calculator'
-                ? 'bg-slate-900 text-white'
-                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-            }`}
-          >
-            <Sparkles size={14} className={activeTab === 'sample_calculator' ? 'text-amber-400' : 'text-purple-500'} />
-            <span>Kalkulator ROI Sample Pack</span>
-          </button>
+        <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-5 px-1 flex-wrap gap-3">
+          <div className="flex items-center gap-2 overflow-x-auto">
+            <button
+              onClick={() => setActiveTab('leads')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm ${
+                activeTab === 'leads'
+                  ? 'bg-slate-900 text-white'
+                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+              }`}
+            >
+              <Users size={14} />
+              <span>Daftar Prospek Restoran ({leads.length})</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('queue')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm ${
+                activeTab === 'queue'
+                  ? 'bg-slate-900 text-white'
+                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+              }`}
+            >
+              <Bot size={14} className={activeTab === 'queue' ? 'text-amber-400' : 'text-amber-500'} />
+              <span>Antrean Auto-Scraper ({queue.length})</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('sample_calculator')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm ${
+                activeTab === 'sample_calculator'
+                  ? 'bg-slate-900 text-white'
+                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+              }`}
+            >
+              <Sparkles size={14} className={activeTab === 'sample_calculator' ? 'text-amber-400' : 'text-purple-500'} />
+              <span>Kalkulator ROI Sample Pack</span>
+            </button>
+          </div>
+
+          {/* Quick Tab Country Filter Pill */}
+          {activeTab === 'leads' && (
+            <div className="flex items-center bg-white border border-slate-200 rounded-xl p-1 text-xs shadow-sm">
+              <button
+                onClick={() => setCountryTabFilter('all')}
+                className={`px-2.5 py-1 rounded-lg font-semibold transition ${
+                  countryTabFilter === 'all' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Semua ({leads.length})
+              </button>
+              <button
+                onClick={() => setCountryTabFilter('indonesia')}
+                className={`px-2.5 py-1 rounded-lg font-semibold transition ${
+                  countryTabFilter === 'indonesia' ? 'bg-amber-500 text-slate-950 font-bold' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                🇮🇩 Indonesia ({stats.indoTotal})
+              </button>
+              <button
+                onClick={() => setCountryTabFilter('singapore')}
+                className={`px-2.5 py-1 rounded-lg font-semibold transition ${
+                  countryTabFilter === 'singapore' ? 'bg-amber-500 text-slate-950 font-bold' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                🇸🇬 Singapore ({stats.sgTotal})
+              </button>
+            </div>
+          )}
         </div>
 
         {/* ── TAB 1: LEADS DIRECTORY ── */}
@@ -362,7 +534,7 @@ export default function B2BLeadsOutreachPage() {
                 <Building2 size={40} className="mx-auto mb-2 text-slate-300" />
                 <p className="text-sm font-bold text-slate-800">Belum Ada Prospek Restoran</p>
                 <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-                  Tambahkan prospek secara manual atau daftarkan antrean wilayah baru agar bot n8n men-scrape otomatis dari Google Maps.
+                  Tambahkan prospek secara manual atau daftarkan antrean wilayah Solo Raya baru agar bot n8n men-scrape otomatis dari Google Maps.
                 </p>
                 <button
                   onClick={openAddLead}
@@ -378,6 +550,7 @@ export default function B2BLeadsOutreachPage() {
                   const isReplied = lead.status_email === 'replied'
                   const isHot = lead.lead_priority === 'hot'
                   const isCold = lead.lead_priority === 'cold'
+                  const isIndo = (lead.country || '').toLowerCase() === 'indonesia'
 
                   return (
                     <motion.div
@@ -388,13 +561,18 @@ export default function B2BLeadsOutreachPage() {
                       <div>
                         {/* Header Badges */}
                         <div className="flex items-center justify-between gap-2 mb-2.5">
-                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${
-                            isHot ? 'bg-rose-50 text-rose-700 border-rose-200' :
-                            isCold ? 'bg-slate-100 text-slate-600 border-slate-200' :
-                            'bg-blue-50 text-blue-700 border-blue-200'
-                          }`}>
-                            {lead.lead_priority?.toUpperCase() || 'WARM'} LEAD
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                              {isIndo ? '🇮🇩 ID' : '🇸🇬 SG'}
+                            </span>
+                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${
+                              isHot ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                              isCold ? 'bg-slate-100 text-slate-600 border-slate-200' :
+                              'bg-blue-50 text-blue-700 border-blue-200'
+                            }`}>
+                              {lead.lead_priority?.toUpperCase() || 'WARM'}
+                            </span>
+                          </div>
                           <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold flex items-center gap-1 border ${
                             isReplied ? 'bg-purple-50 text-purple-700 border-purple-200' :
                             isSent ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
@@ -410,7 +588,7 @@ export default function B2BLeadsOutreachPage() {
                           {lead.clean_name || lead.name}
                         </h3>
                         <p className="text-[11px] text-slate-500 font-medium mb-3">
-                          {lead.category || 'Indonesian restaurant'} · <span className="text-slate-700 font-semibold">{lead.city || 'Singapore'}</span>
+                          {lead.category || 'Indonesian restaurant'} · <span className="text-slate-700 font-semibold">{lead.city || (isIndo ? 'Surakarta' : 'Singapore')}</span>
                         </p>
 
                         {/* Details */}
@@ -572,10 +750,10 @@ export default function B2BLeadsOutreachPage() {
             <div className="border-b border-slate-100 pb-4">
               <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                 <Sparkles size={16} className="text-amber-500" />
-                <span>Simulasi ROI Pengiriman Chef Tasting Sample Pack ke Singapura / Malaysia</span>
+                <span>Simulasi ROI Pengiriman Chef Tasting Sample Pack (Domestik Solo/Jawa vs Ekspor)</span>
               </h3>
               <p className="text-xs text-slate-500 mt-1">
-                Hitung estimasi modal kirim sample tester pack 100g gratis vs potensi keuntungan repeat order batch 10kg dari restoran luar negeri.
+                Hitung estimasi modal kirim sample tester pack 100g gratis vs potensi keuntungan repeat order batch 10kg dari restoran mitra.
               </p>
             </div>
 
@@ -593,7 +771,7 @@ export default function B2BLeadsOutreachPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] font-bold text-slate-600 block mb-1">Ongkir Kurir Internasional / Pack</label>
+                  <label className="text-[11px] font-bold text-slate-600 block mb-1">Ongkir Kurir (Lokal / Paxel)</label>
                   <input
                     type="number"
                     value={sampleCourier}
@@ -625,7 +803,7 @@ export default function B2BLeadsOutreachPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] font-bold text-slate-600 block mb-1">Harga Jual Ekspor Grosir / Kg</label>
+                  <label className="text-[11px] font-bold text-slate-600 block mb-1">Harga Jual Grosir / Kg</label>
                   <input
                     type="number"
                     value={trialWholesalePrice}
@@ -667,7 +845,7 @@ export default function B2BLeadsOutreachPage() {
                 </div>
 
                 <div className="pt-4 border-t border-amber-200/60 mt-4">
-                  <p className="text-[11px] font-bold text-slate-600">Estimasi Laba Bersih Bersih:</p>
+                  <p className="text-[11px] font-bold text-slate-600">Estimasi Laba Bersih:</p>
                   <p className="text-2xl font-black text-emerald-700 tracking-tight">
                     {formatIDR(expectedProfitPer10Samples)}
                   </p>
@@ -702,7 +880,7 @@ export default function B2BLeadsOutreachPage() {
               <input
                 type="text"
                 required
-                placeholder="Contoh: Tambuah Mas Orchard"
+                placeholder="Contoh: Soto Segeer Boyolali Hj. Amanah"
                 value={formName}
                 onChange={(e) => setFormName(e.target.value)}
                 className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs placeholder:text-slate-400 focus:bg-white focus:border-amber-500 focus:outline-none transition"
@@ -714,7 +892,7 @@ export default function B2BLeadsOutreachPage() {
                 <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">Kategori Resto</label>
                 <input
                   type="text"
-                  placeholder="Contoh: Padang Restaurant"
+                  placeholder="Warung Soto / Resto Padang"
                   value={formCategory}
                   onChange={(e) => setFormCategory(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs focus:bg-white focus:border-amber-500 focus:outline-none"
@@ -724,7 +902,7 @@ export default function B2BLeadsOutreachPage() {
                 <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">Kota / Wilayah</label>
                 <input
                   type="text"
-                  placeholder="Singapore / Kuala Lumpur"
+                  placeholder="Surakarta / Solo Baru / Boyolali"
                   value={formCity}
                   onChange={(e) => setFormCity(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs focus:bg-white focus:border-amber-500 focus:outline-none"
@@ -736,7 +914,7 @@ export default function B2BLeadsOutreachPage() {
               <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">Alamat Outlet / Dapur</label>
               <textarea
                 rows={2}
-                placeholder="Alamat fisik restoran untuk kirim sample pack"
+                placeholder="Alamat fisik restoran untuk kirim sample pack tester"
                 value={formAddress}
                 onChange={(e) => setFormAddress(e.target.value)}
                 className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs resize-none focus:bg-white focus:border-amber-500 focus:outline-none"
@@ -758,7 +936,7 @@ export default function B2BLeadsOutreachPage() {
                 <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">No. Telp / WhatsApp</label>
                 <input
                   type="text"
-                  placeholder="+65 9123 4567"
+                  placeholder="+62 812-3456-7890"
                   value={formPhone}
                   onChange={(e) => setFormPhone(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs focus:bg-white focus:border-amber-500 focus:outline-none"
@@ -841,7 +1019,7 @@ export default function B2BLeadsOutreachPage() {
           <SheetHeader className="p-5 border-b border-slate-100 bg-slate-50/80">
             <SheetTitle className="text-base font-bold text-slate-900">Daftarkan Target Scraper Baru</SheetTitle>
             <SheetDescription className="text-xs text-slate-500">
-              Bot n8n akan mengecek antrean ini dan men-scrape kontak restoran Indonesia secara otomatis.
+              Bot n8n akan mengecek antrean ini dan men-scrape kontak restoran kuliner secara otomatis.
             </SheetDescription>
           </SheetHeader>
 
@@ -853,7 +1031,7 @@ export default function B2BLeadsOutreachPage() {
               <input
                 type="text"
                 required
-                placeholder="Contoh: Tanjong Pagar, Singapore"
+                placeholder="Contoh: Surakarta Kota / Solo Baru / Sleman"
                 value={qLocation}
                 onChange={(e) => setQLocation(e.target.value)}
                 className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs focus:bg-white focus:border-amber-500 focus:outline-none"
@@ -867,11 +1045,11 @@ export default function B2BLeadsOutreachPage() {
                 onChange={(e) => setQCountry(e.target.value)}
                 className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-semibold focus:bg-white focus:border-amber-500"
               >
+                <option value="Indonesia">Indonesia (Solo Raya & Domestik)</option>
                 <option value="Singapore">Singapore</option>
                 <option value="Malaysia">Malaysia</option>
                 <option value="Brunei">Brunei</option>
                 <option value="Australia">Australia</option>
-                <option value="Indonesia">Indonesia</option>
               </select>
             </div>
 
@@ -879,7 +1057,7 @@ export default function B2BLeadsOutreachPage() {
               <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">Catatan Instruksi</label>
               <textarea
                 rows={3}
-                placeholder="Fokus pada resto Padang, Warung Nusantara, atau Nasi Lemak"
+                placeholder="Fokus pada Warung Soto, Resto Padang, Bebek Goreng, Bakso, atau Katering"
                 value={qNotes}
                 onChange={(e) => setQNotes(e.target.value)}
                 className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs resize-none focus:bg-white focus:border-amber-500 focus:outline-none"
@@ -919,7 +1097,7 @@ export default function B2BLeadsOutreachPage() {
                     {selectedLeadForPitch?.clean_name || selectedLeadForPitch?.name}
                   </SheetTitle>
                   <p className="text-xs text-slate-500 font-medium">
-                    {selectedLeadForPitch?.category} · {selectedLeadForPitch?.city}, {selectedLeadForPitch?.country}
+                    {selectedLeadForPitch?.category} · {selectedLeadForPitch?.city || 'Surakarta'}, {selectedLeadForPitch?.country || 'Indonesia'}
                   </p>
                 </div>
               </div>
@@ -942,13 +1120,13 @@ export default function B2BLeadsOutreachPage() {
               </div>
               {selectedLeadForPitch?.phone && (
                 <div className="flex items-center justify-between">
-                  <span className="font-semibold text-slate-600">Nomor Telepon:</span>
+                  <span className="font-semibold text-slate-600">Nomor Telepon / WA:</span>
                   <span className="text-slate-800 font-medium">{selectedLeadForPitch.phone}</span>
                 </div>
               )}
               {selectedLeadForPitch?.address && (
                 <div className="flex items-start justify-between gap-2">
-                  <span className="font-semibold text-slate-600 shrink-0">Alamat Outlet:</span>
+                  <span className="font-semibold text-slate-600 shrink-0">Alamat Outlet / Dapur:</span>
                   <span className="text-slate-700 text-right">{selectedLeadForPitch.address}</span>
                 </div>
               )}
@@ -982,7 +1160,7 @@ export default function B2BLeadsOutreachPage() {
                 Subject Email (AI Generated):
               </label>
               <div className="p-3 rounded-xl bg-amber-50/70 border border-amber-200 text-amber-950 font-semibold select-all">
-                {selectedLeadForPitch?.ai_generated_subject || selectedLeadForPitch?.pitch_subject || `Exclusive Taste Test for ${selectedLeadForPitch?.clean_name || 'Chef'}: Premium Boyolali Fried Shallots`}
+                {selectedLeadForPitch?.ai_generated_subject || selectedLeadForPitch?.pitch_subject || `Sample Gratis Bawang Goreng Asli Boyolali untuk Dapur ${selectedLeadForPitch?.clean_name || 'Resto'}`}
               </div>
             </div>
 
@@ -992,23 +1170,25 @@ export default function B2BLeadsOutreachPage() {
                 Isi Body Email (AI Generated Pitch):
               </label>
               <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 leading-relaxed font-sans whitespace-pre-wrap select-all shadow-inner">
-                {selectedLeadForPitch?.ai_generated_pitch || selectedLeadForPitch?.pitch_email || `Dear Chef / Kitchen Manager at ${selectedLeadForPitch?.clean_name || 'Resto'},
+                {selectedLeadForPitch?.ai_generated_pitch || selectedLeadForPitch?.pitch_email || `Halo Chef / Pengelola Dapur ${selectedLeadForPitch?.clean_name || 'Resto'},
 
-Kami melihat ulasan luar biasa tentang cita rasa masakan Nusantara di resto Anda.
+Salam hangat dari kami di Juragan by Anak Bawang (Cepogo, Boyolali).
 
-Kami dari Juragan Boyolali memproduksi Bawang Goreng Grade Super kualitas ekspor (renyah tahan lama, tanpa pengawet, aroma wangi gurih khas Boyolali).
+Kami memproduksi Bawang Goreng Grade Super kualitas premium langsung dari sentra bawang Boyolali (aroma wangi khas tanah vulkanik, renyah tahan lama, 0% pengawet, dan sudah bersertifikat Halal resmi).
 
-Apakah kami boleh mengirimkan 1 Box Sample Pack GRATIS (100g Tasting Pack) ke alamat dapur Anda di ${selectedLeadForPitch?.address || selectedLeadForPitch?.city || 'Singapore'} untuk diuji langsung oleh Head Chef?
+Untuk mendukung kualitas hidangan di ${selectedLeadForPitch?.clean_name || 'Resto Anda'}, apakah kami boleh mengirimkan 1 Box Sample Tester Gratis (100g Tasting Pack) langsung ke alamat dapur Anda di ${selectedLeadForPitch?.address || selectedLeadForPitch?.city || 'Solo'} untuk diuji langsung oleh Head Chef?
+
+Tanpa komitmen apapun, cukup dicoba rasa dan kerenyahannya.
 
 Salam hangat,
-Fahrul Hernanda - Juragan by Anak Bawang`}
+Fahrul Hernanda - Juragan by Anak Bawang (Boyolali)`}
               </div>
             </div>
 
             {/* Outreach Metadata */}
             <div className="flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-100">
               <span>Status Email: <strong className="text-slate-800 uppercase">{selectedLeadForPitch?.status_email || 'pending'}</strong></span>
-              <span>Prioritas: <strong className="text-slate-800 uppercase">{selectedLeadForPitch?.lead_priority || 'warm'}</strong></span>
+              <span>Negara / Wilayah: <strong className="text-slate-800">{selectedLeadForPitch?.country || 'Indonesia'} ({selectedLeadForPitch?.city || 'Surakarta'})</strong></span>
             </div>
           </div>
 
@@ -1023,7 +1203,7 @@ Fahrul Hernanda - Juragan by Anak Bawang`}
 
             {selectedLeadForPitch?.email && (
               <a
-                href={`mailto:${selectedLeadForPitch.email}?subject=${encodeURIComponent(selectedLeadForPitch?.ai_generated_subject || `Sample Tasting Pack for ${selectedLeadForPitch?.clean_name}`)}&body=${encodeURIComponent(selectedLeadForPitch?.ai_generated_pitch || '')}`}
+                href={`mailto:${selectedLeadForPitch.email}?subject=${encodeURIComponent(selectedLeadForPitch?.ai_generated_subject || `Sample Tester Bawang Goreng Boyolali untuk ${selectedLeadForPitch?.clean_name}`)}&body=${encodeURIComponent(selectedLeadForPitch?.ai_generated_pitch || '')}`}
                 className="px-5 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 flex items-center gap-1.5 shadow-sm transition"
               >
                 <Send size={13} />
