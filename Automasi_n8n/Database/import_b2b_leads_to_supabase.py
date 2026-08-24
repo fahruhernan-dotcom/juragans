@@ -13,7 +13,7 @@ from datetime import datetime
 
 CSV_PATH = os.path.join(os.path.dirname(__file__), "..", "Datasets", "leads_singapore_fnb_enriched.csv")
 
-SUPABASE_URL = os.getenv("SUPABASE_URL", "https://cvsbuqepdbjzdsabjfuw.supabase.co")
+SUPABASE_URL = os.getenv("SUPABASE_URL", "https://rezbfduwtpiyclvjqrlj.supabase.co")
 ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "YOUR_SUPABASE_ANON_KEY")
 
 def clean_restaurant_name(raw_name: str) -> str:
