@@ -71,9 +71,9 @@ export default function B2BLeadsOutreachPage() {
   const [cityFilter, setCityFilter] = useState('all')
   const [countryTabFilter, setCountryTabFilter] = useState('all') // 'all' | 'Indonesia' | 'Singapore'
 
-  // Webhook State
+  // Webhook State (Default: TEST Mode)
   const [isTriggeringWebhook, setIsTriggeringWebhook] = useState(false)
-  const [webhookMode, setWebhookMode] = useState('prod') // 'prod' | 'test'
+  const [webhookMode, setWebhookMode] = useState('test') // 'test' | 'prod'
 
   // Modals
   const [leadModalOpen, setLeadModalOpen] = useState(false)
@@ -125,39 +125,55 @@ export default function B2BLeadsOutreachPage() {
     }
   }
 
-  // Trigger n8n Webhook
+  // Trigger n8n Webhook (CORS-Bypass with Vite Proxy & Text Body)
   const handleTriggerN8nWebhook = async () => {
-    const prodUrl = import.meta.env.VITE_N8N_WEBHOOK_PROD_URL || 'https://n8n-2ccbyak1l3x6.jkt2.sumopod.my.id/webhook/ed8c6de6-78a5-4fdc-bc07-698f6c03a9f3'
-    const testUrl = import.meta.env.VITE_N8N_WEBHOOK_TEST_URL || 'https://n8n-2ccbyak1l3x6.jkt2.sumopod.my.id/webhook-test/ed8c6de6-78a5-4fdc-bc07-698f6c03a9f3'
-    const targetUrl = webhookMode === 'test' ? testUrl : prodUrl
+    const path = webhookMode === 'test' 
+      ? '/webhook-test/ed8c6de6-78a5-4fdc-bc07-698f6c03a9f3' 
+      : '/webhook/ed8c6de6-78a5-4fdc-bc07-698f6c03a9f3'
+
+    const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    const targetUrl = isLocal ? `/n8n-proxy${path}` : `https://n8n-2ccbyak1l3x6.jkt2.sumopod.my.id${path}`
+
+    const payload = JSON.stringify({
+      country: currentCountry,
+      region: currentRegion,
+      action: 'trigger_outreach_and_scrape',
+      source: 'Juragan Web Dashboard',
+      timestamp: new Date().toISOString()
+    })
 
     setIsTriggeringWebhook(true)
     try {
       const response = await fetch(targetUrl, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'text/plain;charset=UTF-8'
         },
-        body: JSON.stringify({
-          country: currentCountry,
-          region: currentRegion,
-          action: 'trigger_outreach_and_scrape',
-          source: 'Juragan Web Dashboard',
-          timestamp: new Date().toISOString()
-        })
+        body: payload
       })
 
-      if (response.ok) {
-        toast.success(`⚡ Bot n8n (${webhookMode.toUpperCase()}) berhasil dipicu! Memproses antrean...`)
+      if (response.ok || response.status === 200) {
+        toast.success(`⚡ Sinyal Webhook (${webhookMode.toUpperCase()}) Berhasil Diterima n8n!`)
         setTimeout(() => {
           refetch()
           refetchQueue()
         }, 3000)
       } else {
-        toast.error(`Webhook n8n merespons status ${response.status}. Pastikan workflow aktif.`)
+        toast.error(`n8n merespons status ${response.status}. Pastikan tombol 'Listen for Test Event' di n8n sudah diklik aktif.`)
       }
     } catch (err) {
-      toast.error(`Gagal memanggil webhook n8n: ${err.message}`)
+      // Fallback via direct endpoint
+      try {
+        await fetch(`https://n8n-2ccbyak1l3x6.jkt2.sumopod.my.id${path}`, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain' },
+          body: payload
+        })
+        toast.success(`⚡ Sinyal Webhook (${webhookMode.toUpperCase()}) Terkirim ke n8n!`)
+      } catch (fallbackErr) {
+        toast.error(`Gagal menghubungi webhook n8n: ${err.message}`)
+      }
     } finally {
       setIsTriggeringWebhook(false)
     }

@@ -15,6 +15,13 @@ export default defineConfig({
   server: {
     port: 3000,
     open: true,
+    proxy: {
+      '/n8n-proxy': {
+        target: 'https://n8n-2ccbyak1l3x6.jkt2.sumopod.my.id',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/n8n-proxy/, '')
+      }
+    }
   },
   build: {
     target: 'es2020',
