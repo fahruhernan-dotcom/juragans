@@ -13,8 +13,8 @@ from datetime import datetime
 
 CSV_PATH = os.path.join(os.path.dirname(__file__), "..", "Datasets", "leads_singapore_fnb_enriched.csv")
 
-SUPABASE_URL = "https://cvsbuqepdbjzdsabjfuw.supabase.co"
-ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN2c2J1cWVwZGJqemRzYWJqZnV3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY5NTkwMTksImV4cCI6MjEwMjUzNTAxOX0.TSPTEXDeevJYKqGIwFdPX5-dPT4b4rl9ERfRobkRjdU"
+SUPABASE_URL = os.getenv("SUPABASE_URL", "https://cvsbuqepdbjzdsabjfuw.supabase.co")
+ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "YOUR_SUPABASE_ANON_KEY")
 
 def clean_restaurant_name(raw_name: str) -> str:
     """Bersihkan nama restoran dari slogan, karakter khusus, atau embel-embel."""
