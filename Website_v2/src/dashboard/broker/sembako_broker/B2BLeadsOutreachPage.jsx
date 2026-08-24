@@ -58,6 +58,7 @@ export default function B2BLeadsOutreachPage() {
   const [editingLead, setEditingLead] = useState(null)
   const [viewLeadDetails, setViewLeadDetails] = useState(null)
   const [queueModalOpen, setQueueModalOpen] = useState(false)
+  const [selectedLeadForPitch, setSelectedLeadForPitch] = useState(null)
 
   // Form Lead State
   const [formName, setFormName] = useState('')
@@ -465,6 +466,14 @@ export default function B2BLeadsOutreachPage() {
                         </div>
 
                         <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => setSelectedLeadForPitch(lead)}
+                            className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-semibold flex items-center gap-1 border border-amber-500/30 transition"
+                            title="Lihat AI Pitch & Outreach Copy"
+                          >
+                            <Bot size={11} />
+                            <span>AI Pitch</span>
+                          </button>
                           <button
                             onClick={() => openEditLead(lead)}
                             className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1"
@@ -885,6 +894,131 @@ export default function B2BLeadsOutreachPage() {
             >
               Daftarkan ke Antrean
             </button>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* ── SHEET: PREVIEW AI PITCH & OUTREACH ── */}
+      <Sheet open={!!selectedLeadForPitch} onOpenChange={(open) => !open && setSelectedLeadForPitch(null)}>
+        <SheetContent side="right" className="w-full sm:max-w-xl bg-slate-950 border-l border-white/10 text-white p-0 flex flex-col">
+          <SheetHeader className="p-5 border-b border-white/10 bg-slate-900/50">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                  <Bot size={18} />
+                </div>
+                <div>
+                  <SheetTitle className="text-base font-bold text-white">
+                    {selectedLeadForPitch?.clean_name || selectedLeadForPitch?.name}
+                  </SheetTitle>
+                  <p className="text-xs text-slate-400">
+                    {selectedLeadForPitch?.category} · {selectedLeadForPitch?.city}, {selectedLeadForPitch?.country}
+                  </p>
+                </div>
+              </div>
+              <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
+                selectedLeadForPitch?.status_email === 'sent'
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                  : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+              }`}>
+                {selectedLeadForPitch?.status_email?.toUpperCase() || 'PENDING'}
+              </span>
+            </div>
+          </SheetHeader>
+
+          <div className="p-5 flex-1 overflow-y-auto space-y-4 text-xs">
+            {/* Target Contact Details */}
+            <div className="p-3.5 rounded-xl bg-slate-900/70 border border-white/10 space-y-2">
+              <div className="flex items-center justify-between text-slate-400">
+                <span className="font-semibold text-slate-300">Email Target:</span>
+                <span className="text-amber-300 font-mono">{selectedLeadForPitch?.email || 'Belum ada email'}</span>
+              </div>
+              {selectedLeadForPitch?.phone && (
+                <div className="flex items-center justify-between text-slate-400">
+                  <span className="font-semibold text-slate-300">Nomor Telepon:</span>
+                  <span className="text-slate-200">{selectedLeadForPitch.phone}</span>
+                </div>
+              )}
+              {selectedLeadForPitch?.address && (
+                <div className="flex items-start justify-between gap-2 text-slate-400">
+                  <span className="font-semibold text-slate-300 shrink-0">Alamat:</span>
+                  <span className="text-slate-300 text-right">{selectedLeadForPitch.address}</span>
+                </div>
+              )}
+            </div>
+
+            {/* AI Custom Icebreaker / Menu Highlight */}
+            {(selectedLeadForPitch?.ai_custom_icebreaker || selectedLeadForPitch?.ai_menu_highlight) && (
+              <div className="p-3.5 rounded-xl bg-purple-500/10 border border-purple-500/20 space-y-1.5">
+                <div className="flex items-center gap-1.5 text-purple-300 font-bold">
+                  <Sparkles size={13} />
+                  <span>AI Personalization & Menu Insights</span>
+                </div>
+                {selectedLeadForPitch?.ai_menu_highlight && (
+                  <p className="text-slate-300">
+                    <span className="text-purple-300 font-semibold">Menu Highlight: </span>
+                    {selectedLeadForPitch.ai_menu_highlight}
+                  </p>
+                )}
+                {selectedLeadForPitch?.ai_custom_icebreaker && (
+                  <p className="text-slate-300">
+                    <span className="text-purple-300 font-semibold">Icebreaker: </span>
+                    {selectedLeadForPitch.ai_custom_icebreaker}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* AI Generated Pitch Subject */}
+            <div>
+              <label className="font-bold text-slate-300 block mb-1">Subject Email (AI Generated):</label>
+              <div className="p-3 rounded-xl bg-slate-900 border border-white/10 text-amber-200 font-medium select-all">
+                {selectedLeadForPitch?.ai_generated_subject || selectedLeadForPitch?.pitch_subject || `Exclusive Taste Test for ${selectedLeadForPitch?.clean_name || 'Chef'}: Premium Boyolali Fried Shallots`}
+              </div>
+            </div>
+
+            {/* AI Generated Pitch Body */}
+            <div>
+              <label className="font-bold text-slate-300 block mb-1">Isi Body Email (AI Generated Pitch):</label>
+              <div className="p-3.5 rounded-xl bg-slate-900 border border-white/10 text-slate-200 leading-relaxed font-sans whitespace-pre-wrap select-all">
+                {selectedLeadForPitch?.ai_generated_pitch || selectedLeadForPitch?.pitch_email || `Dear Chef / Kitchen Manager at ${selectedLeadForPitch?.clean_name || 'Resto'},
+
+Kami melihat ulasan luar biasa tentang cita rasa masakan Nusantara di resto Anda.
+
+Kami dari Juragan Boyolali memproduksi Bawang Goreng Grade Super kualitas ekspor (renyah tahan lama, tanpa pengawet, aroma wangi gurih khas Boyolali).
+
+Apakah kami boleh mengirimkan 1 Box Sample Pack GRATIS (100g Tasting Pack) ke alamat dapur Anda di ${selectedLeadForPitch?.address || selectedLeadForPitch?.city || 'Singapore'} untuk diuji langsung oleh Head Chef?
+
+Salam hangat,
+Fahrul Hernanda - Juragan by Anak Bawang`}
+              </div>
+            </div>
+
+            {/* Outreach Metadata */}
+            <div className="flex items-center justify-between text-[11px] text-slate-500 pt-2">
+              <span>Status: <strong className="text-slate-300">{selectedLeadForPitch?.status_email || 'pending'}</strong></span>
+              <span>Prioritas: <strong className="text-slate-300 uppercase">{selectedLeadForPitch?.lead_priority || 'warm'}</strong></span>
+            </div>
+          </div>
+
+          <div className="p-4 border-t border-white/10 bg-slate-900/60 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setSelectedLeadForPitch(null)}
+              className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5"
+            >
+              Tutup
+            </button>
+
+            {selectedLeadForPitch?.email && (
+              <a
+                href={`mailto:${selectedLeadForPitch.email}?subject=${encodeURIComponent(selectedLeadForPitch?.ai_generated_subject || `Sample Tasting Pack for ${selectedLeadForPitch?.clean_name}`)}&body=${encodeURIComponent(selectedLeadForPitch?.ai_generated_pitch || '')}`}
+                className="px-5 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 flex items-center gap-1.5"
+              >
+                <Send size={13} />
+                <span>Kirim via Email Client</span>
+              </a>
+            )}
           </div>
         </SheetContent>
       </Sheet>

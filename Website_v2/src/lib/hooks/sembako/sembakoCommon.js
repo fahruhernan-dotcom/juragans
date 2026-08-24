@@ -24,15 +24,16 @@ export const ALLOWED_COLUMNS = {
     'total_spent', 'min_stock_alert', 'supplier_name', 'notes', 'is_deleted'
   ],
   b2b_leads: [
-    'tenant_id', 'queue_id', 'place_id', 'name', 'clean_name', 'category', 'country',
+    'tenant_id', 'campaign_id', 'queue_id', 'place_id', 'name', 'clean_name', 'category', 'country',
     'city', 'address', 'latitude', 'longitude', 'maps_url', 'phone', 'email',
     'email_source', 'website', 'cms', 'has_contact_form', 'instagram_url',
     'facebook_url', 'tiktok_url', 'linkedin_url', 'rating', 'review_count',
     'contactability_score', 'lead_priority', 'status_email', 'status_whatsapp',
+    'ai_menu_highlight', 'ai_custom_icebreaker', 'ai_generated_subject', 'ai_generated_pitch',
     'notes', 'is_deleted'
   ],
   b2b_scraping_queue: [
-    'target_location', 'country', 'city_or_region', 'status', 'scheduled_for', 'notes'
+    'target_location', 'country', 'city_or_region', 'status', 'total_leads_collected', 'last_scraped_at', 'notes'
   ],
   sembako_stock_batches: [
     'tenant_id', 'product_id', 'supplier_id', 'batch_code', 'qty_masuk',
