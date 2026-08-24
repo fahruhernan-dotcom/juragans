@@ -47,6 +47,7 @@ const pageImporters = {
   tim:              () => import('./dashboard/broker/sembako_broker/TimManajemenPage'),
   akun:             () => import('./dashboard/_shared/pages/Akun'),
   kelolaAkun:       () => import('./dashboard/broker/sembako_broker/DevAdminHubPage'),
+  b2bOutreach:      () => import('./dashboard/broker/sembako_broker/B2BLeadsOutreachPage'),
 }
 
 // Prefetch modul halaman secara bertahap (staggered) di background saat sistem benar-benar idle
@@ -92,6 +93,7 @@ const SembakoLaporan          = React.lazy(pageImporters.laporan)
 const SembakoTimManajemenPage = React.lazy(pageImporters.tim)
 const SembakoAkun             = React.lazy(pageImporters.akun)
 const SembakoDevAdminHub      = React.lazy(pageImporters.kelolaAkun)
+const SembakoB2BLeadsOutreach = React.lazy(pageImporters.b2bOutreach)
 
 // ─── Fase 2: Single source of truth untuk semua route ───────────────────────
 // Format: [slug, element]
@@ -108,6 +110,8 @@ const SEMBAKO_ROUTES = [
   ['toko-supplier/:type/:id', <SembakoTokoSupplierDetail />],
   ['retur',                   <SembakoRetur />],
   ['laporan',                 <SembakoLaporan />],
+  ['b2b-outreach',            <SembakoB2BLeadsOutreach />],
+  ['b2b-leads',               <SembakoB2BLeadsOutreach />],
   ['tim',                     <SembakoTimManajemenPage />],
   ['pegawai',                 <SembakoTimManajemenPage />],
   ['karyawan',                <SembakoTimManajemenPage />],

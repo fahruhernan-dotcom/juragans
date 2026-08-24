@@ -127,6 +127,7 @@ export default function AppSidebar({ open, onClose }) {
     {
       label: 'LAPORAN & MANAJEMEN',
       items: [
+        { title: 'B2B Leads (Export)', url: `${brokerBase}/b2b-outreach`, icon: MessageSquareText, roles: ['owner', 'dev', 'admin', 'manajer', 'sales'] },
         { title: 'Laporan Bisnis', url: `${brokerBase}/laporan`, icon: BarChart2, roles: ['owner', 'dev', 'admin', 'manajer'], dataTutorial: 'sembako-laporan' },
         { title: 'Tim & Karyawan', url: `${brokerBase}/tim`, icon: Users, roles: ['owner', 'dev', 'admin', 'manajer'] },
         { title: 'Kelola Akun & Dev', url: `${brokerBase}/kelola-akun`, icon: Wrench, roles: ['dev'], isDevItem: true },

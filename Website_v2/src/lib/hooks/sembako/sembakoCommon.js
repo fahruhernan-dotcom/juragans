@@ -14,7 +14,25 @@ export const ALLOWED_COLUMNS = {
   ],
   sembako_products: [
     'tenant_id', 'product_name', 'category', 'unit', 'current_stock',
-    'avg_buy_price', 'sell_price', 'min_stock_alert', 'is_active', 'is_deleted'
+    'avg_buy_price', 'sell_price', 'min_stock_alert', 'is_active', 'is_deleted',
+    'sku', 'weight_gram', 'raw_ingredient_cost', 'pouch_cost', 'sticker_front_cost',
+    'sticker_back_cost', 'other_packaging_cost', 'harga_solo_rp', 'harga_luar_kota_rp',
+    'harga_grosir_rp', 'harga_marketplace_promo_rp'
+  ],
+  sembako_raw_materials: [
+    'tenant_id', 'material_name', 'category', 'unit', 'current_stock', 'unit_cost',
+    'total_spent', 'min_stock_alert', 'supplier_name', 'notes', 'is_deleted'
+  ],
+  b2b_leads: [
+    'tenant_id', 'queue_id', 'place_id', 'name', 'clean_name', 'category', 'country',
+    'city', 'address', 'latitude', 'longitude', 'maps_url', 'phone', 'email',
+    'email_source', 'website', 'cms', 'has_contact_form', 'instagram_url',
+    'facebook_url', 'tiktok_url', 'linkedin_url', 'rating', 'review_count',
+    'contactability_score', 'lead_priority', 'status_email', 'status_whatsapp',
+    'notes', 'is_deleted'
+  ],
+  b2b_scraping_queue: [
+    'target_location', 'country', 'city_or_region', 'status', 'scheduled_for', 'notes'
   ],
   sembako_stock_batches: [
     'tenant_id', 'product_id', 'supplier_id', 'batch_code', 'qty_masuk',

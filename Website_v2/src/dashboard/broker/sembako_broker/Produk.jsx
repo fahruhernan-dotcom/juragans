@@ -1,5 +1,9 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react'
-import { Plus, Search, X, ChevronDown, ToggleLeft, ToggleRight, Trash2, Package, FileSpreadsheet, AlertTriangle } from 'lucide-react'
+import {
+  Plus, Search, X, ChevronDown, ToggleLeft, ToggleRight, Trash2, Package,
+  FileSpreadsheet, AlertTriangle, Layers, Tag, Calculator, Boxes, Sparkles,
+  Edit3, RefreshCw, Layers2, ShieldAlert
+} from 'lucide-react'
 import ImportCsvModal from '@/components/ui/ImportCsvModal'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
@@ -18,7 +22,11 @@ import {
   useCreateSembakoProduct,
   useUpdateSembakoProduct,
   useSoftDeleteSembakoProduct,
+  useSembakoRawMaterials,
+  useDeleteSembakoRawMaterial,
 } from '@/lib/hooks/useSembakoData'
+import SembakoBahanBakuSheet from './components/SembakoBahanBakuSheet'
+import { formatIDR } from '@/lib/format'
 import { useOutletContext, useLocation, useNavigate } from 'react-router-dom'
 import { C } from '@/dashboard/broker/sembako_broker/components/sembakoSaleUtils'
 import { BrokerMobileHeader } from '@/dashboard/broker/_shared/components/BrokerMobileHeader'
@@ -130,6 +138,7 @@ function ProductSheet({ product, onClose, onDelete }) {
     product_name: product?.product_name || '',
     category: product?.category || 'Beras & Biji-bijian',
     unit: product?.unit || 'pcs',
+    sku: product?.sku || '',
     sell_price: product?.sell_price || '',
     avg_buy_price: product?.avg_buy_price || '',
     current_stock: product?.current_stock || 0,
@@ -138,7 +147,18 @@ function ProductSheet({ product, onClose, onDelete }) {
     is_active: product?.is_active ?? true,
     secondary_unit: product?.secondary_unit || '',
     conversion_rate: product?.conversion_rate || '',
+    // Multi-tier regional pricing
+    harga_solo_rp: product?.harga_solo_rp || '',
+    harga_luar_kota_rp: product?.harga_luar_kota_rp || '',
+    harga_grosir_rp: product?.harga_grosir_rp || '',
+    // BOM breakdown
+    raw_ingredient_cost: product?.raw_ingredient_cost || '',
+    pouch_cost: product?.pouch_cost || '',
+    sticker_front_cost: product?.sticker_front_cost || '',
+    sticker_back_cost: product?.sticker_back_cost || '',
+    other_packaging_cost: product?.other_packaging_cost || '',
   })
+  const [showBomCalculator, setShowBomCalculator] = useState(false)
   const [catOpen, setCatOpen] = useState(false)
   const [priceInputUnit, setPriceInputUnit] = useState('primary') // 'primary' (Retail) | 'secondary' (Grosir)
   const [tempGrosirSellPrice, setTempGrosirSellPrice] = useState('')
@@ -149,6 +169,24 @@ function ProductSheet({ product, onClose, onDelete }) {
 
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }))
 
+  // Auto calculate total HPP from BOM components if user changes any BOM field
+  const updateBomCost = (key, val) => {
+    setForm(f => {
+      const updated = { ...f, [key]: val }
+      const totalHppFromBom =
+        (Number(updated.raw_ingredient_cost) || 0) +
+        (Number(updated.pouch_cost) || 0) +
+        (Number(updated.sticker_front_cost) || 0) +
+        (Number(updated.sticker_back_cost) || 0) +
+        (Number(updated.other_packaging_cost) || 0)
+
+      if (totalHppFromBom > 0) {
+        updated.avg_buy_price = totalHppFromBom
+      }
+      return updated
+    })
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!form.product_name.trim()) return toast.error('Nama produk wajib diisi')
@@ -158,6 +196,14 @@ function ProductSheet({ product, onClose, onDelete }) {
       avg_buy_price: form.avg_buy_price ? Number(String(form.avg_buy_price).replace(/\D/g, '')) : null,
       min_stock_alert: form.min_stock_alert ? Number(String(form.min_stock_alert).replace(/\D/g, '')) : null,
       conversion_rate: form.conversion_rate ? Number(form.conversion_rate) : null,
+      harga_solo_rp: form.harga_solo_rp ? Number(String(form.harga_solo_rp).replace(/\D/g, '')) : null,
+      harga_luar_kota_rp: form.harga_luar_kota_rp ? Number(String(form.harga_luar_kota_rp).replace(/\D/g, '')) : null,
+      harga_grosir_rp: form.harga_grosir_rp ? Number(String(form.harga_grosir_rp).replace(/\D/g, '')) : null,
+      raw_ingredient_cost: form.raw_ingredient_cost ? Number(String(form.raw_ingredient_cost).replace(/\D/g, '')) : null,
+      pouch_cost: form.pouch_cost ? Number(String(form.pouch_cost).replace(/\D/g, '')) : null,
+      sticker_front_cost: form.sticker_front_cost ? Number(String(form.sticker_front_cost).replace(/\D/g, '')) : null,
+      sticker_back_cost: form.sticker_back_cost ? Number(String(form.sticker_back_cost).replace(/\D/g, '')) : null,
+      other_packaging_cost: form.other_packaging_cost ? Number(String(form.other_packaging_cost).replace(/\D/g, '')) : null,
     }
     if (isEdit) {
       await updateMut.mutateAsync({ id: product.id, ...payload })
@@ -540,6 +586,182 @@ function ProductSheet({ product, onClose, onDelete }) {
             )}
           </div>
 
+          {/* ── Dynamic BOM (Bill of Materials) & HPP Calculator ── */}
+          <div style={{
+            background: 'var(--bg-subtle)',
+            border: '1px solid var(--border-soft)',
+            borderRadius: 14,
+            padding: '12px 14px',
+          }}>
+            <button
+              type="button"
+              onClick={() => setShowBomCalculator(!showBomCalculator)}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                width: '100%', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Calculator size={16} color={C.accent} />
+                <span style={{ fontFamily: 'Sora', fontSize: 12, fontWeight: 800, color: 'var(--text-primary)' }}>
+                  Kalkulator HPP dari Bahan & Kemasan (BOM)
+                </span>
+              </div>
+              <span style={{ fontSize: 11, fontWeight: 700, color: C.accent }}>
+                {showBomCalculator ? 'Tutup ▲' : 'Rincikan ▼'}
+              </span>
+            </button>
+
+            {showBomCalculator && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}
+              >
+                <p style={{ fontSize: 11, color: TEXT_SEC, margin: 0, lineHeight: 1.4 }}>
+                  Isi biaya per pcs dari bahan baku & packaging untuk menjumlahkan HPP otomatis:
+                </p>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <div>
+                    <label style={{ fontSize: 10, fontWeight: 700, color: TEXT_SEC, display: 'block', marginBottom: 4 }}>
+                      Modal Bawang Curah (Rp)
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={form.raw_ingredient_cost ? fmt(form.raw_ingredient_cost) : ''}
+                      onChange={e => updateBomCost('raw_ingredient_cost', e.target.value.replace(/\D/g, ''))}
+                      placeholder="0"
+                      style={inputStyle}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 10, fontWeight: 700, color: TEXT_SEC, display: 'block', marginBottom: 4 }}>
+                      Pouch / Toples (Rp)
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={form.pouch_cost ? fmt(form.pouch_cost) : ''}
+                      onChange={e => updateBomCost('pouch_cost', e.target.value.replace(/\D/g, ''))}
+                      placeholder="0"
+                      style={inputStyle}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <div>
+                    <label style={{ fontSize: 10, fontWeight: 700, color: TEXT_SEC, display: 'block', marginBottom: 4 }}>
+                      Stiker Depan (Rp)
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={form.sticker_front_cost ? fmt(form.sticker_front_cost) : ''}
+                      onChange={e => updateBomCost('sticker_front_cost', e.target.value.replace(/\D/g, ''))}
+                      placeholder="0"
+                      style={inputStyle}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 10, fontWeight: 700, color: TEXT_SEC, display: 'block', marginBottom: 4 }}>
+                      Stiker Belakang (Rp)
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={form.sticker_back_cost ? fmt(form.sticker_back_cost) : ''}
+                      onChange={e => updateBomCost('sticker_back_cost', e.target.value.replace(/\D/g, ''))}
+                      placeholder="0"
+                      style={inputStyle}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: 10, fontWeight: 700, color: TEXT_SEC, display: 'block', marginBottom: 4 }}>
+                    Kardus / Bubblewrap / Safety Pack (Rp)
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={form.other_packaging_cost ? fmt(form.other_packaging_cost) : ''}
+                    onChange={e => updateBomCost('other_packaging_cost', e.target.value.replace(/\D/g, ''))}
+                    placeholder="0"
+                    style={inputStyle}
+                  />
+                </div>
+              </motion.div>
+            )}
+          </div>
+
+          {/* ── Multi-Tier Pricing (Solo, Luar Kota, Grosir) ── */}
+          <div style={{
+            background: 'var(--bg-subtle)',
+            border: '1px solid var(--border-soft)',
+            borderRadius: 14,
+            padding: '12px 14px',
+            display: 'flex', flexDirection: 'column', gap: 10
+          }}>
+            <span style={{ fontFamily: 'Sora', fontSize: 12, fontWeight: 800, color: 'var(--text-primary)' }}>
+              Harga Multi-Tier / Wilayah (Opsional)
+            </span>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+              <div>
+                <label style={{ fontSize: 10, fontWeight: 700, color: TEXT_SEC, display: 'block', marginBottom: 4 }}>
+                  Solo Raya (Rp)
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={form.harga_solo_rp ? fmt(form.harga_solo_rp) : ''}
+                  onChange={e => set('harga_solo_rp', e.target.value.replace(/\D/g, ''))}
+                  placeholder="0"
+                  style={inputStyle}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: 10, fontWeight: 700, color: TEXT_SEC, display: 'block', marginBottom: 4 }}>
+                  Luar Kota (Rp)
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={form.harga_luar_kota_rp ? fmt(form.harga_luar_kota_rp) : ''}
+                  onChange={e => set('harga_luar_kota_rp', e.target.value.replace(/\D/g, ''))}
+                  placeholder="0"
+                  style={inputStyle}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: 10, fontWeight: 700, color: TEXT_SEC, display: 'block', marginBottom: 4 }}>
+                  Grosir/Resto (Rp)
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={form.harga_grosir_rp ? fmt(form.harga_grosir_rp) : ''}
+                  onChange={e => set('harga_grosir_rp', e.target.value.replace(/\D/g, ''))}
+                  placeholder="0"
+                  style={inputStyle}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* SKU / Kode Produk */}
+          <Field label="Kode SKU Produk (Opsional)">
+            <input
+              id="product-sku" name="sku" type="text"
+              value={form.sku}
+              onChange={e => set('sku', e.target.value.toUpperCase())}
+              placeholder="contoh: JB-BAMO-100G"
+              style={inputStyle}
+            />
+          </Field>
+
           {/* Stok alert */}
           <Field label="Alert Stok Minimum">
             <input
@@ -816,6 +1038,11 @@ export default function Produk() {
   const { data: products = [], isLoading, isError, error, refetch } = useSembakoProducts()
   const deleteMut = useSoftDeleteSembakoProduct()
 
+  // Raw Materials Hook
+  const { data: rawMaterials = [], isLoading: isLoadingRaw, refetch: refetchRaw } = useSembakoRawMaterials()
+  const deleteRawMut = useDeleteSembakoRawMaterial()
+
+  const [activeSubTab, setActiveSubTab] = useState('produk') // 'produk' | 'kemasan'
   const [search, setSearch] = useState('')
   const [catFilter, setCatFilter] = useState('Semua')
   const [sheet, setSheet] = useState(() => {
@@ -827,9 +1054,19 @@ export default function Produk() {
   const [productToDelete, setProductToDelete] = useState(null)
   const [importCsvOpen, setImportCsvOpen] = useState(false)
 
+  // Raw Materials Sheet State
+  const [rawSheetOpen, setRawSheetOpen] = useState(false)
+  const [editingRawMaterial, setEditingRawMaterial] = useState(null)
+  const [rawToDelete, setRawToDelete] = useState(null)
+  const [rawTypeFilter, setRawTypeFilter] = useState('all')
+
   useEffect(() => {
     const params = new URLSearchParams(location.search)
     const action = params.get('action')
+    const tab = params.get('tab')
+    if (tab === 'kemasan' || tab === 'bahan') {
+      setActiveSubTab('kemasan')
+    }
     if (action === 'new' || action === 'tambah') {
       setSheet('new')
     }
@@ -844,10 +1081,29 @@ export default function Produk() {
     return products.filter(p => {
       if (!showInactive && !p.is_active) return false
       if (catFilter !== 'Semua' && p.category !== catFilter) return false
-      if (search && !p.product_name.toLowerCase().includes(search.toLowerCase())) return false
+      if (search) {
+        const q = search.toLowerCase()
+        const matchName = p.product_name.toLowerCase().includes(q)
+        const matchSku = p.sku && p.sku.toLowerCase().includes(q)
+        if (!matchName && !matchSku) return false
+      }
       return true
     })
   }, [products, search, catFilter, showInactive])
+
+  const filteredRaw = useMemo(() => {
+    return rawMaterials.filter(r => {
+      if (rawTypeFilter !== 'all' && r.material_type !== rawTypeFilter) return false
+      if (search) {
+        const q = search.toLowerCase()
+        const matchName = r.material_name?.toLowerCase().includes(q)
+        const matchNotes = r.notes?.toLowerCase().includes(q)
+        const matchSupplier = r.supplier_name?.toLowerCase().includes(q)
+        if (!matchName && !matchNotes && !matchSupplier) return false
+      }
+      return true
+    })
+  }, [rawMaterials, rawTypeFilter, search])
 
   const stats = useMemo(() => {
     const active = products.filter(p => p.is_active && !p.is_deleted)
@@ -855,6 +1111,13 @@ export default function Produk() {
     const nilaiStok = active.reduce((s, p) => s + (p.current_stock * (p.avg_buy_price || 0)), 0)
     return { total: active.length, lowStock: lowStock.length, nilaiStok }
   }, [products])
+
+  const rawStats = useMemo(() => {
+    const totalJenis = rawMaterials.length
+    const lowStock = rawMaterials.filter(r => r.min_stock_alert > 0 && r.current_stock <= r.min_stock_alert).length
+    const totalInvestasi = rawMaterials.reduce((s, r) => s + (Number(r.total_spent) || (Number(r.current_stock) * Number(r.unit_cost || 0))), 0)
+    return { totalJenis, lowStock, totalInvestasi }
+  }, [rawMaterials])
 
   const handleDelete = (product) => {
     setProductToDelete(product)
@@ -864,6 +1127,16 @@ export default function Produk() {
     if (!productToDelete) return
     deleteMut.mutate(productToDelete.id)
     setProductToDelete(null)
+  }
+
+  const handleDeleteRaw = (item) => {
+    setRawToDelete(item)
+  }
+
+  const confirmDeleteRaw = () => {
+    if (!rawToDelete) return
+    deleteRawMut.mutate(rawToDelete.id)
+    setRawToDelete(null)
   }
 
   if (isLoading) return (
@@ -878,98 +1151,277 @@ export default function Produk() {
     </div>
   )
 
-  const summaryItems = [
+  const summaryItems = activeSubTab === 'produk' ? [
     { label: 'Total Produk Aktif', value: stats.total, color: 'amber' },
     { label: 'Stok Menipis', value: stats.lowStock > 0 ? `${stats.lowStock} produk` : 'Stok Aman', color: stats.lowStock > 0 ? 'red' : 'green', subLabel: stats.lowStock > 0 ? 'perlu restock' : 'semua aman' },
     { label: 'Total Nilai Stok', value: stats.nilaiStok, isCurrency: true, color: 'amber' },
+  ] : [
+    { label: 'Total Jenis Kemasan & Bahan', value: rawStats.totalJenis, color: 'amber', subLabel: 'Pouch, Stiker, Bawang' },
+    { label: 'Kemasan Menipis', value: rawStats.lowStock > 0 ? `${rawStats.lowStock} item` : 'Aman', color: rawStats.lowStock > 0 ? 'red' : 'green', subLabel: rawStats.lowStock > 0 ? 'perlu order pabrik' : 'stok packaging cukup' },
+    { label: 'Total Pembelian Bahan', value: rawStats.totalInvestasi, isCurrency: true, color: 'amber' },
   ]
 
   const categoryFilters = categories.map(c => ({ id: c, label: c }))
 
   return (
     <div className="min-h-screen bg-background text-foreground pb-[max(140px,calc(110px+env(safe-area-inset-bottom,24px)))] text-left">
-      {!isDesktop && <BrokerMobileHeader title="Produk" onMenuClick={() => setSidebarOpen(true)} />}
+      {!isDesktop && <BrokerMobileHeader title={activeSubTab === 'produk' ? 'Produk' : 'Bahan Baku'} onMenuClick={() => setSidebarOpen(true)} />}
 
       <div className="mx-auto max-w-7xl">
         <SembakoPageHeader
-          title="Manajemen Produk"
-          subtitle={`Katalog & Harga Produk · ${stats.total} produk aktif`}
+          title={activeSubTab === 'produk' ? 'Manajemen Produk & SKU' : 'Bahan Baku & Kemasan (BOM)'}
+          subtitle={activeSubTab === 'produk' ? `Katalog & Harga Multi-Tier · ${stats.total} produk aktif` : `Pouch, Stiker, Kardus & Bawang Curah · Auto HPP Calculation`}
           isDesktop={isDesktop}
           searchQuery={search}
           onSearchChange={setSearch}
-          searchPlaceholder="Cari produk..."
-          filters={categoryFilters}
+          searchPlaceholder={activeSubTab === 'produk' ? 'Cari nama produk / SKU...' : 'Cari nama bahan, kemasan, supplier...'}
+          filters={activeSubTab === 'produk' ? categoryFilters : []}
           activeFilter={catFilter}
           onFilterChange={setCatFilter}
           actionButton={
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setImportCsvOpen(true)}
-                className="flex items-center gap-1.5 px-3 h-10 rounded-xl font-bold text-xs bg-muted hover:bg-muted/80 text-foreground border border-border transition-all cursor-pointer shrink-0"
-              >
-                <FileSpreadsheet size={15} className="text-[#0F172A]" />
-                <span>Import CSV</span>
-              </button>
-              <button
-                onClick={() => setSheet('new')}
-                className="flex items-center gap-2 px-4 h-10 rounded-xl font-bold text-xs bg-[#0F172A] hover:bg-slate-900 text-white transition-all cursor-pointer shadow-lg shadow-slate-950/10 active:scale-95 shrink-0"
-              >
-                <Plus size={16} />
-                <span>Tambah Produk</span>
-              </button>
+              {activeSubTab === 'produk' ? (
+                <>
+                  <button
+                    onClick={() => setImportCsvOpen(true)}
+                    className="flex items-center gap-1.5 px-3 h-10 rounded-xl font-bold text-xs bg-muted hover:bg-muted/80 text-foreground border border-border transition-all cursor-pointer shrink-0"
+                  >
+                    <FileSpreadsheet size={15} className="text-[#0F172A]" />
+                    <span>Import CSV</span>
+                  </button>
+                  <button
+                    onClick={() => setSheet('new')}
+                    className="flex items-center gap-2 px-4 h-10 rounded-xl font-bold text-xs bg-[#0F172A] hover:bg-slate-900 text-white transition-all cursor-pointer shadow-lg shadow-slate-950/10 active:scale-95 shrink-0"
+                  >
+                    <Plus size={16} />
+                    <span>Tambah Produk</span>
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => {
+                    setEditingRawMaterial(null)
+                    setRawSheetOpen(true)
+                  }}
+                  className="flex items-center gap-2 px-4 h-10 rounded-xl font-bold text-xs bg-amber-500 hover:bg-amber-400 text-slate-950 transition-all cursor-pointer shadow-lg shadow-amber-500/20 active:scale-95 shrink-0"
+                >
+                  <Plus size={16} />
+                  <span>Tambah Bahan / Kemasan</span>
+                </button>
+              )}
             </div>
           }
         />
 
+        {/* ── SubTab Selector (Produk Jadi vs Bahan & Kemasan) ── */}
+        <div className="px-4 sm:px-6 pt-2">
+          <div className="flex items-center gap-2 p-1.5 bg-muted/60 border border-border/80 rounded-2xl w-fit">
+            <button
+              onClick={() => setActiveSubTab('produk')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                activeSubTab === 'produk'
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Package size={15} />
+              <span>Produk Jadi / SKU ({products.length})</span>
+            </button>
+            <button
+              onClick={() => setActiveSubTab('kemasan')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                activeSubTab === 'kemasan'
+                  ? 'bg-amber-500 text-slate-950 shadow-sm font-black'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Boxes size={15} />
+              <span>Bahan Baku & Kemasan ({rawMaterials.length})</span>
+            </button>
+          </div>
+        </div>
+
         <SembakoSummaryStrip items={summaryItems} />
 
-        {/* Toggle non-aktif */}
-        <div className="px-4 sm:px-6 pt-2 pb-2 flex items-center justify-between">
-          <button
-            onClick={() => setShowInactive(v => !v)}
-            className="border-0 bg-transparent cursor-pointer text-muted-foreground hover:text-foreground flex items-center gap-2 text-xs font-medium transition-colors"
-          >
-            {showInactive ? <ToggleRight size={22} className="text-[#0F172A]" /> : <ToggleLeft size={22} className="text-muted-foreground" />}
-            <span>Tampilkan produk non-aktif</span>
-          </button>
-        </div>
+        {/* ── TAB PRODUK JADI ── */}
+        {activeSubTab === 'produk' && (
+          <>
+            {/* Toggle non-aktif */}
+            <div className="px-4 sm:px-6 pt-2 pb-2 flex items-center justify-between">
+              <button
+                onClick={() => setShowInactive(v => !v)}
+                className="border-0 bg-transparent cursor-pointer text-muted-foreground hover:text-foreground flex items-center gap-2 text-xs font-medium transition-colors"
+              >
+                {showInactive ? <ToggleRight size={22} className="text-[#0F172A]" /> : <ToggleLeft size={22} className="text-muted-foreground" />}
+                <span>Tampilkan produk non-aktif</span>
+              </button>
+            </div>
 
-        {/* Product grid */}
-        <div className="px-4 sm:px-6 pt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
-          <AnimatePresence>
-            {filtered.length === 0 ? (
-              <div className="col-span-full text-center py-16 bg-card border border-border/60 rounded-2xl">
-                <Package size={40} className="mx-auto mb-3 opacity-40 text-muted-foreground" />
-                <p className="font-bold text-base text-foreground mb-1">
-                  {search ? 'Produk tidak ditemukan' : 'Belum ada produk'}
-                </p>
-                <p className="text-xs text-muted-foreground mb-4">
-                  {search ? 'Coba kata kunci lain' : 'Mulai dengan menambahkan produk yang Anda jual'}
-                </p>
-                {!search && (
-                  <button
-                    onClick={() => setSheet('new')}
-                    className="inline-flex items-center gap-2 px-5 h-10 rounded-xl bg-[#0F172A] hover:bg-slate-900 text-white text-xs font-bold transition-all shadow-lg shadow-slate-950/10"
-                  >
-                    <Plus size={15} /> Tambah Produk Pertama
-                  </button>
+            {/* Product grid */}
+            <div className="px-4 sm:px-6 pt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
+              <AnimatePresence>
+                {filtered.length === 0 ? (
+                  <div className="col-span-full text-center py-16 bg-card border border-border/60 rounded-2xl">
+                    <Package size={40} className="mx-auto mb-3 opacity-40 text-muted-foreground" />
+                    <p className="font-bold text-base text-foreground mb-1">
+                      {search ? 'Produk tidak ditemukan' : 'Belum ada produk'}
+                    </p>
+                    <p className="text-xs text-muted-foreground mb-4">
+                      {search ? 'Coba kata kunci lain' : 'Mulai dengan menambahkan produk yang Anda jual'}
+                    </p>
+                    {!search && (
+                      <button
+                        onClick={() => setSheet('new')}
+                        className="inline-flex items-center gap-2 px-5 h-10 rounded-xl bg-[#0F172A] hover:bg-slate-900 text-white text-xs font-bold transition-all shadow-lg shadow-slate-950/10"
+                      >
+                        <Plus size={15} /> Tambah Produk Pertama
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  filtered.map(product => (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      onEdit={setSheet}
+                      onDelete={handleDelete}
+                    />
+                  ))
                 )}
+              </AnimatePresence>
+            </div>
+          </>
+        )}
+
+        {/* ── TAB BAHAN BAKU & KEMASAN ── */}
+        {activeSubTab === 'kemasan' && (
+          <div className="px-4 sm:px-6 pt-2 space-y-4">
+            {/* Filter Jenis Kemasan */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+              {[
+                { id: 'all', label: 'Semua Bahan' },
+                { id: 'pouch', label: 'Pouch & Kemasan' },
+                { id: 'sticker_depan', label: 'Stiker Depan' },
+                { id: 'sticker_belakang', label: 'Stiker Belakang' },
+                { id: 'kardus', label: 'Kardus & Safety' },
+                { id: 'bawang_mentah', label: 'Bawang Mentah/Curah' },
+                { id: 'minyak_bumbu', label: 'Minyak & Bumbu' },
+              ].map(f => (
+                <button
+                  key={f.id}
+                  onClick={() => setRawTypeFilter(f.id)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                    rawTypeFilter === f.id
+                      ? 'bg-[#0F172A] text-white'
+                      : 'bg-muted text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Grid Bahan & Kemasan */}
+            {isLoadingRaw ? (
+              <div className="p-12 text-center text-xs text-muted-foreground">Memuat data kemasan & bahan...</div>
+            ) : filteredRaw.length === 0 ? (
+              <div className="p-12 text-center bg-card border border-border/80 rounded-3xl space-y-3">
+                <Boxes size={40} className="mx-auto text-muted-foreground/40" />
+                <div>
+                  <p className="font-bold text-sm text-foreground">Belum ada Bahan Baku / Kemasan</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Tambahkan pouch 100g, 200g, 250g, stiker, atau kardus pengiriman dengan sistem auto-kalkulator HPP.
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setEditingRawMaterial(null)
+                    setRawSheetOpen(true)
+                  }}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold"
+                >
+                  <Plus size={15} /> Tambah Bahan Sekarang
+                </button>
               </div>
             ) : (
-              filtered.map(product => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  onEdit={setSheet}
-                  onDelete={handleDelete}
-                />
-              ))
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                {filteredRaw.map(raw => {
+                  const isLow = raw.min_stock_alert > 0 && raw.current_stock <= raw.min_stock_alert
+                  return (
+                    <motion.div
+                      key={raw.id}
+                      layout
+                      className="bg-card border border-border/80 hover:border-amber-500/50 rounded-2xl p-4 flex flex-col justify-between transition-all"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                            {raw.material_type?.replace('_', ' ') || 'KEMASAN'}
+                          </span>
+                          {isLow && (
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-500/10 text-rose-600 border border-rose-500/20">
+                              Stok Menipis
+                            </span>
+                          )}
+                        </div>
+
+                        <h3 className="font-bold text-sm text-foreground">{raw.material_name}</h3>
+                        {raw.notes && <p className="text-[11px] text-muted-foreground line-clamp-1 mt-0.5">{raw.notes}</p>}
+
+                        <div className="mt-3 p-2.5 rounded-xl bg-muted/40 border border-border/50 space-y-1.5 text-xs">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Stok Tersedia:</span>
+                            <span className="font-bold text-foreground">{fmt(raw.current_stock)} {raw.unit}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">HPP Satuan:</span>
+                            <span className="font-extrabold text-amber-600 dark:text-amber-400">
+                              Rp {fmt(raw.unit_cost)} / {raw.unit}
+                            </span>
+                          </div>
+                          {Number(raw.total_spent) > 0 && (
+                            <div className="flex justify-between text-[11px] pt-1 border-t border-border/40">
+                              <span className="text-muted-foreground">Total Nilai Pembelian:</span>
+                              <span className="font-semibold text-foreground">Rp {fmt(raw.total_spent)}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="mt-3 pt-2.5 border-t border-border/60 flex items-center justify-between">
+                        <span className="text-[11px] text-muted-foreground">
+                          {raw.supplier_name ? `Supplier: ${raw.supplier_name}` : 'Supplier Mandiri'}
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => {
+                              setEditingRawMaterial(raw)
+                              setRawSheetOpen(true)
+                            }}
+                            className="p-1.5 rounded-lg bg-muted hover:bg-muted/80 text-foreground"
+                            title="Edit Bahan"
+                          >
+                            <Edit3 size={13} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteRaw(raw)}
+                            className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-600"
+                            title="Hapus Bahan"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )
+                })}
+              </div>
             )}
-          </AnimatePresence>
-        </div>
+          </div>
+        )}
       </div>
 
-      {/* Sheet */}
+      {/* Sheet Produk */}
       <AnimatePresence>
         {sheet && (
           <ProductSheet
@@ -980,6 +1432,49 @@ export default function Produk() {
         )}
       </AnimatePresence>
 
+      {/* Sheet Bahan Baku & Kemasan */}
+      <SembakoBahanBakuSheet
+        open={rawSheetOpen}
+        onClose={() => {
+          setRawSheetOpen(false)
+          setEditingRawMaterial(null)
+        }}
+        initialData={editingRawMaterial}
+      />
+
+      {/* Modal Hapus Bahan Baku */}
+      <AlertDialog open={!!rawToDelete} onOpenChange={(v) => !v && setRawToDelete(null)}>
+        <AlertDialogContent className="bg-white dark:bg-[#0C1319] border border-slate-200 dark:border-white/10 rounded-3xl max-w-md p-6 shadow-2xl">
+          <AlertDialogHeader className="space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-600 dark:text-rose-400 shrink-0">
+                <AlertTriangle size={20} />
+              </div>
+              <div>
+                <AlertDialogTitle className="text-slate-900 dark:text-white font-black text-base tracking-tight font-['Sora']">
+                  Hapus Bahan / Kemasan
+                </AlertDialogTitle>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Hapus item kemasan "{rawToDelete?.material_name}" dari data inventaris?
+                </p>
+              </div>
+            </div>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2.5 mt-5">
+            <AlertDialogCancel className="flex-1 h-11 rounded-xl bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/15 text-slate-700 dark:text-white font-bold text-xs border-none cursor-pointer">
+              Batal
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteRaw}
+              className="flex-1 h-11 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black text-xs tracking-wide border-none shadow-lg shadow-rose-600/20 cursor-pointer"
+            >
+              Ya, Hapus
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Modal Hapus Produk */}
       <AlertDialog open={!!productToDelete} onOpenChange={(v) => !v && setProductToDelete(null)}>
         <AlertDialogContent className="bg-white dark:bg-[#0C1319] border border-slate-200 dark:border-white/10 rounded-3xl max-w-md p-6 shadow-2xl">
           <AlertDialogHeader className="space-y-3">

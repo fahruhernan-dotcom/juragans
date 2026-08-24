@@ -27,6 +27,7 @@ export const formatIDR = (n) => {
   const num = safeNum(n)
   return 'Rp ' + num.toLocaleString('id-ID')
 }
+export const formatRupiah = formatIDR
 
 export const formatIDRShort = (n) => {
   const num = safeNum(n)
