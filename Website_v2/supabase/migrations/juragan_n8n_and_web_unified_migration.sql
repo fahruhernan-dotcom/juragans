@@ -1,5 +1,5 @@
 -- ==============================================================================
--- JURAGAN BY ANAK BAWANG — UNIFIED DATABASE MASTER MIGRATION
+-- JURAGAN BY ANAK BAWANG — UNIFIED DATABASE MASTER MIGRATION (V2 - ROBUST)
 -- (MENGGABUNGKAN DATABASE N8N & DATABASE WEB MENJADI 1 SUPABASE INSTANCE)
 -- ==============================================================================
 -- Instruksi:
@@ -139,7 +139,6 @@ CREATE TABLE IF NOT EXISTS public.sembako_products (
   sell_price NUMERIC DEFAULT 0,
   is_active BOOLEAN DEFAULT true,
   is_deleted BOOLEAN DEFAULT false,
-  -- BOM & Regional Pricing Extensions
   weight_gram INT DEFAULT 200,
   raw_ingredient_cost NUMERIC(15,2) DEFAULT 0,
   pouch_cost NUMERIC(15,2) DEFAULT 0,
@@ -156,7 +155,6 @@ CREATE TABLE IF NOT EXISTS public.sembako_products (
   CONSTRAINT sembako_products_pkey PRIMARY KEY (id)
 );
 
--- Pastikan kolom baru tetap ada jika tabel sudah pernah dibuat sebelumnya
 ALTER TABLE public.sembako_products ADD COLUMN IF NOT EXISTS sku TEXT DEFAULT '';
 ALTER TABLE public.sembako_products ADD COLUMN IF NOT EXISTS weight_gram INT DEFAULT 200;
 ALTER TABLE public.sembako_products ADD COLUMN IF NOT EXISTS raw_ingredient_cost NUMERIC(15,2) DEFAULT 0;
@@ -189,6 +187,14 @@ CREATE TABLE IF NOT EXISTS public.sembako_raw_materials (
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   CONSTRAINT sembako_raw_materials_pkey PRIMARY KEY (id)
 );
+
+ALTER TABLE public.sembako_raw_materials ADD COLUMN IF NOT EXISTS current_stock NUMERIC(15,2) DEFAULT 0;
+ALTER TABLE public.sembako_raw_materials ADD COLUMN IF NOT EXISTS unit_cost NUMERIC(15,2) DEFAULT 0;
+ALTER TABLE public.sembako_raw_materials ADD COLUMN IF NOT EXISTS total_spent NUMERIC(15,2) DEFAULT 0;
+ALTER TABLE public.sembako_raw_materials ADD COLUMN IF NOT EXISTS min_stock_alert NUMERIC(15,2) DEFAULT 50;
+ALTER TABLE public.sembako_raw_materials ADD COLUMN IF NOT EXISTS supplier_name TEXT;
+ALTER TABLE public.sembako_raw_materials ADD COLUMN IF NOT EXISTS notes TEXT;
+ALTER TABLE public.sembako_raw_materials ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT false;
 
 -- 3.3 SUPPLIERS
 CREATE TABLE IF NOT EXISTS public.sembako_suppliers (
@@ -278,6 +284,15 @@ CREATE TABLE IF NOT EXISTS public.sembako_sales (
   CONSTRAINT sembako_sales_pkey PRIMARY KEY (id)
 );
 
+ALTER TABLE public.sembako_sales ADD COLUMN IF NOT EXISTS subtotal NUMERIC DEFAULT 0;
+ALTER TABLE public.sembako_sales ADD COLUMN IF NOT EXISTS order_source TEXT DEFAULT 'direct';
+ALTER TABLE public.sembako_sales ADD COLUMN IF NOT EXISTS area TEXT;
+ALTER TABLE public.sembako_sales ADD COLUMN IF NOT EXISTS items_summary TEXT;
+ALTER TABLE public.sembako_sales ADD COLUMN IF NOT EXISTS kardus TEXT;
+ALTER TABLE public.sembako_sales ADD COLUMN IF NOT EXISTS kartu_ucapan TEXT;
+ALTER TABLE public.sembako_sales ADD COLUMN IF NOT EXISTS notes TEXT;
+ALTER TABLE public.sembako_sales ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT false;
+
 -- 3.7 SALE ITEMS
 CREATE TABLE IF NOT EXISTS public.sembako_sale_items (
   id UUID NOT NULL DEFAULT uuid_generate_v4(),
@@ -297,6 +312,15 @@ CREATE TABLE IF NOT EXISTS public.sembako_sale_items (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   CONSTRAINT sembako_sale_items_pkey PRIMARY KEY (id)
 );
+
+ALTER TABLE public.sembako_sale_items ADD COLUMN IF NOT EXISTS unit TEXT;
+ALTER TABLE public.sembako_sale_items ADD COLUMN IF NOT EXISTS weight_gram INT;
+ALTER TABLE public.sembako_sale_items ADD COLUMN IF NOT EXISTS price_per_unit NUMERIC DEFAULT 0;
+ALTER TABLE public.sembako_sale_items ADD COLUMN IF NOT EXISTS sell_price NUMERIC DEFAULT 0;
+ALTER TABLE public.sembako_sale_items ADD COLUMN IF NOT EXISTS unit_price NUMERIC DEFAULT 0;
+ALTER TABLE public.sembako_sale_items ADD COLUMN IF NOT EXISTS subtotal NUMERIC DEFAULT 0;
+ALTER TABLE public.sembako_sale_items ADD COLUMN IF NOT EXISTS cogs_per_unit NUMERIC DEFAULT 0;
+ALTER TABLE public.sembako_sale_items ADD COLUMN IF NOT EXISTS cogs_total NUMERIC DEFAULT 0;
 
 -- 3.8 STOCK OUT LOGS
 CREATE TABLE IF NOT EXISTS public.sembako_stock_out (
@@ -591,6 +615,12 @@ CREATE TABLE IF NOT EXISTS public.b2b_scraping_queue (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Pastikan kolom b2b_scraping_queue terlengkapi jika tabel sudah ada sebelumnya
+ALTER TABLE public.b2b_scraping_queue ADD COLUMN IF NOT EXISTS notes TEXT;
+ALTER TABLE public.b2b_scraping_queue ADD COLUMN IF NOT EXISTS total_leads_collected INT DEFAULT 0;
+ALTER TABLE public.b2b_scraping_queue ADD COLUMN IF NOT EXISTS last_scraped_at TIMESTAMPTZ;
+ALTER TABLE public.b2b_scraping_queue ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending';
+
 CREATE TABLE IF NOT EXISTS public.b2b_leads (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   campaign_id UUID REFERENCES public.b2b_campaigns(id) ON DELETE SET NULL,
@@ -636,6 +666,32 @@ CREATE TABLE IF NOT EXISTS public.b2b_leads (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Pastikan kolom b2b_leads terlengkapi jika tabel sudah ada sebelumnya
+ALTER TABLE public.b2b_leads ADD COLUMN IF NOT EXISTS campaign_id UUID;
+ALTER TABLE public.b2b_leads ADD COLUMN IF NOT EXISTS queue_id UUID;
+ALTER TABLE public.b2b_leads ADD COLUMN IF NOT EXISTS clean_name TEXT;
+ALTER TABLE public.b2b_leads ADD COLUMN IF NOT EXISTS email_source TEXT;
+ALTER TABLE public.b2b_leads ADD COLUMN IF NOT EXISTS website TEXT;
+ALTER TABLE public.b2b_leads ADD COLUMN IF NOT EXISTS cms TEXT;
+ALTER TABLE public.b2b_leads ADD COLUMN IF NOT EXISTS has_contact_form BOOLEAN DEFAULT false;
+ALTER TABLE public.b2b_leads ADD COLUMN IF NOT EXISTS instagram_url TEXT;
+ALTER TABLE public.b2b_leads ADD COLUMN IF NOT EXISTS facebook_url TEXT;
+ALTER TABLE public.b2b_leads ADD COLUMN IF NOT EXISTS tiktok_url TEXT;
+ALTER TABLE public.b2b_leads ADD COLUMN IF NOT EXISTS linkedin_url TEXT;
+ALTER TABLE public.b2b_leads ADD COLUMN IF NOT EXISTS contactability_score INT DEFAULT 50;
+ALTER TABLE public.b2b_leads ADD COLUMN IF NOT EXISTS opportunity_tags TEXT[];
+ALTER TABLE public.b2b_leads ADD COLUMN IF NOT EXISTS opening_hours JSONB;
+ALTER TABLE public.b2b_leads ADD COLUMN IF NOT EXISTS email_sent_count INT DEFAULT 0;
+ALTER TABLE public.b2b_leads ADD COLUMN IF NOT EXISTS wa_sent_count INT DEFAULT 0;
+ALTER TABLE public.b2b_leads ADD COLUMN IF NOT EXISTS last_contacted_at TIMESTAMPTZ;
+ALTER TABLE public.b2b_leads ADD COLUMN IF NOT EXISTS ai_menu_highlight TEXT;
+ALTER TABLE public.b2b_leads ADD COLUMN IF NOT EXISTS ai_custom_icebreaker TEXT;
+ALTER TABLE public.b2b_leads ADD COLUMN IF NOT EXISTS ai_generated_subject TEXT;
+ALTER TABLE public.b2b_leads ADD COLUMN IF NOT EXISTS ai_generated_pitch TEXT;
+ALTER TABLE public.b2b_leads ADD COLUMN IF NOT EXISTS scraped_at TIMESTAMPTZ;
+ALTER TABLE public.b2b_leads ADD COLUMN IF NOT EXISTS notes TEXT;
+ALTER TABLE public.b2b_leads ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT false;
 
 CREATE TABLE IF NOT EXISTS public.b2b_outreach_logs (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
