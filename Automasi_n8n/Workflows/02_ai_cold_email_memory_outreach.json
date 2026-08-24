@@ -21,7 +21,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT * FROM v_n8n_pending_emails LIMIT 15;"
+        "query": "SELECT * FROM public.v_n8n_active_pending_leads LIMIT 15;"
       },
       "id": "supabase-fetch-leads-memory",
       "name": "2. Fetch Pending Leads & Interaction Memory",

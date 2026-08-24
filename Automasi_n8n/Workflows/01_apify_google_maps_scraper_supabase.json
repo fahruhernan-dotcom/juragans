@@ -21,7 +21,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT \n    id AS queue_id,\n    country,\n    city_or_region,\n    target_location\nFROM b2b_scraping_queue\nWHERE status = 'pending' \n   OR last_scraped_at < NOW() - INTERVAL '30 days'\nORDER BY \n    CASE status WHEN 'pending' THEN 1 ELSE 2 END,\n    last_scraped_at ASC NULLS FIRST\nLIMIT 1;"
+        "query": "SELECT \n    id AS queue_id,\n    country,\n    city_or_region,\n    target_location\nFROM public.v_n8n_active_scraping_queue\nLIMIT 1;"
       },
       "id": "node-fetch-queue",
       "name": "2. Cek Antrian Negara di Supabase",

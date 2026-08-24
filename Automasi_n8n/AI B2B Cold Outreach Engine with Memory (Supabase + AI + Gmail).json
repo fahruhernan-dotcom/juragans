@@ -58,7 +58,7 @@
     {
       "parameters": {
         "operation": "getAll",
-        "tableId": "b2b_scraping_queue",
+        "tableId": "v_n8n_active_scraping_queue",
         "limit": 1,
         "filters": {
           "conditions": [
@@ -91,7 +91,7 @@
         "url": "https://api.apify.com/v2/acts/berkaydev~google-maps-email-scraper-business-leads/run-sync-get-dataset-items?token=YOUR_APIFY_API_TOKEN",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"enrichLeads\": true,\n  \"extractEmail\": true,\n  \"location\": \"{{ $json.target_location }}\",\n  \"maxResults\": 1,\n  \"onlyWithPhone\": true,\n  \"onlyWithWebsite\": true,\n  \"proxyConfiguration\": {\n    \"useApifyProxy\": true,\n    \"apifyProxyGroups\": []\n  },\n  \"searchTerms\": [\n    \"Indonesian restaurant\",\n    \"Indonesian food\",\n    \"Indonesian cuisine\",\n    \"Indonesian restaurant {{ $json.target_location }}\",\n    \"Nusantara restaurant\",\n    \"Nusantara cuisine\",\n    \"Indonesian cafe\",\n    \"Indonesian halal restaurant\",\n    \"Indonesian catering\",\n    \"Padang restaurant\",\n    \"Nasi Padang\",\n    \"Warung Indonesia\"\n  ]\n}",
+        "jsonBody": "={\n  \"enrichLeads\": true,\n  \"extractEmail\": true,\n  \"location\": \"{{ $json.target_location }}\",\n  \"maxResults\": 20,\n  \"onlyWithPhone\": true,\n  \"onlyWithWebsite\": false,\n  \"proxyConfiguration\": {\n    \"useApifyProxy\": true,\n    \"apifyProxyGroups\": []\n  },\n  \"searchTerms\": [\n    \"Warung Soto {{ $json.city_or_region || $json.target_location }}\",\n    \"Bebek Goreng {{ $json.city_or_region || $json.target_location }}\",\n    \"Restoran Padang {{ $json.city_or_region || $json.target_location }}\",\n    \"Warung Bakso {{ $json.city_or_region || $json.target_location }}\",\n    \"Rumah Makan {{ $json.city_or_region || $json.target_location }}\",\n    \"Katering {{ $json.city_or_region || $json.target_location }}\",\n    \"Indonesian restaurant {{ $json.target_location }}\",\n    \"Nasi Padang {{ $json.target_location }}\"\n  ]\n}",
         "options": {
           "timeout": 300000
         }
