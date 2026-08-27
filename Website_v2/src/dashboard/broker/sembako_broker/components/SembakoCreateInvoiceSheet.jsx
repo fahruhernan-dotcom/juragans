@@ -2103,10 +2103,58 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
                             />
                           </div>
 
-                          {/* Biaya BBM */}
-                          <div>
-                            <label className={labelCn}>Biaya BBM Internal <span className="normal-case opacity-60 font-normal">(Opsional)</span></label>
-                            <InputRupiah value={fuelCost} onChange={setFuelCost} />
+                          {/* Ongkos Kirim (Ke Pelanggan) */}
+                          <div className="space-y-1.5 pt-2 border-t border-slate-200 dark:border-white/10">
+                            <div className="flex items-center justify-between">
+                              <label className={labelCn}>Ongkos Kirim (Ke Pelanggan)</label>
+                              <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                                deliveryCost === 0 ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300' : 'bg-indigo-100 dark:bg-indigo-950/60 text-indigo-800 dark:text-indigo-300'
+                              }`}>
+                                {deliveryCost === 0 ? '🎁 Bebas Ongkir' : `+${formatIDR(deliveryCost)}`}
+                              </span>
+                            </div>
+                            <InputRupiah id="delivery-cost-input" value={deliveryCost} onChange={setDeliveryCost} />
+                            
+                            {/* Quick Ongkir Presets */}
+                            <div className="flex flex-wrap items-center gap-1 pt-1">
+                              <button
+                                type="button"
+                                onClick={() => setDeliveryCost(0)}
+                                className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
+                                  deliveryCost === 0
+                                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                                    : 'bg-white dark:bg-white/5 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-white/10 hover:border-emerald-400'
+                                }`}
+                              >
+                                🎁 Bebas Ongkir (Rp 0)
+                              </button>
+                              {[10000, 15000, 20000, 25000].map(amt => (
+                                <button
+                                  key={amt}
+                                  type="button"
+                                  onClick={() => setDeliveryCost(amt)}
+                                  className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
+                                    deliveryCost === amt
+                                      ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white shadow-xs'
+                                      : 'bg-white dark:bg-white/5 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-white/10 hover:border-slate-400'
+                                  }`}
+                                >
+                                  {amt / 1000}k
+                                </button>
+                              ))}
+                            </div>
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 font-medium italic">
+                              * Ditagihkan ke nota pelanggan ({deliveryCost === 0 ? 'Tercatat GRATIS / Bebas Ongkir' : 'menambah total invoice'}).
+                            </p>
+                          </div>
+
+                          {/* Biaya BBM / Operasional Internal */}
+                          <div className="pt-2 border-t border-slate-200 dark:border-white/10">
+                            <label className={labelCn}>Biaya BBM / Operasional Toko <span className="normal-case opacity-60 font-normal">(Internal Toko)</span></label>
+                            <InputRupiah value={otherCost} onChange={setOtherCost} />
+                            <p className="text-[10px] text-emerald-700 dark:text-emerald-400 mt-1 font-medium italic">
+                              * Beban operasional toko (memotong laba bersih, <strong>tidak masuk nota pelanggan</strong>).
+                            </p>
                           </div>
                         </motion.div>
                       )}
@@ -2234,7 +2282,7 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
                 )}
 
                 {/* ════════════════════════════════════════
-                    STEP 3 — Summary & Payment
+                    STEP 3 — Summary & Payment (Review Only)
                 ════════════════════════════════════════ */}
                 {step === 3 && (
                   <>
@@ -2254,8 +2302,21 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
                       </div>
                     )}
 
-                    {/* Summary card */}
-                    <div className="rounded-2xl p-4 space-y-2" style={{ background: SURFACE, border: `1px solid ${BORDER}` }}>
+                    {/* Summary review card */}
+                    <div className="rounded-2xl p-4 space-y-2.5" style={{ background: SURFACE, border: `1px solid ${BORDER}` }}>
+                      <div className="flex items-center justify-between pb-1 border-b border-slate-200 dark:border-white/10">
+                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                          Review Ringkasan Tagihan
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setStep(2)}
+                          className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                        >
+                          Ubah Pengiriman ✏️
+                        </button>
+                      </div>
+                      
                       <SummaryLine
                         label="Toko / Customer"
                         value={selectedCust?.customer_name || <span className="text-red-500 font-bold">⚠️ Belum Dipilih</span>}
@@ -2264,7 +2325,7 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
                       <SummaryLine label="Jumlah Item" value={`${items.filter(i => i.product_id).length} Item (${totalPouchesCount} pouch)`} />
                       {effectivePackingQty > 0 && (
                         <SummaryLine
-                          label="Kemasan Packing"
+                          label="Kemasan Digunakan"
                           value={`${effectivePackingQty} pcs ${packingType === 'kardus' ? 'Kardus Box' : 'Plastik Polymailer Hitam'}`}
                         />
                       )}
@@ -2376,61 +2437,6 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
                         </div>
                       </div>
                     )}
-
-                    {/* Cost inputs */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <label className={labelCn}>Ongkos Kirim (Ke Pelanggan)</label>
-                          <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
-                            deliveryCost === 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-indigo-100 text-indigo-800'
-                          }`}>
-                            {deliveryCost === 0 ? '🎁 Bebas Ongkir' : `+${formatIDR(deliveryCost)}`}
-                          </span>
-                        </div>
-                        <InputRupiah id="delivery-cost-input" value={deliveryCost} onChange={setDeliveryCost} />
-                        
-                        {/* Quick Ongkir Presets */}
-                        <div className="flex flex-wrap items-center gap-1 pt-1">
-                          <button
-                            type="button"
-                            onClick={() => setDeliveryCost(0)}
-                            className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
-                              deliveryCost === 0
-                                ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
-                                : 'bg-white text-slate-600 border-slate-200 hover:border-emerald-400'
-                            }`}
-                          >
-                            🎁 Bebas Ongkir (Rp 0)
-                          </button>
-                          {[10000, 15000, 20000, 25000].map(amt => (
-                            <button
-                              key={amt}
-                              type="button"
-                              onClick={() => setDeliveryCost(amt)}
-                              className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
-                                deliveryCost === amt
-                                  ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
-                                  : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'
-                              }`}
-                            >
-                              {amt / 1000}k
-                            </button>
-                          ))}
-                        </div>
-                        <p className="text-[10px] text-slate-500 mt-1 font-medium italic">
-                          * Tercetak di nota customer ({deliveryCost === 0 ? 'GRATIS / Bebas Ongkir' : 'menambah tagihan'}).
-                        </p>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className={labelCn}>Biaya Operasional Internal (Sopir/BBM)</label>
-                        <InputRupiah value={otherCost} onChange={setOtherCost} />
-                        <p className="text-[10px] text-emerald-700 mt-1 font-medium italic">
-                          * Beban operasional toko (memotong laba bersih, <strong>tidak masuk nota pelanggan</strong>).
-                        </p>
-                      </div>
-                    </div>
 
                     {/* Operational Cost Preset Chips when otherCost > 0 */}
                     <AnimatePresence>
