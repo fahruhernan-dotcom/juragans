@@ -100,6 +100,8 @@ export const useCreateSembakoRawMaterial = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sembako-raw-materials'] })
+      queryClient.invalidateQueries({ queryKey: ['sembako-products'] })
+      queryClient.invalidateQueries({ queryKey: ['sembako-dashboard-stats'] })
       queryClient.invalidateQueries({ queryKey: ['sembako-suppliers'] })
       toast.success('Bahan baku / kemasan berhasil ditambahkan')
     },
@@ -143,6 +145,8 @@ export const useUpdateSembakoRawMaterial = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sembako-raw-materials'] })
+      queryClient.invalidateQueries({ queryKey: ['sembako-products'] })
+      queryClient.invalidateQueries({ queryKey: ['sembako-dashboard-stats'] })
       toast.success('Bahan baku / kemasan berhasil diperbarui')
     },
     onError: (err) => toast.error(normalizeSupabaseError(err).message),
@@ -170,6 +174,8 @@ export const useDeleteSembakoRawMaterial = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sembako-raw-materials'] })
+      queryClient.invalidateQueries({ queryKey: ['sembako-products'] })
+      queryClient.invalidateQueries({ queryKey: ['sembako-dashboard-stats'] })
       toast.success('Bahan baku / kemasan dihapus')
     },
     onError: (err) => toast.error(normalizeSupabaseError(err).message),
@@ -262,6 +268,8 @@ export const useRestockSembakoRawMaterial = () => {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['sembako-raw-materials'] })
+      queryClient.invalidateQueries({ queryKey: ['sembako-products'] })
+      queryClient.invalidateQueries({ queryKey: ['sembako-dashboard-stats'] })
       queryClient.invalidateQueries({ queryKey: ['sembako-suppliers'] })
       toast.success(`Stok ${data?.material_name || 'bahan'} berhasil ditambah!`)
     },
