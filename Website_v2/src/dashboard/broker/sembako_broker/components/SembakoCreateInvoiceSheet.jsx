@@ -801,7 +801,8 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
   const [deliveryDriver, setDeliveryDriver]     = useState(() => getSavedInvoiceDraft()?.deliveryDriver ?? '')
   const [deliveryVehicle, setDeliveryVehicle]   = useState(() => getSavedInvoiceDraft()?.deliveryVehicle ?? '')
   const [deliveryPlate, setDeliveryPlate]       = useState(() => getSavedInvoiceDraft()?.deliveryPlate ?? '')
-  const [deliveryArea, setDeliveryArea]         = useState(() => getSavedInvoiceDraft()?.deliveryArea ?? '')
+  const [shippingBorneBy, setShippingBorneBy]   = useState(() => getSavedInvoiceDraft()?.shippingBorneBy ?? 'buyer') // 'buyer' | 'seller'
+  const [sellerShippingFee, setSellerShippingFee] = useState(() => getSavedInvoiceDraft()?.sellerShippingFee ?? 0)
   const [fuelCost, setFuelCost]                 = useState(() => getSavedInvoiceDraft()?.fuelCost ?? 0)
   const [addKurir, setAddKurir]                 = useState(false)
   const [newKurirForm, setNewKurirForm]         = useState({ full_name: '', phone: '' })
@@ -846,7 +847,7 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
     const tomorrow = () => { const d = new Date(); d.setDate(d.getDate() + 1); return format(d, 'yyyy-MM-dd') }
     setStep(0); setCustId(''); setCustError(''); setTxnDate(format(new Date(), 'yyyy-MM-dd')); setDueDate(tomorrow())
     setItems([{ product_id: '', product_name: '', unit: '', selectedUnit: '', priceMode: 'per_base', quantity: 0, price_per_unit: 0, cogs_per_unit: 0 }])
-    setDeliveryCost(0); setOtherCost(0); setSelectedCostChips([]); setOtherCostNotes(''); setNotes('')
+    setDeliveryCost(0); setShippingBorneBy('buyer'); setSellerShippingFee(0); setOtherCost(0); setSelectedCostChips([]); setOtherCostNotes(''); setNotes('')
     setPayAmount(0); setPayMethod('cash')
     setUseDelivery(false); setDeliveryDriver(''); setDeliveryVehicle(''); setDeliveryPlate(''); setDeliveryArea(''); setFuelCost(0)
     setAddKurir(false); setNewKurirForm({ full_name: '', phone: '' })
@@ -878,13 +879,23 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
       : (Number(i.quantity) || 0) * inputPrice
     return s + Math.round(sub)
   }, 0)
-  const totalAmount  = productSubtotal + Number(deliveryCost || 0)
+
+  const isSellerShipping = deliveryMethod === 'ekspedisi' && shippingBorneBy === 'seller'
+  const effectiveCustomerDelivery = (isSellerShipping || deliveryMethod === 'pickup' || !useDelivery)
+    ? 0
+    : Number(deliveryCost || 0)
+  const effectiveSellerShippingExpense = (isSellerShipping && useDelivery)
+    ? Number(sellerShippingFee || 0)
+    : 0
+
+  const totalAmount  = productSubtotal + effectiveCustomerDelivery
   const totalCogs    = items.reduce((s, i) => {
     const factor = getFactor(i.selectedUnit || i.unit || 'pcs')
     return s + Math.round((i.quantity || 0) * factor * (i.cogs_per_unit || 0))
   }, 0)
   const grossProfit  = productSubtotal - totalCogs
-  const netProfit    = grossProfit - otherCost
+  const effectiveOtherCost = Number(otherCost || 0) + effectiveSellerShippingExpense
+  const netProfit    = grossProfit - effectiveOtherCost
   const netMarginPct = productSubtotal > 0 ? Math.round((netProfit / productSubtotal) * 100) : 0
 
   // ── Edit prefill ────────────────────────────────────────────────────────────
@@ -900,13 +911,23 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
     if (lastPrefillKeyRef.current === prefillKey) return
     lastPrefillKeyRef.current = prefillKey
 
-    // Prefill semua field dari data invoice lama
     setCustId(editSale.customer_id || '')
     setTxnDate(editSale.transaction_date?.slice(0, 10) || new Date().toISOString().slice(0, 10))
     setDueDate(editSale.due_date?.slice(0, 10) || '')
     setDeliveryCost(editSale.delivery_cost || 0)
     setOtherCost(editSale.other_cost || 0)
     setNotes(editSale.notes || '')
+
+    if (editSale.delivery_cost > 0) {
+      setShippingBorneBy('buyer')
+    } else if (editSale.notes?.includes('Ongkir Ditanggung Penjual')) {
+      setShippingBorneBy('seller')
+      const matchSellerFee = editSale.notes.match(/\[Ongkir Ditanggung Penjual:\s*Rp\s*([\d\.]+)\]/)
+      if (matchSellerFee && matchSellerFee[1]) {
+        const raw = parseInt(matchSellerFee[1].replace(/\./g, ''), 10)
+        if (!isNaN(raw)) setSellerShippingFee(raw)
+      }
+    }
 
     // Parse operational cost categories & notes from editSale.notes
     if (editSale.notes) {
@@ -1208,6 +1229,18 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
         finalNotes = finalNotes ? `${finalNotes}\n${costTag}` : costTag
       }
 
+      if (deliveryMethod === 'ekspedisi' && useDelivery) {
+        if (shippingBorneBy === 'seller' && sellerShippingFee > 0) {
+          const shipTag = `[Ongkir Ditanggung Penjual: Rp ${formatIDR(sellerShippingFee)}]`
+          finalNotes = finalNotes.replace(/\[Ongkir Ditanggung[^\]]+\]/g, '').trim()
+          finalNotes = finalNotes ? `${finalNotes}\n${shipTag}` : shipTag
+        } else if (shippingBorneBy === 'buyer' && effectiveCustomerDelivery > 0) {
+          const shipTag = `[Ongkir Ditanggung Pembeli: Rp ${formatIDR(effectiveCustomerDelivery)}]`
+          finalNotes = finalNotes.replace(/\[Ongkir Ditanggung[^\]]+\]/g, '').trim()
+          finalNotes = finalNotes ? `${finalNotes}\n${shipTag}` : shipTag
+        }
+      }
+
       if (editId) {
         await updateSale.mutateAsync({
           id: editId,
@@ -1215,7 +1248,7 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
             customer_id: custId || null, customer_name: custName,
             transaction_date: txnDate, due_date: dueDate || null,
             total_amount: totalAmount, total_cogs: totalCogs,
-            delivery_cost: deliveryCost, other_cost: otherCost, notes: finalNotes,
+            delivery_cost: effectiveCustomerDelivery, other_cost: effectiveOtherCost, notes: finalNotes,
             packing_details: {
               packing_type: packingType,
               material_name: packingType === 'kardus' ? 'Kardus & Safety' : 'Plastik Packing Polymailer Hitam',
@@ -1232,7 +1265,7 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
       const sale = await createSale.mutateAsync({
         customer_id: custId || null, customer_name: custName,
         transaction_date: txnDate, due_date: dueDate || null,
-        items: validItems, delivery_cost: deliveryCost, other_cost: otherCost, notes: finalNotes,
+        items: validItems, delivery_cost: effectiveCustomerDelivery, other_cost: effectiveOtherCost, notes: finalNotes,
         packing_details: {
           packing_type: packingType,
           material_name: packingType === 'kardus' ? 'Kardus & Safety' : 'Plastik Packing Polymailer Hitam',
@@ -1333,6 +1366,8 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
           if (d.dueDate) setDueDate(d.dueDate)
           if (Array.isArray(d.items) && d.items.length > 0) setItems(d.items)
           if (d.deliveryCost !== undefined) setDeliveryCost(d.deliveryCost)
+          if (d.shippingBorneBy) setShippingBorneBy(d.shippingBorneBy)
+          if (d.sellerShippingFee !== undefined) setSellerShippingFee(d.sellerShippingFee)
           if (d.otherCost !== undefined) setOtherCost(d.otherCost)
           if (Array.isArray(d.selectedCostChips)) setSelectedCostChips(d.selectedCostChips)
           if (d.otherCostNotes !== undefined) setOtherCostNotes(d.otherCostNotes)
@@ -1994,50 +2029,111 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
                             />
                           </div>
 
-                          {/* Ongkos Kirim (Ke Pelanggan) */}
-                          <div className="space-y-1.5 pt-2 border-t border-slate-200 dark:border-white/10">
-                            <div className="flex items-center justify-between">
-                              <label className={labelCn}>Ongkos Kirim Ekspedisi (Ke Pelanggan)</label>
-                              <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
-                                deliveryCost === 0 ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300' : 'bg-indigo-100 dark:bg-indigo-950/60 text-indigo-800 dark:text-indigo-300'
-                              }`}>
-                                {deliveryCost === 0 ? '🎁 Bebas Ongkir' : `+${formatIDR(deliveryCost)}`}
-                              </span>
-                            </div>
-                            <InputRupiah id="delivery-cost-input" value={deliveryCost} onChange={setDeliveryCost} />
-                            
-                            {/* Quick Ongkir Presets */}
-                            <div className="flex flex-wrap items-center gap-1 pt-1">
+                          {/* Penanggung Ongkir Selector (Pembeli vs Penjual) */}
+                          <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-white/10">
+                            <label className={labelCn}>Siapa yang Menanggung Ongkos Kirim?</label>
+                            <div className="grid grid-cols-2 gap-2">
                               <button
                                 type="button"
-                                onClick={() => setDeliveryCost(0)}
-                                className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
-                                  deliveryCost === 0
-                                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
-                                    : 'bg-white dark:bg-white/5 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-white/10 hover:border-emerald-400'
+                                onClick={() => setShippingBorneBy('buyer')}
+                                className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                                  shippingBorneBy === 'buyer'
+                                    ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white shadow-xs'
+                                    : 'bg-white dark:bg-white/5 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-white/10 hover:border-slate-400'
                                 }`}
                               >
-                                🎁 Bebas Ongkir (Rp 0)
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-black">👤 Ditanggung Pembeli</span>
+                                  {shippingBorneBy === 'buyer' && <Check size={14} strokeWidth={3} />}
+                                </div>
+                                <p className="text-[10px] opacity-75 mt-0.5">Ongkir masuk nota tagihan pelanggan</p>
                               </button>
-                              {[10000, 15000, 20000, 25000, 35000, 50000].map(amt => (
-                                <button
-                                  key={amt}
-                                  type="button"
-                                  onClick={() => setDeliveryCost(amt)}
-                                  className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
-                                    deliveryCost === amt
-                                      ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white shadow-xs'
-                                      : 'bg-white dark:bg-white/5 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-white/10 hover:border-slate-400'
-                                  }`}
-                                >
-                                  {amt / 1000}k
-                                </button>
-                              ))}
+
+                              <button
+                                type="button"
+                                onClick={() => setShippingBorneBy('seller')}
+                                className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                                  shippingBorneBy === 'seller'
+                                    ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white shadow-xs'
+                                    : 'bg-white dark:bg-white/5 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-white/10 hover:border-slate-400'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-black">🏪 Ditanggung Penjual</span>
+                                  {shippingBorneBy === 'seller' && <Check size={14} strokeWidth={3} />}
+                                </div>
+                                <p className="text-[10px] opacity-75 mt-0.5">Free Ongkir pembeli, beban toko</p>
+                              </button>
                             </div>
-                            <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 font-medium italic">
-                              * Ditagihkan ke nota pelanggan ({deliveryCost === 0 ? 'Tercatat GRATIS / Bebas Ongkir' : 'menambah total tagihan'}).
-                            </p>
                           </div>
+
+                          {/* Mode 1: Ongkir Ditanggung Pembeli */}
+                          {shippingBorneBy === 'buyer' ? (
+                            <div className="space-y-1.5 pt-1">
+                              <div className="flex items-center justify-between">
+                                <label className={labelCn}>Ongkos Kirim Ditagihkan ke Pelanggan</label>
+                                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                                  deliveryCost === 0 ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300' : 'bg-indigo-100 dark:bg-indigo-950/60 text-indigo-800 dark:text-indigo-300'
+                                }`}>
+                                  {deliveryCost === 0 ? '🎁 Bebas Ongkir' : `+${formatIDR(deliveryCost)}`}
+                                </span>
+                              </div>
+                              <InputRupiah id="delivery-cost-input" value={deliveryCost} onChange={setDeliveryCost} />
+                              
+                              {/* Quick Ongkir Presets */}
+                              <div className="flex flex-wrap items-center gap-1 pt-1">
+                                {[0, 6000, 10000, 15000, 20000, 25000, 35000, 50000].map(amt => (
+                                  <button
+                                    key={amt}
+                                    type="button"
+                                    onClick={() => setDeliveryCost(amt)}
+                                    className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
+                                      deliveryCost === amt
+                                        ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white shadow-xs'
+                                        : 'bg-white dark:bg-white/5 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-white/10 hover:border-slate-400'
+                                    }`}
+                                  >
+                                    {amt === 0 ? '🎁 Rp 0' : `${amt >= 1000 ? amt / 1000 + 'k' : amt}`}
+                                  </button>
+                                ))}
+                              </div>
+                              <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 font-medium italic">
+                                * Ditambahkan ke total nota tagihan pelanggan ({deliveryCost === 0 ? 'Tercatat Bebas Ongkir' : 'menambah total invoice'}).
+                              </p>
+                            </div>
+                          ) : (
+                            /* Mode 2: Ongkir Ditanggung Penjual */
+                            <div className="space-y-1.5 pt-1">
+                              <div className="flex items-center justify-between">
+                                <label className={labelCn}>Biaya Ekspedisi yang Dibayar Toko (Beban Penjual)</label>
+                                <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300">
+                                  Beban Toko: {formatIDR(sellerShippingFee)}
+                                </span>
+                              </div>
+                              <InputRupiah id="seller-shipping-fee-input" value={sellerShippingFee} onChange={setSellerShippingFee} />
+                              
+                              {/* Quick Presets */}
+                              <div className="flex flex-wrap items-center gap-1 pt-1">
+                                {[6000, 10000, 15000, 20000, 25000, 35000, 50000].map(amt => (
+                                  <button
+                                    key={amt}
+                                    type="button"
+                                    onClick={() => setSellerShippingFee(amt)}
+                                    className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
+                                      sellerShippingFee === amt
+                                        ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white shadow-xs'
+                                        : 'bg-white dark:bg-white/5 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-white/10 hover:border-slate-400'
+                                    }`}
+                                  >
+                                    {amt >= 1000 ? amt / 1000 + 'k' : amt}
+                                  </button>
+                                ))}
+                              </div>
+                              <p className="text-[10px] text-emerald-700 dark:text-emerald-400 mt-1 font-medium italic">
+                                * Pelanggan mendapat <strong>Bebas Ongkir (Rp 0 di nota)</strong>. Biaya ekspedisi memotong laba operasional toko.
+                              </p>
+                            </div>
+                          )}
                         </motion.div>
                       )}
 
@@ -2392,13 +2488,25 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
                           <span className="font-bold text-slate-900 dark:text-white">{formatIDR(productSubtotal)}</span>
                         </div>
                         <div className="flex justify-between items-center text-slate-600 dark:text-slate-400">
-                          <span>Ongkos Kirim Ditagihkan:</span>
-                          <span className={`font-bold ${deliveryCost > 0 ? 'text-indigo-600 dark:text-indigo-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                            {deliveryCost > 0 ? `+${formatIDR(deliveryCost)}` : '🎁 Bebas Ongkir (Rp 0)'}
+                          <span>Ongkos Kirim Nota Pelanggan:</span>
+                          <span className={`font-bold ${
+                            shippingBorneBy === 'buyer' && effectiveCustomerDelivery > 0
+                              ? 'text-indigo-600 dark:text-indigo-400' 
+                              : 'text-emerald-600 dark:text-emerald-400'
+                          }`}>
+                            {shippingBorneBy === 'buyer' && effectiveCustomerDelivery > 0 
+                              ? `+${formatIDR(effectiveCustomerDelivery)} (Ditanggung Pembeli)` 
+                              : '🎁 Bebas Ongkir (Ditanggung Penjual)'}
                           </span>
                         </div>
+                        {shippingBorneBy === 'seller' && effectiveSellerShippingExpense > 0 && (
+                          <div className="flex justify-between items-center text-amber-700 dark:text-amber-400 text-[11px]">
+                            <span>Beban Ongkir Toko (Potong Laba):</span>
+                            <span className="font-bold">-{formatIDR(effectiveSellerShippingExpense)}</span>
+                          </div>
+                        )}
                         <div className="flex justify-between items-center pt-1.5 border-t border-slate-200/60 dark:border-white/10 font-black text-slate-900 dark:text-white">
-                          <span>Total Sementara:</span>
+                          <span>Total Tagihan Sementara:</span>
                           <span className="font-mono text-sm text-sky-600 dark:text-sky-400">{formatIDR(totalAmount)}</span>
                         </div>
                       </div>
@@ -2488,11 +2596,13 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
 
                         <div className="flex justify-between items-center text-slate-600 dark:text-slate-400">
                           <span>Ongkos Kirim</span>
-                          {deliveryCost > 0 ? (
-                            <span className="font-bold text-slate-900 dark:text-white">+{formatIDR(deliveryCost)}</span>
+                          {shippingBorneBy === 'buyer' && effectiveCustomerDelivery > 0 ? (
+                            <span className="font-bold text-slate-900 dark:text-white">
+                              +{formatIDR(effectiveCustomerDelivery)} <span className="text-[10px] font-normal text-slate-400 dark:text-slate-500">(Ditanggung Pembeli)</span>
+                            </span>
                           ) : (
                             <span className="font-black text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-md border border-emerald-200/70 dark:border-emerald-800/40">
-                              🎁 GRATIS (Rp 0)
+                              🎁 GRATIS ({shippingBorneBy === 'seller' ? 'Ditanggung Penjual' : 'Rp 0'})
                             </span>
                           )}
                         </div>
@@ -2511,7 +2621,7 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
                             Total Tagihan Pelanggan
                           </p>
                           <p className="text-xs font-medium mt-0.5" style={{ color: '#E2E8F0' }}>
-                            {deliveryCost === 0 ? '🎁 Termasuk Bebas Ongkir' : 'Subtotal + Ongkos Kirim'}
+                            {effectiveCustomerDelivery === 0 ? '🎁 Termasuk Bebas Ongkir' : 'Subtotal + Ongkos Kirim'}
                           </p>
                         </div>
                         <div className="text-right">
@@ -2524,10 +2634,24 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
                         </div>
                       </div>
 
-                      {/* Internal Estimasi HPP Caption */}
-                      <div className="flex justify-between items-center pt-1 text-[11px] text-slate-400 dark:text-slate-500 font-medium">
-                        <span>ℹ️ Estimasi HPP Pokok Produk (BOM):</span>
-                        <span className="font-bold text-slate-600 dark:text-slate-300">{formatIDR(totalCogs)}</span>
+                      {/* Internal Estimasi HPP & Laba Breakdown */}
+                      <div className="pt-2 border-t border-slate-100 dark:border-white/10 space-y-1 text-[11px]">
+                        <div className="flex justify-between items-center text-slate-500 dark:text-slate-400 font-medium">
+                          <span>ℹ️ Estimasi HPP Pokok Produk (BOM):</span>
+                          <span className="font-bold text-slate-700 dark:text-slate-300">{formatIDR(totalCogs)}</span>
+                        </div>
+                        {shippingBorneBy === 'seller' && effectiveSellerShippingExpense > 0 && (
+                          <div className="flex justify-between items-center text-amber-700 dark:text-amber-400 font-medium">
+                            <span>🚚 Beban Ongkir Toko (Free Ongkir):</span>
+                            <span className="font-bold">-{formatIDR(effectiveSellerShippingExpense)}</span>
+                          </div>
+                        )}
+                        {otherCost > 0 && (
+                          <div className="flex justify-between items-center text-slate-500 dark:text-slate-400 font-medium">
+                            <span>⛽ Biaya Operasional Toko:</span>
+                            <span className="font-bold">-{formatIDR(otherCost)}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
 
