@@ -59,13 +59,13 @@ export function SembakoSuccessCard({ isOpen, onClose, data, onPrint }) {
           </p>
 
           <div style={{ background: C.card, borderRadius: '16px', padding: '16px', border: `1px solid ${C.border}`, marginBottom: '16px' }}>
-            <DetailRow label="Total Tagihan" value={formatIDR(data.revenue || 0)} bold />
-            <DetailRow label="Estimasi HPP" value={formatIDR(data.cogs || 0)} />
-            {data.deliveryCost > 0 && <DetailRow label="Biaya Kirim (Tercatat)" value={formatIDR(data.deliveryCost || 0)} />}
-            {data.otherCost > 0 && <DetailRow label="Biaya Lain" value={formatIDR(data.otherCost || 0)} />}
+            <DetailRow label="Total Tagihan Pelanggan" value={formatIDR(data.revenue || 0)} bold />
+            <DetailRow label="Estimasi HPP Pokok (BOM)" value={formatIDR(data.cogs || 0)} />
+            {data.deliveryCost > 0 && <DetailRow label="Ongkos Kirim Ditagihkan" value={formatIDR(data.deliveryCost || 0)} />}
+            {data.otherCost > 0 && <DetailRow label="Biaya Operasional Toko" value={formatIDR(data.otherCost || 0)} />}
             <div style={{ height: 1, background: C.border, margin: '12px 0' }} />
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '14px', fontWeight: 800, color: C.muted }}>Net Profit</span>
+              <span style={{ fontSize: '14px', fontWeight: 800, color: C.muted }}>Estimasi Net Profit</span>
               <span style={{ fontSize: '18px', fontWeight: 900, color: data.netProfit >= 0 ? C.green : C.red }}>{formatIDR(data.netProfit || 0)}</span>
             </div>
           </div>
