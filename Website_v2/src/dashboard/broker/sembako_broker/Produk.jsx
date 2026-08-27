@@ -27,6 +27,7 @@ import {
 } from '@/lib/hooks/useSembakoData'
 import SembakoBahanBakuSheet from './components/SembakoBahanBakuSheet'
 import { SembakoRestockBahanModal } from './components/SembakoRestockBahanModal'
+import { SembakoAdjustStockModal } from './components/SembakoAdjustStockModal'
 import { SembakoBahanBeliHistoryModal } from './components/SembakoBahanBeliHistoryModal'
 import { formatIDR } from '@/lib/format'
 import { useOutletContext, useLocation, useNavigate } from 'react-router-dom'
@@ -2091,13 +2092,15 @@ export default function Produk() {
   const [productToDelete, setProductToDelete] = useState(null)
   const [importCsvOpen, setImportCsvOpen] = useState(false)
 
-  // Raw Materials Sheet, Restock Modal & Purchase History State
+  // Raw Materials Sheet, Restock Modal, Adjust Modal & Purchase History State
   const [rawSheetOpen, setRawSheetOpen] = useState(false)
   const [editingRawMaterial, setEditingRawMaterial] = useState(null)
   const [rawToDelete, setRawToDelete] = useState(null)
   const [rawTypeFilter, setRawTypeFilter] = useState('all')
   const [restockMaterial, setRestockMaterial] = useState(null)
   const [restockModalOpen, setRestockModalOpen] = useState(false)
+  const [adjustMaterial, setAdjustMaterial] = useState(null)
+  const [adjustModalOpen, setAdjustModalOpen] = useState(false)
   const [historyMaterial, setHistoryMaterial] = useState(null)
   const [historyModalOpen, setHistoryModalOpen] = useState(false)
 
@@ -2569,8 +2572,8 @@ export default function Produk() {
                           </button>
                           <button
                             onClick={() => {
-                              setEditingRawMaterial(raw)
-                              setRawSheetOpen(true)
+                              setAdjustMaterial(raw)
+                              setAdjustModalOpen(true)
                             }}
                             className="flex items-center justify-center gap-1 py-2 px-3 rounded-xl bg-muted hover:bg-muted/80 text-foreground font-bold text-xs border border-border/80 transition-all cursor-pointer"
                             title="Koreksi / Adjust Stok Fisik (Opname)"
@@ -2745,8 +2748,8 @@ export default function Produk() {
                           </button>
                           <button
                             onClick={() => {
-                              setEditingRawMaterial(raw)
-                              setRawSheetOpen(true)
+                              setAdjustMaterial(raw)
+                              setAdjustModalOpen(true)
                             }}
                             className="flex items-center justify-center gap-1 py-2 px-3 rounded-xl bg-muted hover:bg-muted/80 text-foreground font-bold text-xs border border-border/80 transition-all cursor-pointer"
                             title="Koreksi / Adjust Stok Fisik (Opname)"
@@ -2802,6 +2805,20 @@ export default function Produk() {
         onClose={() => {
           setRestockModalOpen(false)
           setRestockMaterial(null)
+        }}
+      />
+
+      {/* Modal Adjust Stok Cepat / Opname (Pure Physical Stock Adjustment) */}
+      <SembakoAdjustStockModal
+        open={adjustModalOpen}
+        onOpenChange={(v) => {
+          setAdjustModalOpen(v)
+          if (!v) setAdjustMaterial(null)
+        }}
+        material={adjustMaterial}
+        onClose={() => {
+          setAdjustModalOpen(false)
+          setAdjustMaterial(null)
         }}
       />
 
