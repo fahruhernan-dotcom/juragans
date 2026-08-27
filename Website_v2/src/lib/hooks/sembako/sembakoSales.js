@@ -5,9 +5,15 @@ import { useAuth } from '../useAuth'
 import { normalizeSupabaseError } from '../../supabaseErrorHandler'
 import { logSupabaseError } from '@/lib/logger/supabaseLogger'
 import { logError } from '@/lib/logger/errorLogger'
-import { recordAuditLog } from '@/lib/hooks/useSembakoAudit'
 import { formatIDR } from '@/lib/format'
 import { STALE_5M, sanitizeDBPayload, getTenantId } from './sembakoCommon'
+import {
+  extractProductGrammage,
+  matchBawangMaterial,
+  matchKemasanMaterial,
+  matchStickerFrontMaterial,
+  matchStickerBackMaterial
+} from '@/lib/inventory/bomStockCalculator'
 
 export function processSaleRow(sale, returnsData = [], itemsBySaleId = {}) {
   const itemsFromRel = Array.isArray(sale.sembako_sale_items) && sale.sembako_sale_items.length > 0 ? sale.sembako_sale_items : null
@@ -199,56 +205,63 @@ async function deductRawMaterialsAndPackaging({ tenant_id, items, packing_detail
       if (itemQty <= 0) continue
 
       const nameLower = (item.product_name || '').toLowerCase()
+      const isBundling = (item.category === 'Paket Bundling & Combo') || nameLower.includes('paket') || nameLower.includes('bundling')
 
-      // Find matching pouch based on gram/name
-      let matchedPouch = null
-      if (nameLower.includes('100')) {
-        matchedPouch = rawMaterials.find(r => r.category === 'pouch' && r.material_name.includes('100'))
-      } else if (nameLower.includes('200')) {
-        matchedPouch = rawMaterials.find(r => r.category === 'pouch' && r.material_name.includes('200'))
-      } else if (nameLower.includes('250')) {
-        matchedPouch = rawMaterials.find(r => r.category === 'pouch' && r.material_name.includes('250'))
-      }
-      if (!matchedPouch) {
-        matchedPouch = rawMaterials.find(r => r.category === 'pouch')
+      let multiplier = 1
+      let gramPerPcs = extractProductGrammage(item.product_name, item.notes)
+
+      if (isBundling) {
+        if (nameLower.includes('trio') || nameLower.includes('3x100')) {
+          multiplier = 3
+          gramPerPcs = 300
+        } else if (nameLower.includes('duo') || nameLower.includes('2x200')) {
+          multiplier = 2
+          gramPerPcs = 400
+        } else if (nameLower.includes('reseller') || nameLower.includes('10')) {
+          multiplier = 10
+          gramPerPcs = 2500
+        } else if (nameLower.includes('resto') || nameLower.includes('2 kg') || nameLower.includes('2kg')) {
+          multiplier = 1
+          gramPerPcs = 2000
+        }
       }
 
+      // Match Pouch / Toples
+      const matchedPouch = matchKemasanMaterial(item, rawMaterials)
       if (matchedPouch) {
+        const totalPouchDeduct = itemQty * multiplier
         materialDeductions[matchedPouch.id] = {
           material: matchedPouch,
-          deductQty: (materialDeductions[matchedPouch.id]?.deductQty || 0) + itemQty,
-          reason: `Pouch ${item.product_name}`
+          deductQty: (materialDeductions[matchedPouch.id]?.deductQty || 0) + totalPouchDeduct,
+          reason: `Kemasan ${item.product_name}`
         }
       }
 
       // Match Stiker Depan
-      const stickerDepan = rawMaterials.find(r => r.category === 'sticker_depan' || r.material_name.toLowerCase().includes('stiker depan'))
+      const stickerDepan = matchStickerFrontMaterial(item, rawMaterials)
       if (stickerDepan) {
+        const totalStickerDeduct = itemQty * multiplier
         materialDeductions[stickerDepan.id] = {
           material: stickerDepan,
-          deductQty: (materialDeductions[stickerDepan.id]?.deductQty || 0) + itemQty,
+          deductQty: (materialDeductions[stickerDepan.id]?.deductQty || 0) + totalStickerDeduct,
           reason: `Stiker Depan ${item.product_name}`
         }
       }
 
       // Match Stiker Belakang
-      const stickerBelakang = rawMaterials.find(r => r.category === 'sticker_belakang' || r.material_name.toLowerCase().includes('stiker belakang'))
+      const stickerBelakang = matchStickerBackMaterial(item, rawMaterials)
       if (stickerBelakang) {
+        const totalStickerDeduct = itemQty * multiplier
         materialDeductions[stickerBelakang.id] = {
           material: stickerBelakang,
-          deductQty: (materialDeductions[stickerBelakang.id]?.deductQty || 0) + itemQty,
+          deductQty: (materialDeductions[stickerBelakang.id]?.deductQty || 0) + totalStickerDeduct,
           reason: `Stiker Belakang ${item.product_name}`
         }
       }
 
-      // Match Bawang Curah
-      const bawangCurah = rawMaterials.find(r => r.category === 'bawang_mentah' || r.material_name.toLowerCase().includes('bawang'))
+      // Match Bawang Curah sesuai Grade & Gramatur
+      const bawangCurah = matchBawangMaterial(item, rawMaterials)
       if (bawangCurah) {
-        let gramPerPcs = 100
-        if (nameLower.includes('250')) gramPerPcs = 250
-        else if (nameLower.includes('200')) gramPerPcs = 200
-        else if (nameLower.includes('100')) gramPerPcs = 100
-
         const isKg = (bawangCurah.unit || '').toLowerCase() === 'kg'
         const deductAmt = isKg ? (itemQty * gramPerPcs / 1000) : (itemQty * gramPerPcs)
 

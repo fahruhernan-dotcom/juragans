@@ -7,6 +7,8 @@ import { logSupabaseError } from '@/lib/logger/supabaseLogger'
 import { logError } from '@/lib/logger/errorLogger'
 import { STALE_5M, sanitizeDBPayload, getTenantId } from './sembakoCommon'
 
+import { calculateBomProductStock } from '@/lib/inventory/bomStockCalculator'
+
 export const useSembakoProducts = () => {
   const { tenant } = useAuth()
   return useQuery({
@@ -15,7 +17,7 @@ export const useSembakoProducts = () => {
     staleTime: STALE_5M,
     queryFn: async () => {
       try {
-        const [prodRes, batchRes] = await Promise.all([
+        const [prodRes, batchRes, rawRes] = await Promise.all([
           supabase.from('sembako_products')
             .select('*')
             .eq('tenant_id', tenant.id)
@@ -25,12 +27,17 @@ export const useSembakoProducts = () => {
             .select('product_id, qty_sisa, qty_masuk, buy_price')
             .eq('tenant_id', tenant.id)
             .eq('is_deleted', false)
-            .gt('qty_sisa', 0)
+            .gt('qty_sisa', 0),
+          supabase.from('sembako_raw_materials')
+            .select('*')
+            .eq('tenant_id', tenant.id)
+            .eq('is_deleted', false)
         ])
 
         if (prodRes.error) { console.warn('[useSembakoProducts]', prodRes.error.message); return [] }
         const products = prodRes.data || []
         const batches = batchRes.data || []
+        const rawMaterials = rawRes.data || []
 
         const batchStockMap = {}
         const batchCostMap = {}  // weighted avg buy_price per product
@@ -45,8 +52,12 @@ export const useSembakoProducts = () => {
         const syncedProducts = products.map(p => {
           const hasBatches = batchStockMap[p.id] !== undefined
           const batchSum = batchStockMap[p.id] || 0
-          // SINGLE SOURCE OF TRUTH: Total stock = sum of sisa in active batches
-          const realStock = hasBatches ? batchSum : Number(p.current_stock || 0)
+
+          // Calculate live capacity from Bill of Materials (BOM)
+          const bomData = calculateBomProductStock(p, rawMaterials)
+
+          // SINGLE SOURCE OF TRUTH: If has physical finished batches use batchSum, otherwise auto-sync from BOM materials
+          const realStock = hasBatches ? batchSum : (bomData.totalStock !== undefined ? bomData.totalStock : Number(p.current_stock || 0))
 
           // Fallback avg_buy_price from active batches (FIFO-weighted)
           const batchCost = batchCostMap[p.id]
@@ -55,15 +66,18 @@ export const useSembakoProducts = () => {
             : 0
           const realAvgBuyPrice = Number(p.avg_buy_price) || batchAvgBuyPrice
 
-          // Auto-heal/sync database current_stock so DB is never desynchronized from batch sum
-          if (hasBatches && Number(p.current_stock) !== batchSum) {
-            supabase.from('sembako_products').update({ current_stock: batchSum }).eq('id', p.id).then(() => { })
+          // Auto-heal/sync database current_stock so DB is never desynchronized from BOM / batch sum
+          if (Number(p.current_stock) !== realStock) {
+            supabase.from('sembako_products').update({ current_stock: realStock }).eq('id', p.id).then(() => { })
           }
 
           return {
             ...p,
             current_stock: realStock,
             avg_buy_price: realAvgBuyPrice,
+            bom_stock: bomData.totalStock,
+            bom_bottleneck: bomData.bottleneck,
+            bom_components: bomData.components,
           }
         })
 

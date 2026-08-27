@@ -37,6 +37,7 @@ import { SembakoPageHeader } from '@/dashboard/broker/sembako_broker/components/
 import { SembakoSummaryStrip } from '@/dashboard/broker/sembako_broker/components/SembakoSummaryStrip'
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery'
 import { useBackHandler } from '@/lib/hooks/useBackHandler'
+import { calculateBomProductStock } from '@/lib/inventory/bomStockCalculator'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -526,6 +527,11 @@ function ProductSheet({ product, onClose, onDelete }) {
   const hasGrosirUnit = Boolean(form.secondary_unit && Number(form.conversion_rate) > 0)
 
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }))
+
+  // Live calculation of available stock capacity from BOM materials
+  const liveBomStock = useMemo(() => {
+    return calculateBomProductStock(form, rawMaterials)
+  }, [form, rawMaterials])
 
   // Helper to match rawMaterials based on saved costs / product name
   const detectBomSelections = (formObj, materials) => {
@@ -1579,37 +1585,69 @@ function ProductSheet({ product, onClose, onDelete }) {
                   </div>
                 </div>
 
-                {/* Total Live Summary */}
+                {/* Total Live Summary & Producible Capacity */}
                 <div style={{
                   background: '#F0FDF4',
                   border: '1.5px solid #86EFAC',
                   borderRadius: 12,
-                  padding: '10px 14px',
+                  padding: '12px 14px',
                   display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between'
+                  flexDirection: 'column',
+                  gap: 8
                 }}>
-                  <div>
-                    <div style={{ fontSize: 10.5, fontWeight: 800, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                      ⚡ Total HPP BOM Kemasan & Bahan
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div>
+                      <div style={{ fontSize: 10.5, fontWeight: 800, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        ⚡ Total HPP BOM Kemasan & Bahan
+                      </div>
+                      <div style={{ fontSize: 10, color: '#15803D', marginTop: 1 }}>
+                        Otomatis diterapkan ke field Harga Beli / HPP Produk
+                      </div>
                     </div>
-                    <div style={{ fontSize: 10, color: '#15803D', marginTop: 1 }}>
-                      Otomatis diterapkan ke field Harga Beli / HPP Produk
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: 16, fontWeight: 900, color: '#0c3d0c' }}>
+                        Rp {fmt(
+                          (Number(form.raw_ingredient_cost) || 0) +
+                          (Number(form.pouch_cost) || 0) +
+                          (Number(form.sticker_front_cost) || 0) +
+                          (Number(form.sticker_back_cost) || 0) +
+                          (Number(form.other_packaging_cost) || 0)
+                        )}
+                      </div>
+                      <div style={{ fontSize: 9.5, color: '#166534', fontWeight: 700 }}>
+                        per {form.unit || 'pcs'}
+                      </div>
                     </div>
                   </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: 16, fontWeight: 900, color: '#0c3d0c' }}>
-                      Rp {fmt(
-                        (Number(form.raw_ingredient_cost) || 0) +
-                        (Number(form.pouch_cost) || 0) +
-                        (Number(form.sticker_front_cost) || 0) +
-                        (Number(form.sticker_back_cost) || 0) +
-                        (Number(form.other_packaging_cost) || 0)
-                      )}
+
+                  {/* Live Kapasitas Produksi dari Bahan Baku */}
+                  <div style={{
+                    paddingTop: 8,
+                    borderTop: '1px dashed #86EFAC',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: 4
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <span style={{ fontSize: 11 }}>📦</span>
+                      <span style={{ fontSize: 11, fontWeight: 800, color: '#14532D' }}>
+                        Kapasitas Siap Kemas:
+                      </span>
+                      <span style={{ fontSize: 12, fontWeight: 900, color: '#0c3d0c' }}>
+                        {liveBomStock.totalStock} {form.unit || 'pcs'}
+                      </span>
                     </div>
-                    <div style={{ fontSize: 9.5, color: '#166534', fontWeight: 700 }}>
-                      per {form.unit || 'pcs'}
-                    </div>
+                    {liveBomStock.bottleneck ? (
+                      <span style={{ fontSize: 10, fontWeight: 700, color: '#991B1B', background: '#FEE2E2', padding: '2px 8px', borderRadius: 6 }}>
+                        🔴 Batas: {liveBomStock.bottleneck.name} ({liveBomStock.bottleneck.capacity} pcs)
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: 10, fontWeight: 700, color: '#166534', background: '#DCFCE7', padding: '2px 8px', borderRadius: 6 }}>
+                        🟢 Stok Bahan Siap
+                      </span>
+                    )}
                   </div>
                 </div>
               </motion.div>
@@ -1868,6 +1906,9 @@ function ProductCard({ product, onEdit, onDelete }) {
   const margin = marginInfo(product)
   const warning = stockLabel(product)
 
+  const components = product.bom_components || []
+  const bottleneck = product.bom_bottleneck
+
   return (
     <motion.div
       layout
@@ -1886,35 +1927,44 @@ function ProductCard({ product, onEdit, onDelete }) {
       onClick={() => onEdit(product)}
       whileTap={{ scale: 0.98 }}
     >
-      {/* Badge kategori */}
-      {product.category && (
-        <span style={{ fontSize: 10, fontFamily: 'DM Sans', fontWeight: 600, color: C.accent, background: 'rgba(15,23,42,0.08)', padding: '2px 8px', borderRadius: 20, letterSpacing: '0.03em' }}>
-          {product.category}
-        </span>
-      )}
+      {/* Header: Kategori & SKU */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, flexWrap: 'wrap' }}>
+        {product.category && (
+          <span style={{ fontSize: 10, fontFamily: 'DM Sans', fontWeight: 700, color: C.accent, background: 'rgba(15,23,42,0.08)', padding: '2px 8px', borderRadius: 20, letterSpacing: '0.03em' }}>
+            {product.category}
+          </span>
+        )}
+        {product.sku && (
+          <span style={{ fontSize: 9.5, fontFamily: 'monospace', fontWeight: 700, color: TEXT_SEC, background: 'rgba(255,255,255,0.06)', padding: '1px 6px', borderRadius: 6 }}>
+            {product.sku}
+          </span>
+        )}
+      </div>
 
       {/* Nama produk */}
       <p style={{ fontFamily: 'Sora', fontWeight: 700, fontSize: 14, color: C.text, margin: '8px 0 4px', lineHeight: 1.3, wordBreak: 'break-word' }}>
         {product.product_name}
       </p>
 
-      {/* Harga jual */}
-      <p style={{ fontFamily: 'DM Sans', fontSize: 13, color: C.accent, fontWeight: 600, margin: '0 0 10px' }}>
-        Rp {fmt(product.sell_price)} / {product.unit}
-      </p>
+      {/* Harga jual & Margin */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, gap: 6 }}>
+        <p style={{ fontFamily: 'DM Sans', fontSize: 13, color: C.accent, fontWeight: 700, margin: 0 }}>
+          Rp {fmt(product.sell_price)} / {product.unit}
+        </p>
+        {margin && (
+          <span style={{ fontSize: 10.5, fontWeight: 700, color: margin.color, background: `${margin.color}18`, padding: '2px 8px', borderRadius: 20 }}>
+            Margin {margin.pct}%
+          </span>
+        )}
+      </div>
 
-      {/* Margin badge */}
-      {margin && (
-        <span style={{ fontSize: 11, fontWeight: 600, color: margin.color, background: `${margin.color}18`, padding: '2px 8px', borderRadius: 20, marginBottom: 8, display: 'inline-block' }}>
-          Margin {margin.pct}%
-        </span>
-      )}
-
-      {/* Stock bar */}
-      <div style={{ marginTop: 8 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-          <span style={{ fontSize: 11, color: '#6B7280', fontFamily: 'DM Sans' }}>Stok</span>
-          <span style={{ fontSize: 11, color: sColor, fontFamily: 'DM Sans', fontWeight: 600 }}>
+      {/* Stock bar (Single Source of Truth from BOM / Batches) */}
+      <div style={{ marginTop: 6, padding: '8px 10px', background: 'rgba(255,255,255,0.03)', borderRadius: 10, border: '1px solid var(--border-soft)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+          <span style={{ fontSize: 10.5, color: '#6B7280', fontFamily: 'DM Sans', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span>⚡</span> Stok Siap Kemas:
+          </span>
+          <span style={{ fontSize: 12, color: sColor, fontFamily: 'DM Sans', fontWeight: 800 }}>
             {fmt(product.current_stock)} {product.unit}
           </span>
         </div>
@@ -1923,11 +1973,48 @@ function ProductCard({ product, onEdit, onDelete }) {
             <div style={{ height: '100%', width: `${pct}%`, background: sColor, borderRadius: 2, transition: 'width 0.4s ease' }} />
           </div>
         )}
+
+        {/* Breakdown Komponen BOM */}
+        {components.length > 0 && (
+          <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px dashed var(--border-soft)', display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+              {components.map(c => {
+                const isBottleneck = bottleneck && c.type === bottleneck.type
+                const icon = c.type === 'bawang' ? '🧅' : c.type === 'kemasan' ? '🛍️' : '🏷️'
+                return (
+                  <span
+                    key={c.type}
+                    title={`${c.name}: Stok ${c.available} ${c.unit} (Cukup untuk ${c.capacity} pcs)`}
+                    style={{
+                      fontSize: 9.5,
+                      fontWeight: isBottleneck ? 800 : 600,
+                      padding: '1px 5px',
+                      borderRadius: 6,
+                      background: isBottleneck ? '#FEE2E2' : 'rgba(255,255,255,0.06)',
+                      color: isBottleneck ? '#991B1B' : '#475569',
+                      border: isBottleneck ? '1px solid #FCA5A5' : '1px solid transparent'
+                    }}
+                  >
+                    {icon} {c.capacity}
+                  </span>
+                )
+              })}
+            </div>
+            {bottleneck && (
+              <div style={{ fontSize: 9.5, color: '#DC2626', fontWeight: 700, marginTop: 2, display: 'flex', alignItems: 'center', gap: 3 }}>
+                <span>🔴 Batas:</span>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 190 }}>
+                  {bottleneck.name} ({bottleneck.capacity} pcs)
+                </span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Warning */}
+      {/* Warning Alert */}
       {warning && (
-        <p style={{ fontSize: 11, color: '#F87171', marginTop: 6, fontFamily: 'DM Sans' }}>
+        <p style={{ fontSize: 10.5, color: '#F87171', marginTop: 6, fontFamily: 'DM Sans', fontWeight: 600 }}>
           ⚠ {warning}
         </p>
       )}
