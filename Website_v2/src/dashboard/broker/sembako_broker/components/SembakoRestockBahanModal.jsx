@@ -7,7 +7,7 @@ import {
   DialogDescription,
   DialogFooter
 } from '@/components/ui/dialog'
-import { useRestockSembakoRawMaterial } from '@/lib/hooks/useSembakoData'
+import { useRestockSembakoRawMaterial, useSembakoSuppliers } from '@/lib/hooks/useSembakoData'
 import { recordAuditLog } from '@/lib/hooks/useSembakoAudit'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { formatRupiah, formatIDR } from '@/lib/format'
@@ -17,6 +17,7 @@ import { toast } from 'sonner'
 export function SembakoRestockBahanModal({ open, onOpenChange, material, onClose }) {
   const { profile } = useAuth()
   const restockMutation = useRestockSembakoRawMaterial()
+  const { data: suppliers = [] } = useSembakoSuppliers()
 
   const [addQty, setAddQty] = useState('')
   const [buyPricePerUnit, setBuyPricePerUnit] = useState('')
@@ -289,26 +290,91 @@ export function SembakoRestockBahanModal({ open, onOpenChange, material, onClose
           )}
 
           {/* Supplier & Catatan (Optional) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-            <div>
-              <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1">
-                <Store size={11} /> Supplier / Sumber
-              </label>
-              <input
-                type="text"
-                placeholder="Misal: Shopee / Toko Kemasan"
-                value={supplierName}
-                onChange={(e) => setSupplierName(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white text-xs focus:bg-white focus:border-amber-500 focus:outline-none"
-              />
+          <div className="space-y-2.5 pt-1">
+            <div className="p-3 rounded-2xl bg-amber-500/[0.05] border border-amber-500/20 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                  <Store size={12} className="text-amber-600 dark:text-amber-400" />
+                  Supplier / Sumber Pembelian
+                </label>
+                {suppliers.length > 0 && (
+                  <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-100/80 dark:bg-amber-900/30 px-2 py-0.5 rounded-full">
+                    {suppliers.length} Terdaftar
+                  </span>
+                )}
+              </div>
+
+              {/* Dropdown Suplier Terdaftar */}
+              {suppliers.length > 0 && (
+                <div>
+                  <select
+                    value={suppliers.some((s) => s.supplier_name?.toLowerCase() === supplierName.trim().toLowerCase()) ? supplierName : ''}
+                    onChange={(e) => {
+                      if (e.target.value) setSupplierName(e.target.value)
+                    }}
+                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-[#1E293B] border border-amber-300/80 dark:border-white/10 text-slate-800 dark:text-slate-100 text-xs font-medium focus:border-amber-500 focus:outline-none cursor-pointer"
+                  >
+                    <option value="">-- Pilih dari Daftar Suplier Terdaftar --</option>
+                    {suppliers.map((s) => (
+                      <option key={s.id} value={s.supplier_name}>
+                        {s.supplier_name} {s.phone ? `(${s.phone})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Input Text / Datalist */}
+              <div>
+                <input
+                  type="text"
+                  list="restock-suppliers-datalist"
+                  placeholder="Ketik atau pilih nama Supplier / Toko..."
+                  value={supplierName}
+                  onChange={(e) => setSupplierName(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white text-xs focus:bg-white focus:border-amber-500 focus:outline-none"
+                />
+                <datalist id="restock-suppliers-datalist">
+                  {suppliers.map((s) => (
+                    <option key={s.id} value={s.supplier_name} />
+                  ))}
+                </datalist>
+              </div>
+
+              {/* Chips Suplier */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {suppliers.slice(0, 3).map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setSupplierName(s.supplier_name)}
+                    className={`text-[10px] px-2 py-0.5 rounded-lg border font-semibold transition cursor-pointer ${
+                      supplierName === s.supplier_name
+                        ? 'bg-amber-500 text-white border-amber-600'
+                        : 'bg-white dark:bg-white/5 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-white/10 hover:border-amber-400'
+                    }`}
+                  >
+                    {s.supplier_name}
+                  </button>
+                ))}
+              </div>
+
+              {/* Status Terhubung */}
+              {suppliers.find((s) => s.supplier_name?.toLowerCase() === supplierName.trim().toLowerCase()) && (
+                <div className="flex items-center gap-1.5 p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/20 text-[10px] text-emerald-800 dark:text-emerald-300 font-medium">
+                  <CheckCircle2 size={12} className="text-emerald-600 shrink-0" />
+                  <span>Terhubung ke suplier terdaftar</span>
+                </div>
+              )}
             </div>
+
             <div>
               <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1">
-                <FileText size={11} /> Catatan Nota / Batch
+                <FileText size={11} /> Catatan Nota / Batch (Opsional)
               </label>
               <input
                 type="text"
-                placeholder="Misal: Restok Mingguan #4"
+                placeholder="Misal: Restok Mingguan #4 / Nota No. 082"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white text-xs focus:bg-white focus:border-amber-500 focus:outline-none"

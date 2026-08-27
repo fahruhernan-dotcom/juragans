@@ -8,10 +8,11 @@ import {
 } from '@/components/ui/sheet'
 import {
   useCreateSembakoRawMaterial,
-  useUpdateSembakoRawMaterial
+  useUpdateSembakoRawMaterial,
+  useSembakoSuppliers
 } from '@/lib/hooks/useSembakoData'
 import { formatRupiah, formatIDR } from '@/lib/format'
-import { Package, Calculator } from 'lucide-react'
+import { Package, Calculator, Store, CheckCircle2, Building2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData = null, editItem = null, targetType = 'bahan_baku' }) {
@@ -21,6 +22,7 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
     if (onOpenChange) onOpenChange(false)
   }
 
+  const { data: suppliers = [] } = useSembakoSuppliers()
   const createMutation = useCreateSembakoRawMaterial()
   const updateMutation = useUpdateSembakoRawMaterial()
 
@@ -325,32 +327,129 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
             </div>
           </div>
 
-          {/* Minimum Stock Alert & Supplier */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">
-                Peringatan Stok Menipis ({unit})
-              </label>
-              <input
-                type="text"
-                inputMode="decimal"
-                value={minStockAlert}
-                onChange={(e) => setMinStockAlert(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-semibold focus:bg-white focus:border-amber-500 focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">
+          {/* Peringatan Stok Menipis */}
+          <div>
+            <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">
+              Peringatan Stok Menipis ({unit})
+            </label>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={minStockAlert}
+              onChange={(e) => setMinStockAlert(e.target.value)}
+              className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-semibold focus:bg-white focus:border-amber-500 focus:outline-none"
+            />
+          </div>
+
+          {/* Hubungkan ke Database Suplier (Petani / Pengepul / Percetakan) */}
+          <div className="p-3.5 rounded-2xl bg-amber-500/[0.05] border border-amber-500/25 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                <Store size={13} className="text-amber-600" />
                 {isBahanBakuMode ? 'Supplier Petani / Pengepul' : 'Supplier Percetakan / Vendor'}
               </label>
+              {suppliers.length > 0 && (
+                <span className="text-[10px] font-bold text-amber-700 bg-amber-100/90 px-2 py-0.5 rounded-full">
+                  {suppliers.length} Suplier Terdaftar
+                </span>
+              )}
+            </div>
+
+            {/* Dropdown Pemilihan dari Database Suplier */}
+            {suppliers.length > 0 && (
+              <div>
+                <select
+                  value={suppliers.some((s) => s.supplier_name?.toLowerCase() === supplierName.trim().toLowerCase()) ? supplierName : ''}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      setSupplierName(e.target.value)
+                    }
+                  }}
+                  className="w-full px-3 py-2 rounded-xl bg-white border border-amber-300/80 text-slate-800 text-xs font-medium focus:border-amber-500 focus:outline-none cursor-pointer"
+                >
+                  <option value="">-- Pilih dari Daftar Suplier Terdaftar --</option>
+                  {suppliers.map((s) => (
+                    <option key={s.id} value={s.supplier_name}>
+                      {s.supplier_name} {s.phone ? `(${s.phone})` : ''} {s.address ? `- ${s.address}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Input Manual / Autocomplete Datalist */}
+            <div className="relative">
               <input
                 type="text"
-                placeholder={isBahanBakuMode ? 'Misal: Petani Pak Slamet Cepogo' : 'Misal: Percetakan Solo Jaya'}
+                list="registered-suppliers-datalist"
+                placeholder={
+                  isBahanBakuMode
+                    ? 'Ketik atau cari nama Petani / Pengepul...'
+                    : 'Ketik atau cari nama Percetakan / Vendor Pabrik...'
+                }
                 value={supplierName}
                 onChange={(e) => setSupplierName(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs focus:bg-white focus:border-amber-500 focus:outline-none"
+                className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs focus:border-amber-500 focus:outline-none"
               />
+              <datalist id="registered-suppliers-datalist">
+                {suppliers.map((s) => (
+                  <option key={s.id} value={s.supplier_name}>
+                    {s.phone ? `Telp: ${s.phone}` : ''}
+                  </option>
+                ))}
+              </datalist>
             </div>
+
+            {/* Quick Chip Preset / Suplier Pilihan */}
+            <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+              <span className="text-[10px] text-slate-500 font-medium">Pilihan Cepat:</span>
+              {suppliers.slice(0, 4).map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => setSupplierName(s.supplier_name)}
+                  className={`text-[10px] px-2 py-0.5 rounded-lg border font-semibold transition cursor-pointer ${
+                    supplierName === s.supplier_name
+                      ? 'bg-amber-500 text-white border-amber-600 shadow-xs'
+                      : 'bg-white hover:bg-amber-50 text-slate-700 border-amber-200/80'
+                  }`}
+                >
+                  {s.supplier_name}
+                </button>
+              ))}
+              {suppliers.length === 0 &&
+                (isBahanBakuMode
+                  ? ['Petani Boyolali', 'Pengepul Pasar Legi', 'Petani Brebes']
+                  : ['Percetakan Solo Jaya', 'Pabrik Kemasan Toples', 'Vendor Plastik & Dus']
+                ).map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setSupplierName(preset)}
+                    className={`text-[10px] px-2 py-0.5 rounded-lg border font-semibold transition cursor-pointer ${
+                      supplierName === preset
+                        ? 'bg-amber-500 text-white border-amber-600'
+                        : 'bg-white hover:bg-amber-50 text-slate-700 border-slate-200'
+                    }`}
+                  >
+                    +{preset}
+                  </button>
+                ))}
+            </div>
+
+            {/* Status Terhubung ke Database */}
+            {suppliers.find((s) => s.supplier_name?.toLowerCase() === supplierName.trim().toLowerCase()) ? (
+              <div className="flex items-center gap-1.5 p-2 rounded-xl bg-emerald-50 border border-emerald-200/80 text-[10.5px] text-emerald-800 font-medium">
+                <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                <span>
+                  Terhubung ke Suplier Database: <strong>{supplierName}</strong>
+                </span>
+              </div>
+            ) : supplierName ? (
+              <div className="flex items-center gap-1.5 px-2 py-0.5 text-[10px] text-amber-800 italic">
+                <span>ℹ️ Suplier baru (akan tersimpan pada data bahan ini)</span>
+              </div>
+            ) : null}
           </div>
 
           {/* Catatan */}
