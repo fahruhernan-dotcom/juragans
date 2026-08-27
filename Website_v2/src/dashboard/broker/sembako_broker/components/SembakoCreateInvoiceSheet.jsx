@@ -794,6 +794,8 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
   const [newProdForm, setNewProdForm]       = useState({ product_name: '', category: 'lainnya', unit: 'pcs', sell_price: 0 })
 
   const [useDelivery, setUseDelivery]           = useState(() => getSavedInvoiceDraft()?.useDelivery ?? true)
+  const [deliveryMethod, setDeliveryMethod]     = useState(() => getSavedInvoiceDraft()?.deliveryMethod ?? 'ekspedisi')
+  const [courierName, setCourierName]           = useState(() => getSavedInvoiceDraft()?.courierName ?? '')
   const [deliveryStatus, setDeliveryStatus]     = useState('terkirim') // 'terkirim' | 'pending'
   const [deliveryDriver, setDeliveryDriver]     = useState(() => getSavedInvoiceDraft()?.deliveryDriver ?? '')
   const [deliveryVehicle, setDeliveryVehicle]   = useState(() => getSavedInvoiceDraft()?.deliveryVehicle ?? '')
@@ -1238,15 +1240,18 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
       }
 
       if (useDelivery && sale?.id) {
-        const deliveryNotes = otherCost > 0 && selectedCostChips.length > 0
-          ? `Biaya Tambahan: ${selectedCostChips.join(', ')}${otherCostNotes ? ` (${otherCostNotes})` : ''}`
-          : (deliveryStatus === 'terkirim' ? 'Pengiriman langsung saat penjualan' : 'Jadwal pengiriman dari wizard penjualan')
+        const deliveryNotes = deliveryMethod === 'ekspedisi'
+          ? (courierName ? `Ekspedisi: ${courierName}` : 'Ekspedisi / Cargo Luar Kota')
+          : (otherCost > 0 && selectedCostChips.length > 0
+              ? `Biaya Tambahan: ${selectedCostChips.join(', ')}${otherCostNotes ? ` (${otherCostNotes})` : ''}`
+              : (deliveryStatus === 'terkirim' ? 'Pengiriman kurir/armada toko' : 'Jadwal pengiriman armada toko'))
 
         await createDelivery.mutateAsync({
           sale_id: sale.id,
           employee_id: deliveryDriver || null,
-          driver_name: employees.find(e => e.id === deliveryDriver)?.full_name || null,
-          vehicle_type: deliveryVehicle, vehicle_plate: deliveryPlate.toUpperCase(),
+          driver_name: deliveryMethod === 'ekspedisi' ? (courierName || 'Ekspedisi Eksternal') : (employees.find(e => e.id === deliveryDriver)?.full_name || null),
+          vehicle_type: deliveryMethod === 'ekspedisi' ? 'cargo' : deliveryVehicle, 
+          vehicle_plate: deliveryPlate.toUpperCase(),
           delivery_date: txnDate,
           status: deliveryStatus || 'terkirim',
           delivered_at: deliveryStatus === 'terkirim' ? new Date().toISOString() : null,
@@ -1876,71 +1881,83 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
                       </button>
                     </div>
 
-                    {/* Opsi Pengiriman: Terkirim vs Scheduled vs Tanpa Kurir */}
+                    {/* Metode Pengiriman: 3 Pilihan */}
                     <div className="space-y-2">
-                      <label className={labelCn}>Status & Metode Pengiriman</label>
+                      <label className={labelCn}>Metode Pengiriman</label>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                        {/* Card 1: Langsung Terkirim */}
+                        {/* Card 1: Ekspedisi / Cargo */}
                         <button
                           type="button"
-                          onClick={() => { setUseDelivery(true); setDeliveryStatus('terkirim'); }}
+                          onClick={() => { 
+                            setDeliveryMethod('ekspedisi'); 
+                            setUseDelivery(true); 
+                            setDeliveryStatus('terkirim'); 
+                          }}
                           className="p-3.5 rounded-2xl border text-left transition-all relative flex flex-col justify-between cursor-pointer"
                           style={{
-                            background: (useDelivery && deliveryStatus === 'terkirim') ? '#F0FDF4' : SURFACE,
-                            borderColor: (useDelivery && deliveryStatus === 'terkirim') ? '#16A34A' : BORDER,
+                            background: (deliveryMethod === 'ekspedisi' && useDelivery) ? '#F0F9FF' : SURFACE,
+                            borderColor: (deliveryMethod === 'ekspedisi' && useDelivery) ? '#0284C7' : BORDER,
                           }}
                         >
                           <div className="flex items-center justify-between mb-2">
-                            <span className="text-lg">✅</span>
-                            {(useDelivery && deliveryStatus === 'terkirim') && <Check size={16} color="#16A34A" strokeWidth={3} />}
+                            <span className="text-lg">📦</span>
+                            {(deliveryMethod === 'ekspedisi' && useDelivery) && <Check size={16} color="#0284C7" strokeWidth={3} />}
                           </div>
                           <div>
-                            <p className="font-bold text-xs" style={{ color: (useDelivery && deliveryStatus === 'terkirim') ? '#16A34A' : TEXT }}>
-                              Langsung Terkirim
+                            <p className="font-bold text-xs" style={{ color: (deliveryMethod === 'ekspedisi' && useDelivery) ? '#0284C7' : TEXT }}>
+                              Ekspedisi / Cargo (J&T, dll)
                             </p>
-                            <p className="text-[10px] mt-0.5 font-medium" style={{ color: MUTED }}>Barang sudah sampai / diserahkan</p>
+                            <p className="text-[10px] mt-0.5 font-medium" style={{ color: MUTED }}>J&T, SiCepat, Indah Cargo / Luar Kota</p>
                           </div>
                         </button>
 
-                        {/* Card 2: Jadwalkan Pengiriman */}
+                        {/* Card 2: Kurir / Armada Toko */}
                         <button
                           type="button"
-                          onClick={() => { setUseDelivery(true); setDeliveryStatus('pending'); }}
+                          onClick={() => { 
+                            setDeliveryMethod('kurir_toko'); 
+                            setUseDelivery(true); 
+                            setDeliveryStatus('terkirim'); 
+                          }}
                           className="p-3.5 rounded-2xl border text-left transition-all relative flex flex-col justify-between cursor-pointer"
                           style={{
-                            background: (useDelivery && deliveryStatus === 'pending') ? '#F0F9FF' : SURFACE,
-                            borderColor: (useDelivery && deliveryStatus === 'pending') ? '#0284C7' : BORDER,
+                            background: (deliveryMethod === 'kurir_toko' && useDelivery) ? '#F0FDF4' : SURFACE,
+                            borderColor: (deliveryMethod === 'kurir_toko' && useDelivery) ? '#16A34A' : BORDER,
                           }}
                         >
                           <div className="flex items-center justify-between mb-2">
-                            <span className="text-lg">🚚</span>
-                            {(useDelivery && deliveryStatus === 'pending') && <Check size={16} color="#0284C7" strokeWidth={3} />}
+                            <span className="text-lg">🛵</span>
+                            {(deliveryMethod === 'kurir_toko' && useDelivery) && <Check size={16} color="#16A34A" strokeWidth={3} />}
                           </div>
                           <div>
-                            <p className="font-bold text-xs" style={{ color: (useDelivery && deliveryStatus === 'pending') ? '#0284C7' : TEXT }}>
-                              Jadwalkan Kirim
+                            <p className="font-bold text-xs" style={{ color: (deliveryMethod === 'kurir_toko' && useDelivery) ? '#16A34A' : TEXT }}>
+                              Kurir / Armada Toko
                             </p>
-                            <p className="text-[10px] mt-0.5 font-medium" style={{ color: MUTED }}>Trip armada / kurir nanti</p>
+                            <p className="text-[10px] mt-0.5 font-medium" style={{ color: MUTED }}>Antar Solo Raya & Driver Toko</p>
                           </div>
                         </button>
 
-                        {/* Card 3: Tanpa Kurir / Ambil Mandiri */}
+                        {/* Card 3: Ambil Sendiri (Pickup) */}
                         <button
                           type="button"
-                          onClick={() => { setUseDelivery(false); }}
+                          onClick={() => { 
+                            setDeliveryMethod('pickup'); 
+                            setUseDelivery(false); 
+                            setDeliveryCost(0);
+                          }}
                           className="p-3.5 rounded-2xl border text-left transition-all relative flex flex-col justify-between cursor-pointer"
                           style={{
-                            background: !useDelivery ? '#F1F5F9' : SURFACE,
-                            borderColor: !useDelivery ? '#475569' : BORDER,
+                            background: (!useDelivery || deliveryMethod === 'pickup') ? '#F8FAFC' : SURFACE,
+                            borderColor: (!useDelivery || deliveryMethod === 'pickup') ? '#475569' : BORDER,
                           }}
                         >
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-lg">🏪</span>
-                            {!useDelivery && <Check size={16} color="#475569" strokeWidth={3} />}
+                            {(!useDelivery || deliveryMethod === 'pickup') && <Check size={16} color="#475569" strokeWidth={3} />}
                           </div>
                           <div>
-                            <p className="font-bold text-xs" style={{ color: !useDelivery ? '#475569' : TEXT }}>
-                              Tanpa Pengiriman
+                            <p className="font-bold text-xs" style={{ color: (!useDelivery || deliveryMethod === 'pickup') ? '#475569' : TEXT }}>
+                              Ambil Sendiri (Pickup)
                             </p>
                             <p className="text-[10px] mt-0.5 font-medium" style={{ color: MUTED }}>Ambil di toko / cash & carry</p>
                           </div>
@@ -1949,14 +1966,79 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
                     </div>
 
                     <AnimatePresence>
-                      {useDelivery && (
+                      {deliveryMethod === 'ekspedisi' && useDelivery && (
                         <motion.div
                           initial={{ opacity: 0, height: 0 }}
                           animate={{ opacity: 1, height: 'auto' }}
                           exit={{ opacity: 0, height: 0 }}
                           className="space-y-4 overflow-hidden pt-1"
                         >
-                          <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs font-medium text-blue-300 flex items-center gap-2">
+                          {/* Nama Ekspedisi / Resi */}
+                          <div>
+                            <label className={labelCn}>Nama Ekspedisi & No. Resi <span className="normal-case opacity-60 font-normal">(Opsional)</span></label>
+                            <input
+                              className={inputCn}
+                              value={courierName}
+                              onChange={e => setCourierName(e.target.value)}
+                              placeholder="Contoh: J&T Cargo / No. Resi JNT998811..."
+                            />
+                          </div>
+
+                          {/* Ongkos Kirim (Ke Pelanggan) */}
+                          <div className="space-y-1.5 pt-2 border-t border-slate-200 dark:border-white/10">
+                            <div className="flex items-center justify-between">
+                              <label className={labelCn}>Ongkos Kirim Ekspedisi (Ke Pelanggan)</label>
+                              <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                                deliveryCost === 0 ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300' : 'bg-indigo-100 dark:bg-indigo-950/60 text-indigo-800 dark:text-indigo-300'
+                              }`}>
+                                {deliveryCost === 0 ? '🎁 Bebas Ongkir' : `+${formatIDR(deliveryCost)}`}
+                              </span>
+                            </div>
+                            <InputRupiah id="delivery-cost-input" value={deliveryCost} onChange={setDeliveryCost} />
+                            
+                            {/* Quick Ongkir Presets */}
+                            <div className="flex flex-wrap items-center gap-1 pt-1">
+                              <button
+                                type="button"
+                                onClick={() => setDeliveryCost(0)}
+                                className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
+                                  deliveryCost === 0
+                                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                                    : 'bg-white dark:bg-white/5 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-white/10 hover:border-emerald-400'
+                                }`}
+                              >
+                                🎁 Bebas Ongkir (Rp 0)
+                              </button>
+                              {[10000, 15000, 20000, 25000, 35000, 50000].map(amt => (
+                                <button
+                                  key={amt}
+                                  type="button"
+                                  onClick={() => setDeliveryCost(amt)}
+                                  className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
+                                    deliveryCost === amt
+                                      ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white shadow-xs'
+                                      : 'bg-white dark:bg-white/5 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-white/10 hover:border-slate-400'
+                                  }`}
+                                >
+                                  {amt / 1000}k
+                                </button>
+                              ))}
+                            </div>
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 font-medium italic">
+                              * Ditagihkan ke nota pelanggan ({deliveryCost === 0 ? 'Tercatat GRATIS / Bebas Ongkir' : 'menambah total tagihan'}).
+                            </p>
+                          </div>
+                        </motion.div>
+                      )}
+
+                      {deliveryMethod === 'kurir_toko' && useDelivery && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="space-y-4 overflow-hidden pt-1"
+                        >
+                          <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs font-medium text-blue-800 dark:text-blue-300 flex items-center gap-2">
                             <span>💡</span>
                             <span>Rincian kurir & kendaraan di bawah ini <strong>opsional</strong>. Boleh langsung klik <strong>"Lanjut"</strong>.</span>
                           </div>
@@ -2155,6 +2237,21 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
                             <p className="text-[10px] text-emerald-700 dark:text-emerald-400 mt-1 font-medium italic">
                               * Beban operasional toko (memotong laba bersih, <strong>tidak masuk nota pelanggan</strong>).
                             </p>
+                          </div>
+                        </motion.div>
+                      )}
+
+                      {deliveryMethod === 'pickup' && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="p-3.5 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-xs text-slate-700 dark:text-slate-300 flex items-center gap-3"
+                        >
+                          <span className="text-2xl">🏪</span>
+                          <div>
+                            <p className="font-bold text-slate-900 dark:text-white">Ambil Langsung di Toko / Gudang</p>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Pesanan disiapkan untuk diambil mandiri oleh pembeli (Cash & Carry). Ongkos kirim otomatis Rp 0.</p>
                           </div>
                         </motion.div>
                       )}
