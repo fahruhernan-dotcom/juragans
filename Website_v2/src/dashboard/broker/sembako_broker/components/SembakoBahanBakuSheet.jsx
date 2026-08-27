@@ -253,20 +253,20 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
               <span className="text-xs font-bold text-amber-900 flex items-center gap-1.5 font-['Sora']">
                 <Calculator size={14} className="text-amber-600" /> Auto Kalkulator HPP Satuan
               </span>
-              <span className="text-[10px] text-amber-800 font-mono font-semibold">
-                HPP = Total Bayar ÷ Qty
+              <span className="text-[10px] text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full font-mono font-bold">
+                🔒 HPP Terkunci Paten
               </span>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-[10px] font-bold text-slate-600 mb-1 block">
-                  Jumlah Pembelian ({unit})
+                <label className="text-[10px] font-bold text-slate-700 mb-1 block">
+                  Stok Tersedia / Opname ({unit})
                 </label>
                 <input
                   type="text"
                   inputMode="decimal"
-                  placeholder={isBahanBakuMode ? 'Misal: 50 (kg)' : 'Misal: 500 (pcs)'}
+                  placeholder={isBahanBakuMode ? 'Misal: 50 (kg)' : 'Misal: 50 (pcs)'}
                   value={qty}
                   onChange={(e) => handleQtyChange(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl bg-white border border-amber-200 text-slate-900 text-xs font-bold focus:outline-none focus:border-amber-500"

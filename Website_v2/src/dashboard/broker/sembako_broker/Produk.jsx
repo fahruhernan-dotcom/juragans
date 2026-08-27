@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react'
 import {
   Plus, Search, X, ChevronDown, ToggleLeft, ToggleRight, Trash2, Package,
   FileSpreadsheet, AlertTriangle, Layers, Tag, Calculator, Boxes, Sparkles,
-  Edit3, RefreshCw, Layers2, ShieldAlert, PackagePlus, History
+  Edit3, RefreshCw, Layers2, ShieldAlert, PackagePlus, History, SlidersHorizontal
 } from 'lucide-react'
 import ImportCsvModal from '@/components/ui/ImportCsvModal'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -2565,7 +2565,18 @@ export default function Produk() {
                             className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold text-xs shadow-sm hover:shadow transition-all cursor-pointer"
                           >
                             <PackagePlus size={14} />
-                            <span>+ Tambah Stok ({raw.unit})</span>
+                            <span>+ Tambah Stok</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingRawMaterial(raw)
+                              setRawSheetOpen(true)
+                            }}
+                            className="flex items-center justify-center gap-1 py-2 px-3 rounded-xl bg-muted hover:bg-muted/80 text-foreground font-bold text-xs border border-border/80 transition-all cursor-pointer"
+                            title="Koreksi / Adjust Stok Fisik (Opname)"
+                          >
+                            <SlidersHorizontal size={13} />
+                            <span>Adjust</span>
                           </button>
                         </div>
                       </div>
@@ -2727,10 +2738,21 @@ export default function Produk() {
                               setRestockMaterial(raw)
                               setRestockModalOpen(true)
                             }}
-                            className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold text-xs shadow-sm hover:shadow transition-all cursor-pointer"
+                            className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-950 font-bold text-xs shadow-sm hover:shadow transition-all cursor-pointer"
                           >
                             <PackagePlus size={14} />
                             <span>+ Tambah Stok</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingRawMaterial(raw)
+                              setRawSheetOpen(true)
+                            }}
+                            className="flex items-center justify-center gap-1 py-2 px-3 rounded-xl bg-muted hover:bg-muted/80 text-foreground font-bold text-xs border border-border/80 transition-all cursor-pointer"
+                            title="Koreksi / Adjust Stok Fisik (Opname)"
+                          >
+                            <SlidersHorizontal size={13} />
+                            <span>Adjust</span>
                           </button>
                         </div>
                       </div>
