@@ -801,6 +801,7 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
   const [deliveryDriver, setDeliveryDriver]     = useState(() => getSavedInvoiceDraft()?.deliveryDriver ?? '')
   const [deliveryVehicle, setDeliveryVehicle]   = useState(() => getSavedInvoiceDraft()?.deliveryVehicle ?? '')
   const [deliveryPlate, setDeliveryPlate]       = useState(() => getSavedInvoiceDraft()?.deliveryPlate ?? '')
+  const [deliveryArea, setDeliveryArea]         = useState(() => getSavedInvoiceDraft()?.deliveryArea ?? '')
   const [shippingBorneBy, setShippingBorneBy]   = useState(() => getSavedInvoiceDraft()?.shippingBorneBy ?? 'buyer') // 'buyer' | 'seller'
   const [sellerShippingFee, setSellerShippingFee] = useState(() => getSavedInvoiceDraft()?.sellerShippingFee ?? 0)
   const [fuelCost, setFuelCost]                 = useState(() => getSavedInvoiceDraft()?.fuelCost ?? 0)
