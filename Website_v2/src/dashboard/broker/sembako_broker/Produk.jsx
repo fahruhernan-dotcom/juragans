@@ -441,6 +441,13 @@ const DEFAULT_CONVERSIONS = {
 }
 
 const fmt = (n) => new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(Math.round(Number(n) || 0))
+const fmtStock = (n) => {
+  const num = Number(n) || 0
+  return new Intl.NumberFormat('id-ID', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 3
+  }).format(num)
+}
 
 // ── Stock bar helpers ─────────────────────────────────────────────────────────
 
@@ -1989,7 +1996,7 @@ function ProductCard({ product, onEdit, onDelete }) {
             <span>⚡</span> Stok Siap Kemas:
           </span>
           <span style={{ fontSize: 12, color: sColor, fontFamily: 'DM Sans', fontWeight: 800 }}>
-            {fmt(product.current_stock)} {product.unit}
+            {fmtStock(product.current_stock)} {product.unit}
           </span>
         </div>
         {pct !== null && (
@@ -2498,7 +2505,7 @@ export default function Produk() {
                         <div className="mt-3 p-2.5 rounded-xl bg-muted/40 border border-border/50 space-y-1.5 text-xs">
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Stok Tersedia:</span>
-                            <span className="font-bold text-foreground">{fmt(raw.current_stock)} {raw.unit}</span>
+                            <span className="font-bold text-foreground">{fmtStock(raw.current_stock)} {raw.unit}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">HPP Beli per {raw.unit}:</span>
@@ -2663,7 +2670,7 @@ export default function Produk() {
                         <div className="mt-3 p-2.5 rounded-xl bg-muted/40 border border-border/50 space-y-1.5 text-xs">
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Stok Tersedia:</span>
-                            <span className="font-bold text-foreground">{fmt(raw.current_stock)} {raw.unit}</span>
+                            <span className="font-bold text-foreground">{fmtStock(raw.current_stock)} {raw.unit}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">HPP Satuan:</span>
@@ -2866,7 +2873,7 @@ export default function Produk() {
                   <span>⚠️</span> Masih Memiliki Stok Aktif!
                 </p>
                 <p className="text-[11px] text-rose-600/90 dark:text-rose-300/80 leading-relaxed">
-                  Produk ini masih memiliki stok <strong>{fmt(productToDelete.current_stock)} {productToDelete.unit}</strong>.
+                  Produk ini masih memiliki stok <strong>{fmtStock(productToDelete.current_stock)} {productToDelete.unit}</strong>.
                   Menghapusnya dapat mempengaruhi keakuratan nilai inventaris gudang.
                 </p>
               </div>
