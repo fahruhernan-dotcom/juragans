@@ -397,10 +397,8 @@ export function SembakoInvoiceCard({ sale, onOpenDetail, onEdit, onManageDeliver
   const hasDebt = remainingAmount > 0
   const isLunas   = sale.payment_status === 'lunas'   || (totalAmount > 0 && remainingAmount <= 0)
   const isSebagian = sale.payment_status === 'sebagian' || (paidAmount > 0 && remainingAmount > 0)
-  // Pakai fin.profit jika ada retur (DB net_profit stale sebelum retur); fallback ke DB jika tidak ada retur
-  const netProfit = fin.saleReturns.length > 0
-    ? fin.profit
-    : (Number(sale.net_profit) > 0 ? Number(sale.net_profit) : fin.profit)
+  // Gunakan fin.profit sebagai source of truth dinamis untuk net profit
+  const netProfit = fin.profit
 
   const initialCustomer = customerName.charAt(0).toUpperCase()
 
