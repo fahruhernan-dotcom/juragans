@@ -11,13 +11,16 @@ export function GlobalErrorDialog() {
         const filename = event?.filename || ''
         const lineno = event?.lineno || ''
 
-        // Abaikan error dari ekstensi browser (Chrome extensions, add-ons)
+        // Abaikan error dari ekstensi browser & harmless ResizeObserver loop
         if (
           filename.includes('chrome-extension://') ||
           filename.includes('moz-extension://') ||
           stack.includes('chrome-extension://') ||
           stack.includes('moz-extension://') ||
-          message.includes('chrome-extension://')
+          message.includes('chrome-extension://') ||
+          message.includes('ResizeObserver loop') ||
+          message.includes('ResizeObserver loop completed') ||
+          message.includes('ResizeObserver loop limit exceeded')
         ) {
           return
         }
@@ -41,11 +44,14 @@ export function GlobalErrorDialog() {
         const message = reason?.message || String(reason || 'Unhandled Promise Rejection')
         const stack = reason?.stack || 'No stack trace'
 
-        // Abaikan promise rejection dari ekstensi browser pihak ketiga
+        // Abaikan promise rejection dari ekstensi browser pihak ketiga & ResizeObserver
         if (
           stack.includes('chrome-extension://') ||
           stack.includes('moz-extension://') ||
           message.includes('chrome-extension://') ||
+          message.includes('ResizeObserver loop') ||
+          message.includes('ResizeObserver loop completed') ||
+          message.includes('ResizeObserver loop limit exceeded') ||
           (typeof reason === 'string' && reason.includes('chrome-extension://'))
         ) {
           return
