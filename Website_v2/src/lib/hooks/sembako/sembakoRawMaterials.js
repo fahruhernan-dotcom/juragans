@@ -72,10 +72,35 @@ export const useCreateSembakoRawMaterial = () => {
         })
         throw error
       }
+
+      // Auto-register supplier to sembako_suppliers if not already present
+      if (payload.supplier_name && payload.supplier_name.trim()) {
+        const sName = payload.supplier_name.trim()
+        try {
+          const { data: existing } = await supabase
+            .from('sembako_suppliers')
+            .select('id')
+            .eq('tenant_id', tenant_id)
+            .eq('is_deleted', false)
+            .ilike('supplier_name', sName)
+            .limit(1)
+
+          if (!existing || existing.length === 0) {
+            await supabase.from('sembako_suppliers').insert({
+              tenant_id,
+              supplier_name: sName,
+              notes: `Suplier terdaftar otomatis dari ${payload.category === 'bahan_baku' ? 'Bahan Baku' : 'Kemasan'}`
+            })
+            queryClient.invalidateQueries({ queryKey: ['sembako-suppliers'] })
+          }
+        } catch { /* ignore non-blocking supplier check */ }
+      }
+
       return data
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sembako-raw-materials'] })
+      queryClient.invalidateQueries({ queryKey: ['sembako-suppliers'] })
       toast.success('Bahan baku / kemasan berhasil ditambahkan')
     },
     onError: (err) => toast.error(normalizeSupabaseError(err).message),
@@ -198,10 +223,36 @@ export const useRestockSembakoRawMaterial = () => {
         })
         throw error
       }
+
+      // Auto-register supplier to sembako_suppliers if not already present
+      if (supplier_name && supplier_name.trim()) {
+        const sName = supplier_name.trim()
+        try {
+          const tenant_id = await getTenantId()
+          const { data: existing } = await supabase
+            .from('sembako_suppliers')
+            .select('id')
+            .eq('tenant_id', tenant_id)
+            .eq('is_deleted', false)
+            .ilike('supplier_name', sName)
+            .limit(1)
+
+          if (!existing || existing.length === 0) {
+            await supabase.from('sembako_suppliers').insert({
+              tenant_id,
+              supplier_name: sName,
+              notes: 'Suplier terdaftar otomatis dari Riwayat Restok Bahan Baku'
+            })
+            queryClient.invalidateQueries({ queryKey: ['sembako-suppliers'] })
+          }
+        } catch { /* ignore non-blocking supplier check */ }
+      }
+
       return data || { material_name, addQty: nAddQty, newStock, newUnitCost }
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['sembako-raw-materials'] })
+      queryClient.invalidateQueries({ queryKey: ['sembako-suppliers'] })
       toast.success(`Stok ${data?.material_name || 'bahan'} berhasil ditambah!`)
     },
     onError: (err) => toast.error(normalizeSupabaseError(err).message),

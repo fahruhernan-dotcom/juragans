@@ -116,6 +116,7 @@ export default function SembakoTokoSupplier() {
     }, { replace: true })
   }
 
+  const [openSupplierSheet, setOpenSupplierSheet] = useState(false)
   const [search, setSearch] = useState('')
   const [selectedArea, setSelectedArea] = useState('Semua Area')
   const [onlyHutang, setOnlyHutang] = useState(false)
@@ -290,7 +291,13 @@ export default function SembakoTokoSupplier() {
                       }
                     }}
                   />
-                ) : <SupplierActions compact />}
+                ) : (
+                  <SupplierActions
+                    compact
+                    open={openSupplierSheet}
+                    onOpenChange={setOpenSupplierSheet}
+                  />
+                )}
               </div>
             ) : (
               <div className="flex items-center gap-2">
@@ -312,7 +319,13 @@ export default function SembakoTokoSupplier() {
                       }
                     }}
                   />
-                ) : <SupplierActions compact />}
+                ) : (
+                  <SupplierActions
+                    compact
+                    open={openSupplierSheet}
+                    onOpenChange={setOpenSupplierSheet}
+                  />
+                )}
               </div>
             )
           }
@@ -358,6 +371,7 @@ export default function SembakoTokoSupplier() {
               suppliers={suppliers}
               supplierStats={supplierStats}
               search={search}
+              onAddSupplier={() => setOpenSupplierSheet(true)}
             />
           )}
         </div>
@@ -560,8 +574,12 @@ function TokoActions({ compact = false, open: externalOpen, onOpenChange: extern
   )
 }
 
-function SupplierActions({ compact = false }) {
-  const [open, setOpen] = useState(false)
+function SupplierActions({ compact = false, open: controlledOpen, onOpenChange: setControlledOpen }) {
+  const [internalOpen, setInternalOpen] = useState(false)
+  const isControlled = controlledOpen !== undefined
+  const open = isControlled ? controlledOpen : internalOpen
+  const setOpen = isControlled ? setControlledOpen : setInternalOpen
+
   const createSupplier = useCreateSembakoSupplier()
   const [form, setForm] = useState({
     supplier_name: '',
@@ -766,8 +784,22 @@ function TokoList({ customers, customerStats, search, selectedArea, onlyHutang }
   )
 }
 
-function SupplierList({ suppliers, supplierStats, search }) {
+function SupplierList({ suppliers, supplierStats, search, onAddSupplier }) {
   const navigate = useNavigate()
+  const createSupplier = useCreateSembakoSupplier()
+
+  const handleQuickAdd = async (preset) => {
+    try {
+      await createSupplier.mutateAsync({
+        supplier_name: preset.name,
+        phone: preset.phone,
+        address: preset.address,
+        notes: preset.notes
+      })
+    } catch {
+      // toast already handled by mutation hook
+    }
+  }
 
   const filtered = useMemo(() => {
     return suppliers
@@ -787,12 +819,54 @@ function SupplierList({ suppliers, supplierStats, search }) {
 
   if (!filtered.length) {
     return (
-      <SembakoEmptyState
-        icon={Package}
-        title="Supplier Tidak Ditemukan"
-        description="Belum ada supplier yang cocok dengan pencarianmu. Tambahkan partner baru jika dibutuhkan."
-        color="green"
-      />
+      <div className="space-y-6">
+        <SembakoEmptyState
+          icon={Package}
+          title={search ? "Supplier Tidak Ditemukan" : "Belum Ada Supplier Terdaftar"}
+          description={
+            search
+              ? `Tidak ada supplier yang cocok dengan kata kunci "${search}".`
+              : "Belum ada supplier yang tersimpan. Tambahkan supplier baru atau gunakan rekomendasi suplier bawang & kemasan siap pakai."
+          }
+          actionLabel="+ Tambah Supplier Baru"
+          onAction={onAddSupplier}
+          color="green"
+        />
+
+        {!search && (
+          <div className="max-w-lg mx-auto p-5 rounded-3xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-500/20 text-center space-y-3 shadow-xs">
+            <p className="text-xs font-black uppercase tracking-wider text-amber-900 dark:text-amber-300">
+              🌾 Rekomendasi Suplier Bawang & Kemasan (1-Klik Tambah)
+            </p>
+            <p className="text-xs text-slate-600 dark:text-slate-400">
+              Klik partner di bawah untuk mendaftarkannya otomatis ke sistem:
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1 text-left">
+              {[
+                { name: 'Petani Bawang Boyolali', phone: '0812-3456-7890', address: 'Cepogo, Boyolali', notes: 'Bahan Baku Mentah Boyolali' },
+                { name: 'Pengepul Pasar Legi Solo', phone: '0857-1122-3344', address: 'Pasar Legi, Solo', notes: 'Bawang Curah & Bumbu' },
+                { name: 'Percetakan Kemasan Solo Jaya', phone: '0878-9988-7766', address: 'Banjarsari, Surakarta', notes: 'Pouch, Stiker & Label' },
+                { name: 'Pabrik Botol & Toples PET', phone: '0821-4455-6677', address: 'Grogol, Sukoharjo', notes: 'Toples PET & Dus' },
+              ].map((p) => (
+                <button
+                  key={p.name}
+                  type="button"
+                  onClick={() => handleQuickAdd(p)}
+                  disabled={createSupplier.isPending}
+                  className="p-3 rounded-2xl bg-white dark:bg-white/5 hover:bg-amber-500 hover:text-white dark:hover:bg-amber-500 border border-amber-200/80 dark:border-white/10 transition group text-left cursor-pointer shadow-xs disabled:opacity-50"
+                >
+                  <p className="text-xs font-black text-slate-900 dark:text-white group-hover:text-white truncate">
+                    +{p.name}
+                  </p>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400 group-hover:text-amber-100 mt-0.5">
+                    {p.notes} • {p.address}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     )
   }
 
