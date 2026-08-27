@@ -2438,7 +2438,7 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Kemasan Ekspedisi</p>
                           <p className="font-black text-slate-900 dark:text-white truncate">
                             {effectivePackingQty > 0 
-                              ? `${effectivePackingQty} pcs ${packingType === 'kardus' ? 'Kardus Box' : 'Polymailer Hitam'}`
+                              ? `${effectivePackingQty}x ${packingType === 'kardus' ? 'Kardus Box' : 'Polymailer'}`
                               : 'Tanpa Kemasan'}
                           </p>
                         </div>
@@ -2470,18 +2470,27 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
                         </div>
                       </div>
 
-                      {/* Grand Total Box */}
-                      <div className="rounded-xl p-3 bg-slate-900 dark:bg-white text-white dark:text-slate-950 flex justify-between items-center shadow-sm">
+                      {/* Grand Total Box (High Contrast & Explicit Inline Colors) */}
+                      <div 
+                        className="rounded-xl p-3.5 flex justify-between items-center shadow-md transition-all"
+                        style={{ 
+                          background: '#0F172A', 
+                          border: '1px solid #1E293B' 
+                        }}
+                      >
                         <div>
-                          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                          <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#94A3B8' }}>
                             Total Tagihan Pelanggan
                           </p>
-                          <p className="text-xs font-bold opacity-90">
-                            {deliveryCost === 0 ? 'Termasuk Bebas Ongkir' : `Subtotal + Ongkir`}
+                          <p className="text-xs font-medium mt-0.5" style={{ color: '#E2E8F0' }}>
+                            {deliveryCost === 0 ? '🎁 Termasuk Bebas Ongkir' : 'Subtotal + Ongkos Kirim'}
                           </p>
                         </div>
                         <div className="text-right">
-                          <span className="text-lg font-black font-mono tracking-tight">
+                          <span 
+                            className="text-xl font-black font-mono tracking-tight"
+                            style={{ color: '#38BDF8' }}
+                          >
                             {formatIDR(totalAmount)}
                           </span>
                         </div>
