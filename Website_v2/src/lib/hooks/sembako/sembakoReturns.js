@@ -356,6 +356,7 @@ export const useCreateSembakoReturn = () => {
       qc.invalidateQueries({ queryKey: ['sembako-customer-invoices'] })
       qc.invalidateQueries({ queryKey: ['sembako-all-batches'] })
       qc.invalidateQueries({ queryKey: ['sembako-dashboard-stats'] })
+      qc.invalidateQueries({ queryKey: ['sembako-raw-materials'] })
       qc.invalidateQueries({ queryKey: ['sembako-laporan'] })
       qc.invalidateQueries({ queryKey: ['sembako-audit-logs'] })
       toast.success('Retur produk berhasil dicatat!')
@@ -406,6 +407,7 @@ export const useUpdateSembakoReturnStatus = () => {
       qc.invalidateQueries({ queryKey: ['sembako-customer-invoices'] })
       qc.invalidateQueries({ queryKey: ['sembako-all-batches'] })
       qc.invalidateQueries({ queryKey: ['sembako-dashboard-stats'] })
+      qc.invalidateQueries({ queryKey: ['sembako-raw-materials'] })
       qc.invalidateQueries({ queryKey: ['sembako-audit-logs'] })
     }
   })
@@ -584,6 +586,7 @@ export const useDeleteSembakoReturn = () => {
       qc.invalidateQueries({ queryKey: ['sembako-customers'] })
       qc.invalidateQueries({ queryKey: ['sembako-customer-invoices'] })
       qc.invalidateQueries({ queryKey: ['sembako-dashboard-stats'] })
+      qc.invalidateQueries({ queryKey: ['sembako-raw-materials'] })
       qc.invalidateQueries({ queryKey: ['sembako-audit-logs'] })
       toast.success('Retur barang berhasil dibatalkan & transaksi diperbarui!')
     },

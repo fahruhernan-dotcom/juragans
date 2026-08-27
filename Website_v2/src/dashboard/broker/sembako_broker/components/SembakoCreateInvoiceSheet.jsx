@@ -25,6 +25,7 @@ import {
   formatFriendlyErrorMessage,
 } from './sembakoSaleUtils'
 import { SembakoSuccessCard } from './SembakoSuccessCard'
+import { calculateBomProductHpp } from '@/lib/inventory/bomStockCalculator'
 
 const PRESET_OTHER_COST_CATEGORIES = [
   { id: 'bensin', label: 'BBM / Bensin', Icon: Fuel, color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
@@ -1146,9 +1147,11 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
           remaining -= take
         }
         if (remaining > 0) {
-          totalCost += remaining * (p.avg_buy_price || 0)
+          const bomCost = calculateBomProductHpp(p, rawMaterialsList)
+          totalCost += remaining * (bomCost || p.avg_buy_price || 0)
         }
-        next[idx].cogs_per_unit = qtyInBase > 0 ? Math.round(totalCost / qtyInBase) : (p.avg_buy_price || 0)
+        const fallbackCost = calculateBomProductHpp(p, rawMaterialsList) || p.avg_buy_price || 0
+        next[idx].cogs_per_unit = qtyInBase > 0 ? Math.round(totalCost / qtyInBase) : fallbackCost
       }
     }
     setItems(next)
@@ -1212,6 +1215,11 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
             transaction_date: txnDate, due_date: dueDate || null,
             total_amount: totalAmount, total_cogs: totalCogs,
             delivery_cost: deliveryCost, other_cost: otherCost, notes: finalNotes,
+            packing_details: {
+              packing_type: packingType,
+              material_name: packingType === 'kardus' ? 'Kardus & Safety' : 'Plastik Packing Polymailer Hitam',
+              quantity: effectivePackingQty,
+            }
           },
           items: validItems,
         })

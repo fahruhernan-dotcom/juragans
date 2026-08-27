@@ -447,6 +447,16 @@ async function restoreRawMaterialsAndPackaging({ tenant_id, sale_id }) {
       }
     }
 
+    // Restore secondary packing (polymailer / kardus)
+    const polymailerQty = Math.ceil(saleItems.reduce((s, i) => s + (Number(i.quantity) || 0), 0) / 4)
+    if (polymailerQty > 0) {
+      const packingMat = rawMaterials.find(r => (r.category || '').toLowerCase() === 'polymailer' || (r.material_name || '').toLowerCase().includes('polymailer') || (r.material_name || '').toLowerCase().includes('plastik'))
+      if (packingMat) {
+        const cur = Number(packingMat.current_stock) || 0
+        await supabase.from('sembako_raw_materials').update({ current_stock: cur + polymailerQty }).eq('id', packingMat.id)
+      }
+    }
+
     // Auto sync finished goods products stock from restored raw materials
     const { data: updatedRaw } = await supabase
       .from('sembako_raw_materials')
@@ -706,6 +716,9 @@ export const useUpdateSembakoSale = () => {
       }
 
       if (items && items.length > 0) {
+        // Restore old BOM raw materials first
+        await restoreRawMaterialsAndPackaging({ tenant_id, sale_id: id })
+
         const { data: oldStockOuts } = await supabase
           .from('sembako_stock_out')
           .select('batch_id, qty_keluar, product_id, buy_price')
@@ -838,6 +851,14 @@ export const useUpdateSembakoSale = () => {
             qtyToDeduct -= deduct
           }
         }
+
+        // Deduct new BOM raw materials and packaging
+        await deductRawMaterialsAndPackaging({
+          tenant_id,
+          items,
+          packing_details: updates.packing_details,
+          invoice_number: updates.invoice_number
+        })
       }
 
       const { _overpaid, ...cleanUpdates } = updates
@@ -862,6 +883,7 @@ export const useUpdateSembakoSale = () => {
       queryClient.invalidateQueries({ queryKey: ['sembako-dashboard-stats'] })
       queryClient.invalidateQueries({ queryKey: ['sembako-all-batches'] })
       queryClient.invalidateQueries({ queryKey: ['sembako-stock-out'] })
+      queryClient.invalidateQueries({ queryKey: ['sembako-raw-materials'] })
       queryClient.invalidateQueries({ queryKey: ['sembako-audit-logs'] })
 
       recordAuditLog({

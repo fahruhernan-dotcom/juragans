@@ -356,3 +356,71 @@ export function calculateBomProductStock(product, rawMaterials = []) {
     components
   }
 }
+
+/**
+ * Menghitung HPP Pokok Produk Jadi dari komponen bahan baku & kemasan terkini
+ * @param {object} product
+ * @param {Array} rawMaterials
+ * @returns {number} HPP per unit (dalam Rupiah)
+ */
+export function calculateBomProductHpp(product, rawMaterials = []) {
+  if (!product || !rawMaterials || rawMaterials.length === 0) {
+    return Number(product?.avg_buy_price) || 0
+  }
+  const name = product.product_name || ''
+  const nameLower = name.toLowerCase()
+  const isBundling = product.category === 'Paket Bundling & Combo' || nameLower.includes('paket') || nameLower.includes('bundling')
+
+  if (isBundling) {
+    let multiplier = 1
+    let gramPerPack = 300
+    if (nameLower.includes('trio') || nameLower.includes('3x100')) {
+      multiplier = 3
+      gramPerPack = 300
+    } else if (nameLower.includes('duo') || nameLower.includes('2x200')) {
+      multiplier = 2
+      gramPerPack = 400
+    } else if (nameLower.includes('reseller') || nameLower.includes('10')) {
+      multiplier = 10
+      gramPerPack = 2500
+    } else if (nameLower.includes('resto') || nameLower.includes('2 kg') || nameLower.includes('2kg')) {
+      multiplier = 1
+      gramPerPack = 2000
+    }
+    const bawangMat = matchBawangMaterial(product, rawMaterials)
+    const kemasanMat = matchKemasanMaterial(product, rawMaterials)
+    const sFrontMat = matchStickerFrontMaterial(product, rawMaterials)
+    const sBackMat = matchStickerBackMaterial(product, rawMaterials)
+
+    let totalCost = 0
+    if (bawangMat) {
+      const isKg = (bawangMat.unit || '').toLowerCase() === 'kg'
+      const costPerGram = isKg ? (Number(bawangMat.unit_cost) || 0) / 1000 : (Number(bawangMat.unit_cost) || 0)
+      totalCost += gramPerPack * costPerGram
+    }
+    if (kemasanMat) totalCost += multiplier * (Number(kemasanMat.unit_cost) || 0)
+    if (sFrontMat) totalCost += multiplier * (Number(sFrontMat.unit_cost) || 0)
+    if (sBackMat) totalCost += multiplier * (Number(sBackMat.unit_cost) || 0)
+
+    return totalCost > 0 ? Math.round(totalCost) : (Number(product.avg_buy_price) || 0)
+  }
+
+  const gram = extractProductGrammage(name, product.notes)
+  const bawangMat = matchBawangMaterial(product, rawMaterials)
+  const kemasanMat = matchKemasanMaterial(product, rawMaterials)
+  const sFrontMat = matchStickerFrontMaterial(product, rawMaterials)
+  const sBackMat = matchStickerBackMaterial(product, rawMaterials)
+
+  let totalCost = 0
+  if (bawangMat) {
+    const isKg = (bawangMat.unit || '').toLowerCase() === 'kg'
+    const costPerGram = isKg ? (Number(bawangMat.unit_cost) || 0) / 1000 : (Number(bawangMat.unit_cost) || 0)
+    totalCost += gram * costPerGram
+  }
+  if (kemasanMat) totalCost += Number(kemasanMat.unit_cost) || 0
+  if (sFrontMat) totalCost += Number(sFrontMat.unit_cost) || 0
+  if (sBackMat) totalCost += Number(sBackMat.unit_cost) || 0
+
+  return totalCost > 0 ? Math.round(totalCost) : (Number(product.avg_buy_price) || 0)
+}
+
