@@ -782,7 +782,6 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
   const [newCustForm, setNewCustForm]       = useState({ customer_name: '', customer_type: 'perseorangan', phone: '', address: '', payment_terms: 'cash' })
   const [quickAddProd, setQuickAddProd]     = useState(false)
   const [newProdForm, setNewProdForm]       = useState({ product_name: '', category: 'lainnya', unit: 'pcs', sell_price: 0 })
-  const [showCostConfirm, setShowCostConfirm] = useState(false)
 
   const [useDelivery, setUseDelivery]           = useState(() => getSavedInvoiceDraft()?.useDelivery ?? true)
   const [deliveryStatus, setDeliveryStatus]     = useState('terkirim') // 'terkirim' | 'pending'
@@ -1286,11 +1285,7 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
       .filter(i => i.product_id && Number(i.quantity) > 0)
     if (!validItems.length) { toast.error('Tambahkan minimal 1 produk'); return }
 
-    if (deliveryCost === 0 && otherCost === 0) {
-      setShowCostConfirm(true)
-    } else {
-      handleSubmit()
-    }
+    handleSubmit()
   }
 
   // ── Auto Draft Persistence ──────────────────────────────────────────────────
@@ -2501,55 +2496,6 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
         </SheetContent>
       </Sheet>
 
-      <AnimatePresence>
-        {showCostConfirm && (
-          <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white dark:bg-[#111C24] border border-[#E2E8F0] dark:border-white/10 rounded-3xl p-6 max-w-sm w-full shadow-2xl space-y-5 text-left"
-            >
-              <div className="text-center space-y-2">
-                <div className="w-12 h-12 rounded-2xl bg-[#0F172A]/15 border border-[#0F172A]/30 text-[#0F172A] flex items-center justify-center mx-auto text-xl">
-                  🚚
-                </div>
-                <h3 className="font-display font-black text-lg text-[#0F172A] dark:text-white uppercase tracking-tight">
-                  Biaya Tambahan
-                </h3>
-                <p className="text-xs text-[#64748B] dark:text-slate-400 leading-relaxed">
-                  Apakah transaksi ini dikenakan <strong>Biaya Kirim</strong> atau <strong>Biaya Tambahan Lainnya</strong>?
-                </p>
-              </div>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    setShowCostConfirm(false)
-                    handleSubmit()
-                  }}
-                  className="flex-1 h-12 rounded-xl text-xs font-bold text-[#64748B] dark:text-slate-400 bg-[#F1F5F9] dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 transition-all cursor-pointer"
-                >
-                  Tidak Ada
-                </button>
-                <button
-                  onClick={() => {
-                    setShowCostConfirm(false)
-                    const element = document.getElementById('delivery-cost-input')
-                    if (element) {
-                      element.focus()
-                      element.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                    }
-                  }}
-                  className="flex-1 h-12 rounded-xl text-xs font-black text-white bg-[#0F172A] hover:bg-slate-900 shadow-sm transition-all cursor-pointer"
-                >
-                  Ya, Tambah Biaya
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
       <SembakoSuccessCard
         isOpen={!!successData && !printData}
