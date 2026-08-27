@@ -29,7 +29,12 @@
 
         window.addEventListener('error', function(e) {
           try {
+            var filename = e.filename || '';
             var msg = e.message || (e.error && e.error.message) || String(e);
+            var stack = (e.error && e.error.stack) || '';
+            if (filename.indexOf('chrome-extension://') !== -1 || filename.indexOf('moz-extension://') !== -1 || stack.indexOf('chrome-extension://') !== -1 || stack.indexOf('moz-extension://') !== -1 || msg.indexOf('chrome-extension://') !== -1) {
+              return;
+            }
             var el = document.getElementById('emergency-error-banner');
             if (!el) {
               el = document.createElement('div');

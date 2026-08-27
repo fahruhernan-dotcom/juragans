@@ -1,6 +1,7 @@
 /**
- * planGating.js — Central config for plan gating across all business verticals.
- * Virgin Dashboard ERP (Universal Commercial ERP, POS, Retail & Distribution)
+ * planGating.js
+ * Feature gating & plan limit definitions for
+ * Juragans Dashboard (Pencatatan, Inventaris & Penjualan Bawang Goreng)
  */
 
 export const FALLBACK_TRANSACTION_QUOTA = 100

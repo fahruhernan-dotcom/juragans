@@ -10,11 +10,11 @@ import {
   useCreateSembakoRawMaterial,
   useUpdateSembakoRawMaterial
 } from '@/lib/hooks/useSembakoData'
-import { formatRupiah } from '@/lib/format'
-import { Package, Calculator, Tag, Store, AlertCircle } from 'lucide-react'
+import { formatRupiah, formatIDR } from '@/lib/format'
+import { Package, Calculator } from 'lucide-react'
 import { toast } from 'sonner'
 
-export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData = null, editItem = null }) {
+export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData = null, editItem = null, targetType = 'bahan_baku' }) {
   const activeItem = initialData || editItem
   const handleClose = () => {
     if (onClose) onClose()
@@ -24,9 +24,12 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
   const createMutation = useCreateSembakoRawMaterial()
   const updateMutation = useUpdateSembakoRawMaterial()
 
+  // Determine if item is Bahan Baku or Kemasan
+  const isBahanBakuMode = targetType === 'bahan_baku' || (activeItem && ['bawang_mentah', 'bawang_curah', 'bawang_putih', 'minyak_goreng', 'tepung_bumbu', 'bahan_baku', 'bahan_lain'].includes(activeItem.category))
+
   const [name, setName] = useState('')
-  const [category, setCategory] = useState('kemasan')
-  const [unit, setUnit] = useState('pcs')
+  const [category, setCategory] = useState(isBahanBakuMode ? 'bawang_mentah' : 'pouch')
+  const [unit, setUnit] = useState(isBahanBakuMode ? 'kg' : 'pcs')
   const [qty, setQty] = useState('')
   const [totalSpent, setTotalSpent] = useState('')
   const [unitCost, setUnitCost] = useState('')
@@ -40,8 +43,8 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
   useEffect(() => {
     if (activeItem) {
       setName(activeItem.material_name || '')
-      setCategory(activeItem.category || activeItem.material_type || 'kemasan')
-      setUnit(activeItem.unit || 'pcs')
+      setCategory(activeItem.category || activeItem.material_type || (isBahanBakuMode ? 'bawang_mentah' : 'pouch'))
+      setUnit(activeItem.unit || (isBahanBakuMode ? 'kg' : 'pcs'))
       setQty(String(activeItem.current_stock || ''))
       setTotalSpent(String(activeItem.total_spent || ''))
       setUnitCost(String(activeItem.unit_cost || ''))
@@ -50,22 +53,30 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
       setNotes(activeItem.notes || '')
     } else {
       setName('')
-      setCategory('kemasan')
-      setUnit('pcs')
+      setCategory(isBahanBakuMode ? 'bawang_mentah' : 'pouch')
+      setUnit(isBahanBakuMode ? 'kg' : 'pcs')
       setQty('')
       setTotalSpent('')
       setUnitCost('')
-      setMinStockAlert('50')
+      setMinStockAlert(isBahanBakuMode ? '20' : '50')
       setSupplierName('')
       setNotes('')
       setLastEdited('totalSpent')
     }
-  }, [activeItem, open])
+  }, [activeItem, open, isBahanBakuMode])
+
+  // Format number with Indonesian thousand separators (e.g. 130000 -> 130.000)
+  const formatThousands = (val) => {
+    if (!val && val !== 0) return ''
+    const num = Number(val)
+    return isNaN(num) ? '' : num.toLocaleString('id-ID')
+  }
 
   // Bi-directional dynamic math calculator
   const handleQtyChange = (val) => {
-    setQty(val)
-    const nQty = parseFloat(val) || 0
+    const rawVal = val.replace(/[^0-9.]/g, '')
+    setQty(rawVal)
+    const nQty = parseFloat(rawVal) || 0
     if (nQty > 0) {
       if (lastEdited === 'totalSpent' && totalSpent) {
         const nTotal = parseFloat(totalSpent) || 0
@@ -78,9 +89,10 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
   }
 
   const handleTotalSpentChange = (val) => {
-    setTotalSpent(val)
+    const rawVal = val.replace(/\D/g, '')
+    setTotalSpent(rawVal)
     setLastEdited('totalSpent')
-    const nTotal = parseFloat(val) || 0
+    const nTotal = parseFloat(rawVal) || 0
     const nQty = parseFloat(qty) || 0
     if (nQty > 0 && nTotal >= 0) {
       setUnitCost(String(Math.round(nTotal / nQty)))
@@ -88,9 +100,10 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
   }
 
   const handleUnitCostChange = (val) => {
-    setUnitCost(val)
+    const rawVal = val.replace(/\D/g, '')
+    setUnitCost(rawVal)
     setLastEdited('unitCost')
-    const nUnit = parseFloat(val) || 0
+    const nUnit = parseFloat(rawVal) || 0
     const nQty = parseFloat(qty) || 0
     if (nQty > 0 && nUnit >= 0) {
       setTotalSpent(String(Math.round(nUnit * nQty)))
@@ -100,7 +113,7 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!name.trim()) {
-      toast.error('Nama bahan / kemasan wajib diisi')
+      toast.error(`Nama ${isBahanBakuMode ? 'bahan baku' : 'kemasan'} wajib diisi`)
       return
     }
 
@@ -108,12 +121,12 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
       material_name: name.trim(),
       category: category,
       unit: unit,
-      current_stock: parseFloat(qty) || 0,
-      total_spent: parseFloat(totalSpent) || 0,
-      unit_cost: parseFloat(unitCost) || 0,
-      min_stock_alert: parseFloat(minStockAlert) || 50,
+      current_stock: qty ? parseFloat(qty) : 0,
+      total_spent: totalSpent ? parseFloat(totalSpent) : 0,
+      unit_cost: unitCost ? parseFloat(unitCost) : 0,
+      min_stock_alert: minStockAlert ? parseFloat(minStockAlert) : 0,
       supplier_name: supplierName.trim() || null,
-      notes: notes.trim() || null
+      notes: notes.trim() || null,
     }
 
     try {
@@ -123,12 +136,11 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
         await createMutation.mutateAsync(payload)
       }
       handleClose()
-    } catch (err) {
+    } catch {
       // handled by mutation
     }
   }
 
-  const calculatedHpp = parseFloat(unitCost) || 0
   const isSaving = createMutation.isPending || updateMutation.isPending
 
   return (
@@ -140,11 +152,17 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
               <Package size={18} />
             </div>
             <div>
-              <SheetTitle className="text-base font-bold text-slate-900">
-                {editItem ? 'Edit Bahan / Kemasan' : 'Tambah Bahan & Kemasan Baru'}
+              <SheetTitle className="text-base font-bold text-slate-900 font-['Sora']">
+                {editItem 
+                  ? `Edit ${isBahanBakuMode ? 'Bahan Baku Mentah' : 'Kemasan & Packaging'}` 
+                  : `Tambah ${isBahanBakuMode ? 'Bahan Baku Mentah (Petani)' : 'Kemasan & Packaging (Vendor)'}`
+                }
               </SheetTitle>
               <SheetDescription className="text-xs text-slate-500">
-                Catat pembelian pouch, stiker, kardus, atau bahan baku dengan auto-kalkulator HPP.
+                {isBahanBakuMode
+                  ? 'Catat pembelian komoditas mentah (Bawang Merah Boyolali, Bawang Putih, Minyak, Tepung) dari Petani/Pengepul.'
+                  : 'Catat pembelian pouch ziplock, stiker label, kardus, atau polymailer dari Percetakan/Vendor Kemasan.'
+                }
               </SheetDescription>
             </div>
           </div>
@@ -154,15 +172,15 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
           {/* Nama Bahan */}
           <div>
             <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">
-              Nama Bahan / Kemasan <span className="text-rose-500">*</span>
+              {isBahanBakuMode ? 'Nama Bahan Baku Mentah' : 'Nama Kemasan & Packaging'} <span className="text-rose-500">*</span>
             </label>
             <input
               type="text"
               required
-              placeholder="Contoh: Pouch Standing Zipper 250g / Stiker Depan"
+              placeholder={isBahanBakuMode ? 'Contoh: Bawang Merah Basah Super Cepogo / Minyak Goreng Curah' : 'Contoh: Pouch Standing Zipper Matte 250g / Stiker Depan Gold'}
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400 text-xs focus:bg-white focus:border-amber-500 focus:outline-none transition"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400 text-xs font-semibold focus:bg-white focus:border-amber-500 focus:outline-none transition"
             />
           </div>
 
@@ -170,38 +188,71 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">Kategori</label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-semibold focus:bg-white focus:border-amber-500"
-              >
-                <option value="kemasan">Pouch & Plastik</option>
-                <option value="stiker">Stiker & Label</option>
-                <option value="kardus">Kardus & Box</option>
-                <option value="bahan_baku">Bahan Baku (Bawang/Minyak)</option>
-                <option value="lainnya">Lain-lain</option>
-              </select>
+              {isBahanBakuMode ? (
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-semibold focus:bg-white focus:border-amber-500"
+                >
+                  <option value="bawang_mentah">🧅 Bawang Merah Mentah / Curah</option>
+                  <option value="bawang_putih">🧄 Bawang Putih Mentah</option>
+                  <option value="minyak_goreng">🛢️ Minyak Goreng Curah / Jerigen</option>
+                  <option value="tepung_bumbu">🌾 Tepung & Bumbu Penyedap</option>
+                  <option value="bahan_lain">📦 Bahan Baku Mentah Lainnya</option>
+                </select>
+              ) : (
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-semibold focus:bg-white focus:border-amber-500"
+                >
+                  <option value="pouch">🛍️ Standing Pouch Ziplock</option>
+                  <option value="toples">🫙 Toples PET Plastik</option>
+                  <option value="sticker_depan">🏷️ Stiker Label Depan</option>
+                  <option value="sticker_belakang">🏷️ Stiker Label Belakang (Halal/Gizi)</option>
+                  <option value="kardus">📦 Kardus Master Box / Dus Karton</option>
+                  <option value="polymailer">✉️ Plastik Polymailer Ekspedisi</option>
+                  <option value="bubblewrap_safety">🛡️ Bubblewrap / Lakban Fragile</option>
+                  <option value="kemasan_lain">📦 Kemasan Lainnya</option>
+                </select>
+              )}
             </div>
             <div>
               <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">Satuan</label>
-              <select
-                value={unit}
-                onChange={(e) => setUnit(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-semibold focus:bg-white focus:border-amber-500"
-              >
-                <option value="pcs">pcs (buah)</option>
-                <option value="lembar">lembar</option>
-                <option value="roll">roll</option>
-                <option value="kg">kg (kilogram)</option>
-                <option value="box">box</option>
-              </select>
+              {isBahanBakuMode ? (
+                <select
+                  value={unit}
+                  onChange={(e) => setUnit(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-semibold focus:bg-white focus:border-amber-500"
+                >
+                  <option value="kg">kg (kilogram)</option>
+                  <option value="karung">karung</option>
+                  <option value="liter">liter</option>
+                  <option value="sak">sak</option>
+                  <option value="ton">ton</option>
+                  <option value="gram">gram</option>
+                </select>
+              ) : (
+                <select
+                  value={unit}
+                  onChange={(e) => setUnit(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-semibold focus:bg-white focus:border-amber-500"
+                >
+                  <option value="pcs">pcs (buah / lembar)</option>
+                  <option value="lembar">lembar</option>
+                  <option value="roll">roll</option>
+                  <option value="pack">pack (isi pack)</option>
+                  <option value="dus">dus / karton</option>
+                  <option value="box">box</option>
+                </select>
+              )}
             </div>
           </div>
 
           {/* Bi-directional Auto Calculator Box */}
           <div className="p-4 rounded-2xl bg-amber-50/80 border border-amber-200/90 space-y-3 shadow-sm">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+              <span className="text-xs font-bold text-amber-900 flex items-center gap-1.5 font-['Sora']">
                 <Calculator size={14} className="text-amber-600" /> Auto Kalkulator HPP Satuan
               </span>
               <span className="text-[10px] text-amber-800 font-mono font-semibold">
@@ -215,10 +266,9 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
                   Jumlah Pembelian ({unit})
                 </label>
                 <input
-                  type="number"
-                  min="0"
-                  step="any"
-                  placeholder="Misal: 100"
+                  type="text"
+                  inputMode="decimal"
+                  placeholder={isBahanBakuMode ? 'Misal: 50 (kg)' : 'Misal: 500 (pcs)'}
                   value={qty}
                   onChange={(e) => handleQtyChange(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl bg-white border border-amber-200 text-slate-900 text-xs font-bold focus:outline-none focus:border-amber-500"
@@ -226,31 +276,48 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
               </div>
               <div>
                 <label className="text-[10px] font-bold text-slate-600 mb-1 block">
-                  Total Bayar / Nota (Rp)
+                  Total Bayar / Nota Suplier (Rp)
                 </label>
-                <input
-                  type="number"
-                  min="0"
-                  placeholder="Misal: 85000"
-                  value={totalSpent}
-                  onChange={(e) => handleTotalSpentChange(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-white border border-amber-200 text-slate-900 text-xs font-bold focus:outline-none focus:border-amber-500"
-                />
+                <div className="relative">
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400 select-none">
+                    Rp
+                  </span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="Misal: 1.500.000"
+                    value={formatThousands(totalSpent)}
+                    onChange={(e) => handleTotalSpentChange(e.target.value)}
+                    className="w-full pl-8 pr-2.5 py-2 rounded-xl bg-white border border-amber-200 text-slate-900 text-xs font-bold focus:outline-none focus:border-amber-500"
+                  />
+                </div>
               </div>
             </div>
 
             {/* Hasil HPP Satuan */}
             <div className="pt-2.5 border-t border-amber-200/70 flex items-center justify-between">
-              <span className="text-xs text-slate-700 font-semibold">HPP Beli per {unit}:</span>
+              <div>
+                <span className="text-xs text-slate-700 font-semibold block">HPP Beli per {unit}:</span>
+                {unitCost && (
+                  <span className="text-[10.5px] font-bold text-amber-700">
+                    {formatIDR(Number(unitCost))} / {unit}
+                  </span>
+                )}
+              </div>
               <div className="flex items-center gap-1.5">
-                <input
-                  type="number"
-                  min="0"
-                  placeholder="Rp per unit"
-                  value={unitCost}
-                  onChange={(e) => handleUnitCostChange(e.target.value)}
-                  className="w-28 px-2.5 py-1 text-right rounded-lg bg-white border border-amber-300 text-amber-900 font-black text-xs focus:outline-none focus:border-amber-500"
-                />
+                <div className="relative">
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[11px] font-black text-amber-600 select-none">
+                    Rp
+                  </span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="0"
+                    value={formatThousands(unitCost)}
+                    onChange={(e) => handleUnitCostChange(e.target.value)}
+                    className="w-32 pl-8 pr-2.5 py-1.5 text-right rounded-lg bg-white border border-amber-300 text-amber-900 font-black text-xs focus:outline-none focus:border-amber-500"
+                  />
+                </div>
                 <span className="text-xs text-amber-900 font-bold">
                   / {unit}
                 </span>
@@ -262,23 +329,23 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">
-                Peringatan Stok Menipis
+                Peringatan Stok Menipis ({unit})
               </label>
               <input
-                type="number"
-                min="0"
+                type="text"
+                inputMode="decimal"
                 value={minStockAlert}
                 onChange={(e) => setMinStockAlert(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs focus:bg-white focus:border-amber-500 focus:outline-none"
+                className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-semibold focus:bg-white focus:border-amber-500 focus:outline-none"
               />
             </div>
             <div>
               <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">
-                Supplier / Percetakan
+                {isBahanBakuMode ? 'Supplier Petani / Pengepul' : 'Supplier Percetakan / Vendor'}
               </label>
               <input
                 type="text"
-                placeholder="Misal: Percetakan Solo Jaya"
+                placeholder={isBahanBakuMode ? 'Misal: Petani Pak Slamet Cepogo' : 'Misal: Percetakan Solo Jaya'}
                 value={supplierName}
                 onChange={(e) => setSupplierName(e.target.value)}
                 className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs focus:bg-white focus:border-amber-500 focus:outline-none"
@@ -291,31 +358,23 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
             <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">Catatan / Spesifikasi</label>
             <textarea
               rows={2}
-              placeholder="Contoh: Bahan pouch matte ziplock tebal 100 micron"
+              placeholder={isBahanBakuMode ? 'Contoh: Bawang merah basah super lereng Merapi Boyolali' : 'Contoh: Pouch matte ziplock tebal 100 micron'}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs focus:bg-white focus:border-amber-500 focus:outline-none resize-none"
             />
           </div>
-        </form>
 
-        <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-2.5">
-          <button
-            type="button"
-            onClick={handleClose}
-            className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition"
-          >
-            Batal
-          </button>
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={isSaving}
-            className="px-5 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-sm transition disabled:opacity-50"
-          >
-            {isSaving ? 'Menyimpan...' : activeItem ? 'Simpan Perubahan' : 'Tambahkan Bahan'}
-          </button>
-        </div>
+          <div className="pt-2">
+            <button
+              type="submit"
+              disabled={isSaving}
+              className="w-full py-3 rounded-xl bg-[#0F172A] hover:bg-slate-900 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-slate-950/10 cursor-pointer disabled:opacity-50 transition"
+            >
+              {isSaving ? 'Menyimpan...' : (activeItem ? 'Simpan Perubahan' : (isBahanBakuMode ? 'Tambah Bahan Baku Mentah' : 'Tambah Kemasan & Packaging'))}
+            </button>
+          </div>
+        </form>
       </SheetContent>
     </Sheet>
   )

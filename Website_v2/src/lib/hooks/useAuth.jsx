@@ -16,29 +16,30 @@ export const MOCK_BYPASS_ACCOUNTS = {
   owner: {
     user: {
       id: '00000000-0000-0000-0000-000000000002',
-      email: 'owner@sembako.id',
+      email: 'owner@juragans.id',
       app_metadata: { provider: 'email' },
-      user_metadata: { full_name: 'Pemilik Toko (Template)' }
+      user_metadata: { full_name: 'Juragan Bawang (Owner)' }
     },
     profile: {
       id: '00000000-0000-0000-0000-000000000020',
       auth_user_id: '00000000-0000-0000-0000-000000000002',
       tenant_id: '00000000-0000-0000-0000-000000000002',
-      full_name: 'Pemilik Toko (Template)',
-      email: 'owner@sembako.id',
+      full_name: 'Juragan Bawang (Owner)',
+      email: 'owner@juragans.id',
       role: 'owner',
       app_role: 'owner',
       user_type: 'broker',
       sub_type: 'distributor_sembako',
-      business_name: 'Distributor Sembako Template',
+      business_name: 'Juragans by Anak Bawang',
       onboarded: true,
       business_model_selected: true,
       tenants: {
         id: '00000000-0000-0000-0000-000000000002',
-        business_name: 'Distributor Sembako Template',
+        business_name: 'Juragans by Anak Bawang',
         business_vertical: 'distributor_sembako',
         user_type: 'broker',
         sub_type: 'distributor_sembako',
+        city: 'Boyolali',
         plan: 'pro'
       }
     }
@@ -46,29 +47,30 @@ export const MOCK_BYPASS_ACCOUNTS = {
   dev: {
     user: {
       id: '00000000-0000-0000-0000-000000000001',
-      email: 'dev@sembako.id',
+      email: 'dev@juragans.id',
       app_metadata: { is_superadmin: true, provider: 'email' },
-      user_metadata: { full_name: 'Developer Superadmin (Template)' }
+      user_metadata: { full_name: 'Developer Superadmin (Juragan)' }
     },
     profile: {
       id: '00000000-0000-0000-0000-000000000010',
       auth_user_id: '00000000-0000-0000-0000-000000000001',
       tenant_id: '00000000-0000-0000-0000-000000000002',
-      full_name: 'Developer Superadmin (Template)',
-      email: 'dev@sembako.id',
+      full_name: 'Developer Superadmin (Juragan)',
+      email: 'dev@juragans.id',
       role: 'dev',
       app_role: 'dev',
       user_type: 'broker',
       sub_type: 'distributor_sembako',
-      business_name: 'Distributor Sembako Template',
+      business_name: 'Juragans by Anak Bawang',
       onboarded: true,
       business_model_selected: true,
       tenants: {
         id: '00000000-0000-0000-0000-000000000002',
-        business_name: 'Distributor Sembako Template',
+        business_name: 'Juragans by Anak Bawang',
         business_vertical: 'distributor_sembako',
         user_type: 'broker',
         sub_type: 'distributor_sembako',
+        city: 'Boyolali',
         plan: 'pro'
       }
     }
@@ -76,29 +78,30 @@ export const MOCK_BYPASS_ACCOUNTS = {
   admin: {
     user: {
       id: '00000000-0000-0000-0000-000000000003',
-      email: 'admin@sembako.id',
+      email: 'admin@juragans.id',
       app_metadata: { provider: 'email' },
-      user_metadata: { full_name: 'Kasir / Admin (Template)' }
+      user_metadata: { full_name: 'Kasir / Staf Toko (Juragan)' }
     },
     profile: {
       id: '00000000-0000-0000-0000-000000000030',
       auth_user_id: '00000000-0000-0000-0000-000000000003',
       tenant_id: '00000000-0000-0000-0000-000000000002',
-      full_name: 'Kasir / Admin (Template)',
-      email: 'admin@sembako.id',
+      full_name: 'Kasir / Staf Toko (Juragan)',
+      email: 'admin@juragans.id',
       role: 'admin',
       app_role: 'admin',
       user_type: 'broker',
       sub_type: 'distributor_sembako',
-      business_name: 'Distributor Sembako Template',
+      business_name: 'Juragans by Anak Bawang',
       onboarded: true,
       business_model_selected: true,
       tenants: {
         id: '00000000-0000-0000-0000-000000000002',
-        business_name: 'Distributor Sembako Template',
+        business_name: 'Juragans by Anak Bawang',
         business_vertical: 'distributor_sembako',
         user_type: 'broker',
         sub_type: 'distributor_sembako',
+        city: 'Boyolali',
         plan: 'pro'
       }
     }

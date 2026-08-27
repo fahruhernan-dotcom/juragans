@@ -69,7 +69,7 @@ export function usePurgeAuditLogsBeforeDate() {
             .from('sembako_audit_logs')
             .delete()
             .eq('tenant_id', tenantId)
-            .lte('timestamp', timestamp)
+            .lte('created_at', timestamp)
           if (error) throw error
         } catch (err) {
           console.warn('[usePurgeAuditLogsBeforeDate] Supabase delete failed:', err)
@@ -151,7 +151,16 @@ export async function recordAuditLog({ action_type, product_name, old_value, new
   // 2. Direct insert to Supabase if online
   if (navigator.onLine && logEntry.tenant_id) {
     try {
-      await supabase.from('sembako_audit_logs').insert(logEntry)
+      const dbPayload = {
+        tenant_id: logEntry.tenant_id,
+        user_name: logEntry.user_name || 'Sistem',
+        role: logEntry.user_role || 'admin',
+        action_type: logEntry.action_type || 'AUDIT',
+        product_name: logEntry.product_name || '-',
+        notes: logEntry.notes || (logEntry.old_value !== '-' || logEntry.new_value !== '-' ? `${logEntry.old_value} -> ${logEntry.new_value}` : ''),
+        created_at: logEntry.timestamp || new Date().toISOString(),
+      }
+      await supabase.from('sembako_audit_logs').insert(dbPayload)
     } catch (err) {
       console.warn('[recordAuditLog] Direct insert to supabase failed, queuing:', err)
       try {
@@ -207,13 +216,18 @@ export function useSembakoAuditLogs() {
             .from('sembako_audit_logs')
             .select('*')
             .eq('tenant_id', tenantId)
-            .order('timestamp', { ascending: false })
+            .order('created_at', { ascending: false })
             .limit(200)
 
           if (!dbErr && dbLogs && dbLogs.length > 0) {
-            dbLogs.forEach(l => logMap.set(l.id, l))
+            const mappedLogs = dbLogs.map(l => ({
+              ...l,
+              timestamp: l.created_at || l.timestamp || new Date().toISOString(),
+              user_role: l.role || l.user_role || 'staff',
+            }))
+            mappedLogs.forEach(l => logMap.set(l.id, l))
             // Background save to local Dexie for offline speed
-            db.audit_logs.bulkPut(dbLogs).catch(() => {})
+            db.audit_logs.bulkPut(mappedLogs).catch(() => {})
           }
         } catch (err) {
           console.warn('[useSembakoAuditLogs] Supabase query failed:', err)

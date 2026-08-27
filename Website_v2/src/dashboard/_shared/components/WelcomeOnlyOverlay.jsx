@@ -47,8 +47,8 @@ export default function WelcomeOnlyOverlay({ accent, accentDim }) {
   if (!visible) return null
   if (!profile?.role || profile.role === 'owner') return null
 
-  const info = ROLE_INFO[profile.role] || { label: profile.role, desc: 'Selamat datang di TernakOS. Hubungi owner jika butuh bantuan.' }
-  const businessName = tenant?.business_name || 'bisnis ini'
+  const info = ROLE_INFO[profile.role] || { label: profile.role, desc: 'Selamat datang di Juragans. Hubungi owner jika butuh bantuan.' }
+  const businessName = tenant?.business_name || 'Juragans'
 
   const dismiss = () => {
     try { localStorage.setItem(storageKey, 'done') } catch { /* ok */ }

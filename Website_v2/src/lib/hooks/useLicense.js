@@ -57,12 +57,19 @@ export function useLicense() {
     try {
       const { data, error } = await supabase
         .from('sembako_audit_logs')
-        .select('id, user_name, user_role, action_type, notes, timestamp')
+        .select('id, user_name, role, action_type, notes, created_at')
         .eq('tenant_id', tenantId)
         .eq('action_type', 'license_update')
-        .order('timestamp', { ascending: false })
+        .order('created_at', { ascending: false })
         .limit(20)
-      if (!error && data) setHistory(data)
+      if (!error && data) {
+        const mapped = data.map(d => ({
+          ...d,
+          user_role: d.role,
+          timestamp: d.created_at
+        }))
+        setHistory(mapped)
+      }
     } catch { /* ignore */ }
     finally { setHistoryLoading(false) }
   }, [tenantId])
@@ -134,11 +141,10 @@ export function useLicense() {
       }
 
       await supabase.from('sembako_audit_logs').insert({
-        id: `audit-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         tenant_id: tenantId,
-        timestamp: new Date().toISOString(),
+        created_at: new Date().toISOString(),
         user_name: profile?.full_name || profile?.name || 'Developer',
-        user_role: profile?.role || 'dev',
+        role: profile?.role || 'dev',
         action_type: 'license_update',
         notes: actionLabels[pendingAction] || 'Perbarui Lisensi'
       })

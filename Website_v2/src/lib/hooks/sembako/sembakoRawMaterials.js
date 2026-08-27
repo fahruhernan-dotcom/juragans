@@ -140,3 +140,70 @@ export const useDeleteSembakoRawMaterial = () => {
     onError: (err) => toast.error(normalizeSupabaseError(err).message),
   })
 }
+
+export const useRestockSembakoRawMaterial = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      id,
+      material_name,
+      prevStock = 0,
+      prevUnitCost = 0,
+      prevTotalSpent = 0,
+      addQty = 0,
+      buyPricePerUnit = 0,
+      batchTotalSpent = 0,
+      supplier_name,
+      notes
+    }) => {
+      const nAddQty = Number(addQty) || 0
+      const nPrevStock = Number(prevStock) || 0
+      const nPrevUnitCost = Number(prevUnitCost) || 0
+      const nBuyPrice = Number(buyPricePerUnit) || 0
+      const nBatchSpent = Number(batchTotalSpent) > 0 ? Number(batchTotalSpent) : (nAddQty * nBuyPrice)
+
+      const newStock = nPrevStock + nAddQty
+      // Weighted average calculation for new HPP
+      const totalInventoryValue = (nPrevStock * nPrevUnitCost) + nBatchSpent
+      const newUnitCost = newStock > 0 ? Math.round(totalInventoryValue / newStock) : (nBuyPrice || nPrevUnitCost)
+      const newTotalSpent = (Number(prevTotalSpent) || 0) + nBatchSpent
+
+      const updatePayload = {
+        current_stock: newStock,
+        unit_cost: newUnitCost,
+        total_spent: newTotalSpent,
+      }
+
+      if (supplier_name && supplier_name.trim()) {
+        updatePayload.supplier_name = supplier_name.trim()
+      }
+      if (notes && notes.trim()) {
+        updatePayload.notes = notes.trim()
+      }
+
+      const cleanUpdates = sanitizeDBPayload(updatePayload, 'sembako_raw_materials')
+      const { data, error } = await supabase
+        .from('sembako_raw_materials')
+        .update(cleanUpdates)
+        .eq('id', id)
+        .select()
+        .single()
+
+      if (error) {
+        logSupabaseError(error, {
+          table: 'sembako_raw_materials',
+          operation: 'update',
+          component: 'useSembakoRawMaterials',
+          actionName: 'raw_material.restock'
+        })
+        throw error
+      }
+      return data || { material_name, addQty: nAddQty, newStock, newUnitCost }
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['sembako-raw-materials'] })
+      toast.success(`Stok ${data?.material_name || 'bahan'} berhasil ditambah!`)
+    },
+    onError: (err) => toast.error(normalizeSupabaseError(err).message),
+  })
+}

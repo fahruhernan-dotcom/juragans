@@ -1,6 +1,6 @@
 /**
- * Konfigurasi per-role untuk halaman Tim & Manajemen.
- * Virgin Dashboard ERP (Universal Retail, Grosir & Distributor)
+ * timConfigs.js
+ * Role definition and permission configuration for Juragans Dashboard
  */
 
 export const BROKER_SEMBAKO_TIM_CONFIG = {

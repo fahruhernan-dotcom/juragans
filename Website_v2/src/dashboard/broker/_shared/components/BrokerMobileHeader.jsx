@@ -30,8 +30,8 @@ export function BrokerMobileHeader({
   const [isRefreshing, setIsRefreshing] = useState(false)
   const queryClient = useQueryClient()
 
-  const initial = profile?.full_name ? profile.full_name.charAt(0).toUpperCase() : 'B'
-  const firstName = profile?.full_name?.split(' ')[0] ?? 'Broker'
+  const initial = profile?.full_name ? profile.full_name.charAt(0).toUpperCase() : 'J'
+  const firstName = profile?.full_name?.split(' ')[0] ?? 'Juragan'
   const color = accentColor || '#3B82F6'
 
   const handleProfileClick = () => {

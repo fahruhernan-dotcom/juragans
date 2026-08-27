@@ -454,8 +454,8 @@ const id = {
   // Onboarding Business Models
   biz_model_poultry_broker_label: 'Broker Ayam',
   biz_model_poultry_broker_desc: 'Beli dari kandang, jual ke RPA. Kelola margin, piutang & pengiriman.',
-  biz_model_distributor_sembako_label: 'Distributor Sembako',
-  biz_model_distributor_sembako_desc: 'Distribusi sembako ke toko-toko. Kelola stok, invoice, piutang & gaji pegawai.',
+  biz_model_distributor_sembako_label: 'Juragans Bawang Goreng',
+  biz_model_distributor_sembako_desc: 'Distribusi bawang goreng premium ke toko/resto. Kelola stok, invoice, piutang & operasional.',
   biz_model_egg_broker_label: 'Broker Telur',
   biz_model_egg_broker_desc: 'Beli telur dari peternak, jual ke agen/pasar. Kelola stok tray.',
   biz_model_peternak_label: 'Peternak Broiler',
@@ -572,7 +572,7 @@ const id = {
   role_peternak_display: 'Peternak',
   role_rpa_display: 'Rumah Potong Ayam',
   role_egg_broker_display: 'Broker Telur',
-  role_sembako_broker_display: 'Distributor Sembako',
+  role_sembako_broker_display: 'Juragans Bawang Goreng',
 
   feat_broker_pro_unlimited: 'Transaksi tidak terbatas (vs {{STARTER_QUOTA}}/bln)',
   feat_broker_pro_fleet: 'Armada hingga 5 kendaraan & sopir',

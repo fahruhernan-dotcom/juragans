@@ -30,7 +30,7 @@ export function SembakoInvoicePaper({ data, mode = 'invoice' }) {
   if (!data) return null
 
   const isDelivery = mode === 'delivery'
-  const companyName = data.tenant?.business_name || 'Gudang Sembako GPK'
+  const companyName = data.tenant?.business_name || 'Gudang Juragans'
   const companyPhone = data.tenant?.phone || '-'
   const customerName = data.customerName || data.customer_name || 'Pelanggan Umum'
   const customerType = data.customerType || data.customer_type || 'warung'
@@ -94,7 +94,7 @@ export function SembakoInvoicePaper({ data, mode = 'invoice' }) {
               <Phone size={12} className="text-slate-400" /> {companyPhone}
             </p>
             <p className="text-[11px] text-slate-400 font-medium">
-              Distributor Sembako & Platform Manajemen Bisnis GPK
+              Platform Penjualan & Manajemen Bisnis Juragans
             </p>
           </div>
         </div>
@@ -423,7 +423,7 @@ export function SembakoInvoicePaper({ data, mode = 'invoice' }) {
 export function SembakoThermalReceipt({ data }) {
   if (!data) return null
 
-  const companyName = data.tenant?.business_name || 'Gudang Sembako GPK'
+  const companyName = data.tenant?.business_name || 'Gudang Juragans'
   const companyPhone = data.tenant?.phone || '-'
   const companyAddress = data.tenant?.location || ''
   const customerName = data.customerName || data.customer_name || 'Pelanggan Umum'
@@ -551,7 +551,7 @@ export function SembakoThermalReceipt({ data }) {
       <div className="pt-3 text-center text-[9px] text-slate-500 space-y-0.5">
         <p className="font-bold text-slate-700">TERIMA KASIH ATAS KUNJUNGAN ANDA</p>
         <p>Barang yang sudah dibeli tidak dapat ditukar kecuali perjanjian</p>
-        <p className="text-[8px] text-slate-400 pt-1">Dicetak melalui TernakOS GPK</p>
+        <p className="text-[8px] text-slate-400 pt-1">Dicetak melalui Juragans Dashboard</p>
       </div>
 
     </div>
@@ -621,7 +621,7 @@ export default function SembakoInvoicePreview({ data, mode = 'invoice', onClose 
 
       const doc = (
         <SembakoInvoice
-          tenant={data.tenant || { business_name: 'GPK', phone: '-' }}
+          tenant={data.tenant || { business_name: 'Juragans', phone: '-' }}
           invoice={{
             invoice_number: invNo,
             transaction_date: data.transactionDate || data.transaction_date || new Date().toISOString(),
@@ -644,7 +644,7 @@ export default function SembakoInvoicePreview({ data, mode = 'invoice', onClose 
           items={normalizedItems}
           payments={payments}
           invoiceNumber={invNo}
-          generatedBy={data.generatedBy || 'Admin GPK'}
+          generatedBy={data.generatedBy || 'Admin Juragans'}
           showProfit={data.showProfit ?? false}
         />
       )

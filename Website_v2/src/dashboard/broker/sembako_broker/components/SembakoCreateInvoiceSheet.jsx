@@ -11,7 +11,7 @@ import {
   useSembakoProducts, useSembakoCustomers, useSembakoSales, useSembakoEmployees, useSembakoDeliveries,
   useCreateSembakoProduct, useUpdateSembakoProduct, useCreateSembakoSale, useCreateSembakoDelivery,
   useRecordSembakoPayment, useUpdateSembakoSale, useCreateSembakoCustomer, useCreateSembakoEmployee,
-  useSembakoAllBatches,
+  useSembakoAllBatches, useSembakoRawMaterials,
 } from '@/lib/hooks/useSembakoData'
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery'
 import { useBackHandler } from '@/lib/hooks/useBackHandler'
@@ -218,16 +218,16 @@ function QuickAddProduct({ form, onChange, onSave, onCancel, saving }) {
       <div className="space-y-2.5">
         <div>
           <label className={labelCn}>Nama Produk *</label>
-          <input className={inputCn} value={form.product_name} onChange={e => onChange({ ...form, product_name: e.target.value })} placeholder="Beras Maknyus 5Kg" />
+          <input className={inputCn} value={form.product_name} onChange={e => onChange({ ...form, product_name: e.target.value })} placeholder="Bawang Goreng Original 250g" />
         </div>
         <div className="grid grid-cols-2 gap-2">
           <div>
             <label className={labelCn}>Kategori</label>
-            <input className={inputCn} value={form.category} onChange={e => onChange({ ...form, category: e.target.value })} placeholder="beras / minyak..." />
+            <input className={inputCn} value={form.category} onChange={e => onChange({ ...form, category: e.target.value })} placeholder="bawang goreng / toples..." />
           </div>
           <div>
             <label className={labelCn}>Satuan</label>
-            <input className={inputCn} value={form.unit} onChange={e => onChange({ ...form, unit: e.target.value })} placeholder="kg/pcs/sak" />
+            <input className={inputCn} value={form.unit} onChange={e => onChange({ ...form, unit: e.target.value })} placeholder="pcs/pouch/karton" />
           </div>
         </div>
         <div>
@@ -716,6 +716,7 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
   const createDelivery = useCreateSembakoDelivery()
   const recordPayment  = useRecordSembakoPayment()
   const createEmployee = useCreateSembakoEmployee()
+  const { data: rawMaterialsList = [] } = useSembakoRawMaterials()
 
   function getSavedInvoiceDraft() {
     try {
@@ -753,6 +754,28 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
   const [payAmount, setPayAmount] = useState(() => getSavedInvoiceDraft()?.payAmount ?? 0)
   const [payMethod, setPayMethod] = useState(() => getSavedInvoiceDraft()?.payMethod ?? 'cash')
   const [notes, setNotes]         = useState(() => getSavedInvoiceDraft()?.notes ?? '')
+
+  // ── Packaging & Polymailer Calculation ──────────────────────────────────────
+  const [packingType, setPackingType] = useState(() => getSavedInvoiceDraft()?.packingType ?? 'polymailer_hitam')
+  const [customPackingQty, setCustomPackingQty] = useState(() => getSavedInvoiceDraft()?.customPackingQty ?? '')
+
+  const totalPouchesCount = useMemo(() => {
+    return items.reduce((sum, item) => {
+      const qty = Number(item.quantity) || 0
+      if (!item.product_id || qty <= 0) return sum
+      return sum + qty
+    }, 0)
+  }, [items])
+
+  const autoPolymailerQty = useMemo(() => {
+    return totalPouchesCount > 0 ? Math.ceil(totalPouchesCount / 4) : 0
+  }, [totalPouchesCount])
+
+  const effectivePackingQty = useMemo(() => {
+    if (packingType === 'none') return 0
+    if (customPackingQty !== '') return Math.max(0, Number(customPackingQty) || 0)
+    return autoPolymailerQty
+  }, [packingType, customPackingQty, autoPolymailerQty])
 
   const [showCustSearch, setShowCustSearch] = useState(false)
   const [quickAddCust, setQuickAddCust]     = useState(false)
@@ -1187,6 +1210,11 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
         customer_id: custId || null, customer_name: custName,
         transaction_date: txnDate, due_date: dueDate || null,
         items: validItems, delivery_cost: deliveryCost, other_cost: otherCost, notes: finalNotes,
+        packing_details: {
+          packing_type: packingType,
+          material_name: packingType === 'kardus' ? 'Kardus & Safety' : 'Plastik Packing Polymailer Hitam',
+          quantity: effectivePackingQty,
+        }
       })
 
       if (payAmount > 0 && sale?.id) {
@@ -2076,6 +2104,87 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
                         </motion.div>
                       )}
                     </AnimatePresence>
+
+                    {/* ── KEMASAN & PACKING EKSPEDISI (BOM & AUTO POLYMAILER) ── */}
+                    <div className="rounded-2xl p-4 space-y-3 bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-500/20">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">📦</span>
+                          <div>
+                            <p className="text-xs font-black text-slate-900 dark:text-white">
+                              Kemasan & Packing Ekspedisi
+                            </p>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                              Otomatis 1 Polymailer per 1–4 pouch (Total: <strong>{totalPouchesCount} pouch</strong>)
+                            </p>
+                          </div>
+                        </div>
+                        <span className="px-2.5 py-1 rounded-xl text-xs font-black bg-amber-500 text-slate-950 shadow-sm">
+                          {effectivePackingQty} pcs Packing
+                        </span>
+                      </div>
+
+                      {/* Option chips */}
+                      <div className="grid grid-cols-3 gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => { setPackingType('polymailer_hitam'); setCustomPackingQty(''); }}
+                          className={`p-2.5 rounded-xl border text-left text-xs font-bold transition-all cursor-pointer ${
+                            packingType === 'polymailer_hitam' && customPackingQty === ''
+                              ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white shadow-sm'
+                              : 'bg-white dark:bg-white/5 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-white/10 hover:border-amber-500/40'
+                          }`}
+                        >
+                          <p className="text-[11px] font-black">Polymailer Hitam</p>
+                          <p className="text-[10px] opacity-75 mt-0.5">Auto ({autoPolymailerQty} pcs)</p>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => { setPackingType('kardus'); setCustomPackingQty(''); }}
+                          className={`p-2.5 rounded-xl border text-left text-xs font-bold transition-all cursor-pointer ${
+                            packingType === 'kardus'
+                              ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white shadow-sm'
+                              : 'bg-white dark:bg-white/5 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-white/10 hover:border-amber-500/40'
+                          }`}
+                        >
+                          <p className="text-[11px] font-black">Kardus Box</p>
+                          <p className="text-[10px] opacity-75 mt-0.5">Packing Tebal</p>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => { setPackingType('none'); setCustomPackingQty('0'); }}
+                          className={`p-2.5 rounded-xl border text-left text-xs font-bold transition-all cursor-pointer ${
+                            packingType === 'none'
+                              ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white shadow-sm'
+                              : 'bg-white dark:bg-white/5 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-white/10 hover:border-amber-500/40'
+                          }`}
+                        >
+                          <p className="text-[11px] font-black">Tanpa Kemasan</p>
+                          <p className="text-[10px] opacity-75 mt-0.5">Ambil Langsung</p>
+                        </button>
+                      </div>
+
+                      {/* Custom quantity input if needed */}
+                      {packingType !== 'none' && (
+                        <div className="flex items-center justify-between pt-1 text-xs">
+                          <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                            Jumlah Plastik / Kardus Digunakan:
+                          </span>
+                          <div className="flex items-center gap-1.5 w-28">
+                            <input
+                              type="number"
+                              min="0"
+                              value={customPackingQty !== '' ? customPackingQty : autoPolymailerQty}
+                              onChange={e => setCustomPackingQty(e.target.value)}
+                              className="w-full text-center h-8 rounded-lg bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 text-xs font-black text-slate-900 dark:text-white"
+                            />
+                            <span className="text-[11px] font-bold text-slate-500">pcs</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </>
                 )}
 
@@ -2107,7 +2216,13 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
                         value={selectedCust?.customer_name || <span className="text-red-500 font-bold">⚠️ Belum Dipilih</span>}
                         bold
                       />
-                      <SummaryLine label="Jumlah Item" value={`${items.filter(i => i.product_id).length} Item`} />
+                      <SummaryLine label="Jumlah Item" value={`${items.filter(i => i.product_id).length} Item (${totalPouchesCount} pouch)`} />
+                      {effectivePackingQty > 0 && (
+                        <SummaryLine
+                          label="Kemasan Packing"
+                          value={`${effectivePackingQty} pcs ${packingType === 'kardus' ? 'Kardus Box' : 'Plastik Polymailer Hitam'}`}
+                        />
+                      )}
                       <div className="h-px my-1" style={{ background: BORDER }} />
                       <SummaryLine label="Total Barang" value={formatIDR(totalAmount)} bold />
                       <SummaryLine label="Estimasi HPP" value={formatIDR(totalCogs)} />

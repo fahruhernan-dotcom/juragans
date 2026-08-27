@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react'
 import {
   Plus, Search, X, ChevronDown, ToggleLeft, ToggleRight, Trash2, Package,
   FileSpreadsheet, AlertTriangle, Layers, Tag, Calculator, Boxes, Sparkles,
-  Edit3, RefreshCw, Layers2, ShieldAlert
+  Edit3, RefreshCw, Layers2, ShieldAlert, PackagePlus, History
 } from 'lucide-react'
 import ImportCsvModal from '@/components/ui/ImportCsvModal'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -26,11 +26,13 @@ import {
   useDeleteSembakoRawMaterial,
 } from '@/lib/hooks/useSembakoData'
 import SembakoBahanBakuSheet from './components/SembakoBahanBakuSheet'
+import { SembakoRestockBahanModal } from './components/SembakoRestockBahanModal'
+import { SembakoBahanBeliHistoryModal } from './components/SembakoBahanBeliHistoryModal'
 import { formatIDR } from '@/lib/format'
 import { useOutletContext, useLocation, useNavigate } from 'react-router-dom'
 import { C } from '@/dashboard/broker/sembako_broker/components/sembakoSaleUtils'
 import { BrokerMobileHeader } from '@/dashboard/broker/_shared/components/BrokerMobileHeader'
-import { SembakoErrorState } from '@/dashboard/broker/sembako_broker/components/SembakoUiPrimitives'
+import { SembakoErrorState, SembakoEmptyState } from '@/dashboard/broker/sembako_broker/components/SembakoUiPrimitives'
 import { SembakoPageHeader } from '@/dashboard/broker/sembako_broker/components/SembakoPageHeader'
 import { SembakoSummaryStrip } from '@/dashboard/broker/sembako_broker/components/SembakoSummaryStrip'
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery'
@@ -41,53 +43,250 @@ import { useBackHandler } from '@/lib/hooks/useBackHandler'
 const TEXT_SEC = '#94A3B8'
 
 const CATEGORIES = [
-  'Beras & Biji-bijian',
-  'Minyak Goreng & Margarin',
-  'Gula, Garam & Pemanis',
-  'Tepung & Gandum',
-  'Telur & Susu',
-  'Bumbu & Rempah Dapur',
-  'Mie Instan & Bihun',
-  'Minuman, Teh & Kopi',
-  'Makanan Ringan (Snack)',
-  'Sabun, Cuci & Kebersihan',
-  'Kemasan, Plastik & Perlengkapan',
-  'Rokok & Tembakau',
+  'Grade S Murni',
+  'Grade A Crispy',
+  'Paket Bundling & Combo',
+  'Bawang Curah / Bal',
+  'Kemasan & Packaging',
+  'Bahan Baku Mentah',
   'Lain-lain',
+]
+
+const BAWANG_GORENG_TEMPLATES = [
+  // ── GRADE S MURNI (100% Bawang Asli - 0% Tepung) ──
+  {
+    grade: 'Grade S Murni',
+    gradeLabel: '🧅 Grade S Murni (100% Asli)',
+    name: '[HERO] Murni Pouch 250g',
+    category: 'Grade S Murni',
+    unit: 'pcs',
+    secondary_unit: 'karton',
+    conversion_rate: 20,
+    sku: 'JBM-250',
+    sell_price: 40000,
+    avg_buy_price: 34700,
+    harga_solo_rp: 40000,
+    harga_luar_kota_rp: 43500,
+    harga_grosir_rp: 39500,
+    min_stock_alert: 10,
+    notes: '100% Bawang Asli Boyolali Murni, Pouch Ziplock 250g (1 Karton = 20 Pouch)',
+  },
+  {
+    grade: 'Grade S Murni',
+    gradeLabel: '🧅 Grade S Murni (100% Asli)',
+    name: 'Murni Pouch 200g',
+    category: 'Grade S Murni',
+    unit: 'pcs',
+    secondary_unit: 'karton',
+    conversion_rate: 20,
+    sku: 'JBM-200',
+    sell_price: 34500,
+    avg_buy_price: 28200,
+    harga_solo_rp: 34500,
+    harga_luar_kota_rp: 37500,
+    harga_grosir_rp: 32000,
+    min_stock_alert: 10,
+    notes: '100% Bawang Asli Boyolali Murni, Pouch Ziplock 200g (1 Karton = 20 Pouch)',
+  },
+  {
+    grade: 'Grade S Murni',
+    gradeLabel: '🧅 Grade S Murni (100% Asli)',
+    name: 'Murni Pouch 150g',
+    category: 'Grade S Murni',
+    unit: 'pcs',
+    secondary_unit: 'karton',
+    conversion_rate: 20,
+    sku: 'JBM-150',
+    sell_price: 26000,
+    avg_buy_price: 21700,
+    harga_solo_rp: 26000,
+    harga_luar_kota_rp: 26500,
+    harga_grosir_rp: 25000,
+    min_stock_alert: 10,
+    notes: '100% Bawang Asli Boyolali Murni, Pouch Ziplock 150g (1 Karton = 20 Pouch)',
+  },
+  {
+    grade: 'Grade S Murni',
+    gradeLabel: '🧅 Grade S Murni (100% Asli)',
+    name: 'Trial Pack Murni 100g',
+    category: 'Grade S Murni',
+    unit: 'pcs',
+    secondary_unit: 'karton',
+    conversion_rate: 40,
+    sku: 'JBM-100-TRIAL',
+    sell_price: 21600,
+    avg_buy_price: 15400,
+    harga_solo_rp: 21600,
+    harga_luar_kota_rp: 23500,
+    harga_grosir_rp: 18000,
+    min_stock_alert: 15,
+    notes: 'Trial Pack Tester 100g Murni (1 Karton = 40 Pouch)',
+  },
+  {
+    grade: 'Grade S Murni',
+    gradeLabel: '🧅 Grade S Murni (100% Asli)',
+    name: 'Murni Bal PE 1 Kg',
+    category: 'Grade S Murni',
+    unit: 'kg',
+    secondary_unit: 'bal',
+    conversion_rate: 10,
+    sku: 'JBM-1K',
+    sell_price: 152000,
+    avg_buy_price: 127200,
+    harga_solo_rp: 152000,
+    harga_luar_kota_rp: 165500,
+    harga_grosir_rp: 135000,
+    min_stock_alert: 5,
+    notes: 'Kemasan Bal PE Grosir 1 Kg Murni (1 Bal = 10 Kg)',
+  },
+  {
+    grade: 'Grade S Murni',
+    gradeLabel: '🧅 Grade S Murni (100% Asli)',
+    name: 'Bawang Murni 2 kg Bal HORECA',
+    category: 'Grade S Murni',
+    unit: 'kg',
+    secondary_unit: 'bal',
+    conversion_rate: 10,
+    sku: 'JBM-HORECA-2KG',
+    sell_price: 304000,
+    avg_buy_price: 247200,
+    harga_solo_rp: 304000,
+    harga_luar_kota_rp: 331000,
+    harga_grosir_rp: 270000,
+    min_stock_alert: 5,
+    notes: 'Suplai Restoran & Kuliner Bal PE 2 kg (1 Bal = 10 Kg)',
+  },
+
+  // ── GRADE A CRISPY (~5% Tepung Renyah) ──
+  {
+    grade: 'Grade A Crispy',
+    gradeLabel: '🧄 Grade A Crispy (Extra Renyah)',
+    name: '[HERO] Grade A Pouch 250g',
+    category: 'Grade A Crispy',
+    unit: 'pcs',
+    secondary_unit: 'karton',
+    conversion_rate: 20,
+    sku: 'JBA-250',
+    sell_price: 35000,
+    avg_buy_price: 30950,
+    harga_solo_rp: 35000,
+    harga_luar_kota_rp: 37500,
+    harga_grosir_rp: 32500,
+    min_stock_alert: 10,
+    notes: 'Grade A Crispy Renyah Mantap 250g (1 Karton = 20 Pouch)',
+  },
+  {
+    grade: 'Grade A Crispy',
+    gradeLabel: '🧄 Grade A Crispy (Extra Renyah)',
+    name: 'Grade A Pouch 200g',
+    category: 'Grade A Crispy',
+    unit: 'pcs',
+    secondary_unit: 'karton',
+    conversion_rate: 20,
+    sku: 'JBA-200',
+    sell_price: 31000,
+    avg_buy_price: 25100,
+    harga_solo_rp: 31000,
+    harga_luar_kota_rp: 31500,
+    harga_grosir_rp: 26000,
+    min_stock_alert: 10,
+    notes: 'Grade A Crispy Renyah Mantap 200g (1 Karton = 20 Pouch)',
+  },
+  {
+    grade: 'Grade A Crispy',
+    gradeLabel: '🧄 Grade A Crispy (Extra Renyah)',
+    name: 'Grade A Pouch 150g',
+    category: 'Grade A Crispy',
+    unit: 'pcs',
+    secondary_unit: 'karton',
+    conversion_rate: 20,
+    sku: 'JBA-150',
+    sell_price: 25000,
+    avg_buy_price: 19450,
+    harga_solo_rp: 25000,
+    harga_luar_kota_rp: 26500,
+    harga_grosir_rp: 21000,
+    min_stock_alert: 10,
+    notes: 'Grade A Crispy Renyah Mantap 150g (1 Karton = 20 Pouch)',
+  },
+  {
+    grade: 'Grade A Crispy',
+    gradeLabel: '🧄 Grade A Crispy (Extra Renyah)',
+    name: 'Trial Pack Grade A 100g',
+    category: 'Grade A Crispy',
+    unit: 'pcs',
+    secondary_unit: 'karton',
+    conversion_rate: 40,
+    sku: 'JBA-100-TRIAL',
+    sell_price: 18900,
+    avg_buy_price: 13900,
+    harga_solo_rp: 18900,
+    harga_luar_kota_rp: 20500,
+    harga_grosir_rp: 15000,
+    min_stock_alert: 15,
+    notes: 'Trial Pack Tester 100g Grade A (1 Karton = 40 Pouch)',
+  },
+  {
+    grade: 'Grade A Crispy',
+    gradeLabel: '🧄 Grade A Crispy (Extra Renyah)',
+    name: 'Grade A Bal PE 1 Kg',
+    category: 'Grade A Crispy',
+    unit: 'kg',
+    secondary_unit: 'bal',
+    conversion_rate: 10,
+    sku: 'JBA-1K',
+    sell_price: 125000,
+    avg_buy_price: 112200,
+    harga_solo_rp: 125000,
+    harga_luar_kota_rp: 135500,
+    harga_grosir_rp: 116000,
+    min_stock_alert: 5,
+    notes: 'Kemasan Bal PE Grosir 1 Kg Grade A (1 Bal = 10 Kg)',
+  },
+  {
+    grade: 'Grade A Crispy',
+    gradeLabel: '🧄 Grade A Crispy (Extra Renyah)',
+    name: 'Bawang Grade A 2 kg Bal HORECA',
+    category: 'Grade A Crispy',
+    unit: 'kg',
+    secondary_unit: 'bal',
+    conversion_rate: 10,
+    sku: 'JBA-HORECA-2KG',
+    sell_price: 250000,
+    avg_buy_price: 217200,
+    harga_solo_rp: 250000,
+    harga_luar_kota_rp: 271000,
+    harga_grosir_rp: 232000,
+    min_stock_alert: 5,
+    notes: 'Suplai Restoran & Kuliner Bal PE 2 kg Grade A (1 Bal = 10 Kg)',
+  },
 ]
 
 const UNITS = [
   'pcs',
-  'dus',
+  'pouch',
+  'toples',
   'karton',
+  'dus',
   'bal',
-  'sak',
-  'karung',
   'kg',
-  'liter',
   'pack',
   'bungkus',
   'renceng',
   'lusin',
-  'ikat',
-  'kaleng',
-  'botol',
-  'slop',
-  'pres',
+  'gram',
 ]
 
 const DEFAULT_CONVERSIONS = {
-  'sak': 50,
-  'karung': 50,
-  'karton': 40,
+  'karton': 20,
   'dus': 20,
   'bal': 20,
-  'bal besar': 20,
-  'bal kecil': 10,
-  'pres': 10,
   'pack': 10,
+  'pres': 10,
   'renceng': 12,
   'lusin': 12,
+  'sak': 50,
+  'karung': 50,
 }
 
 const fmt = (n) => new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(Math.round(Number(n) || 0))
@@ -133,10 +332,11 @@ function ProductSheet({ product, onClose, onDelete }) {
   const isEdit = !!product?.id
   const createMut = useCreateSembakoProduct()
   const updateMut = useUpdateSembakoProduct()
+  const { data: rawMaterials = [] } = useSembakoRawMaterials()
 
   const [form, setForm] = useState({
     product_name: product?.product_name || '',
-    category: product?.category || 'Beras & Biji-bijian',
+    category: product?.category || 'Grade S Murni',
     unit: product?.unit || 'pcs',
     sku: product?.sku || '',
     sell_price: product?.sell_price || '',
@@ -158,6 +358,7 @@ function ProductSheet({ product, onClose, onDelete }) {
     sticker_back_cost: product?.sticker_back_cost || '',
     other_packaging_cost: product?.other_packaging_cost || '',
   })
+  const [selectedGradeTab, setSelectedGradeTab] = useState('Grade S Murni')
   const [showBomCalculator, setShowBomCalculator] = useState(false)
   const [catOpen, setCatOpen] = useState(false)
   const [priceInputUnit, setPriceInputUnit] = useState('primary') // 'primary' (Retail) | 'secondary' (Grosir)
@@ -185,6 +386,95 @@ function ProductSheet({ product, onClose, onDelete }) {
       }
       return updated
     })
+  }
+
+  // 1-Click Autofill BOM costs based on current inventory pricing
+  const autofillBomFromMaster = (customName) => {
+    const rawName = typeof customName === 'string' ? customName : (form.product_name || '')
+    const nameLower = rawName.toLowerCase()
+    let pouchCost = 0
+    let stickerFrontCost = 0
+    let stickerBackCost = 0
+    let rawIngredientCost = 0
+    let otherPackCost = 0
+
+    // Match Pouch
+    let matchedPouch = null
+    if (nameLower.includes('100')) {
+      matchedPouch = rawMaterials.find(r => r.category === 'pouch' && r.material_name.includes('100'))
+    } else if (nameLower.includes('200')) {
+      matchedPouch = rawMaterials.find(r => r.category === 'pouch' && r.material_name.includes('200'))
+    } else if (nameLower.includes('250')) {
+      matchedPouch = rawMaterials.find(r => r.category === 'pouch' && r.material_name.includes('250'))
+    }
+    if (!matchedPouch) matchedPouch = rawMaterials.find(r => r.category === 'pouch')
+    if (matchedPouch) pouchCost = Math.round(Number(matchedPouch.unit_cost) || 0)
+
+    // Match Sticker Front
+    const sFront = rawMaterials.find(r => r.category === 'sticker_depan' || r.material_name.toLowerCase().includes('stiker depan'))
+    if (sFront) stickerFrontCost = Math.round(Number(sFront.unit_cost) || 0)
+
+    // Match Sticker Back
+    const sBack = rawMaterials.find(r => r.category === 'sticker_belakang' || r.material_name.toLowerCase().includes('stiker belakang'))
+    if (sBack) stickerBackCost = Math.round(Number(sBack.unit_cost) || 0)
+
+    // Match Bawang Curah
+    const bCurah = rawMaterials.find(r => r.category === 'bawang_mentah' || r.material_name.toLowerCase().includes('bawang'))
+    if (bCurah) {
+      let gram = 100
+      if (nameLower.includes('250')) gram = 250
+      else if (nameLower.includes('200')) gram = 200
+      else if (nameLower.includes('100')) gram = 100
+      else if (nameLower.includes('1 kg') || nameLower.includes('1kg')) gram = 1000
+
+      const isKg = (bCurah.unit || '').toLowerCase() === 'kg'
+      const unitCost = Number(bCurah.unit_cost) || 0
+      rawIngredientCost = isKg ? Math.round(unitCost * gram / 1000) : Math.round(unitCost * gram)
+    }
+
+    // Match Polymailer / Packing
+    const pPack = rawMaterials.find(r => r.category === 'kardus' || r.material_name.toLowerCase().includes('polymailer') || r.material_name.toLowerCase().includes('plastik'))
+    if (pPack) otherPackCost = Math.round(Number(pPack.unit_cost) || 0)
+
+    const totalHpp = rawIngredientCost + pouchCost + stickerFrontCost + stickerBackCost + otherPackCost
+
+    setForm(f => ({
+      ...f,
+      raw_ingredient_cost: rawIngredientCost || f.raw_ingredient_cost,
+      pouch_cost: pouchCost || f.pouch_cost,
+      sticker_front_cost: stickerFrontCost || f.sticker_front_cost,
+      sticker_back_cost: stickerBackCost || f.sticker_back_cost,
+      other_packaging_cost: otherPackCost || f.other_packaging_cost,
+      avg_buy_price: totalHpp > 0 ? totalHpp : f.avg_buy_price
+    }))
+
+    return { rawIngredientCost, pouchCost, stickerFrontCost, stickerBackCost, otherPackCost, totalHpp }
+  }
+
+  const applyTemplate = (tmpl) => {
+    const bomRes = autofillBomFromMaster(tmpl.name)
+    setForm(f => ({
+      ...f,
+      product_name: tmpl.name,
+      category: tmpl.category,
+      unit: tmpl.unit,
+      secondary_unit: tmpl.secondary_unit,
+      conversion_rate: tmpl.conversion_rate,
+      sku: tmpl.sku,
+      sell_price: tmpl.sell_price || f.sell_price,
+      avg_buy_price: tmpl.avg_buy_price || (bomRes.totalHpp > 0 ? bomRes.totalHpp : f.avg_buy_price),
+      harga_solo_rp: tmpl.harga_solo_rp || f.harga_solo_rp,
+      harga_luar_kota_rp: tmpl.harga_luar_kota_rp || f.harga_luar_kota_rp,
+      harga_grosir_rp: tmpl.harga_grosir_rp || f.harga_grosir_rp,
+      min_stock_alert: tmpl.min_stock_alert,
+      notes: tmpl.notes,
+      raw_ingredient_cost: bomRes.rawIngredientCost || '',
+      pouch_cost: bomRes.pouchCost || '',
+      sticker_front_cost: bomRes.stickerFrontCost || '',
+      sticker_back_cost: bomRes.stickerBackCost || '',
+      other_packaging_cost: bomRes.otherPackCost || '',
+    }))
+    toast.success(`Template ${tmpl.category} "${tmpl.name}" diterapkan!`)
   }
 
   const handleSubmit = async (e) => {
@@ -288,6 +578,111 @@ function ProductSheet({ product, onClose, onDelete }) {
           </p>
         </div>
 
+        {/* Template Cepat Produk Resmi: Grade S Murni & Grade A Crispy */}
+        {!isEdit && (
+          <div style={{ margin: '14px 20px 0', background: 'var(--bg-subtle)', padding: '12px 14px', borderRadius: 16, border: '1px solid var(--border-soft)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span>🧅</span> Template Cepat Produk Resmi:
+              </span>
+              <span style={{ fontSize: 10, color: '#0c3d0c', fontWeight: 800, background: '#DCFCE7', padding: '2px 8px', borderRadius: 6 }}>
+                ⚡ 1-Click HPP & Harga
+              </span>
+            </div>
+
+            {/* Segmented Switch: Grade S Murni vs Grade A Crispy */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+              <button
+                type="button"
+                onClick={() => setSelectedGradeTab('Grade S Murni')}
+                style={{
+                  padding: '8px 10px',
+                  borderRadius: 10,
+                  border: selectedGradeTab === 'Grade S Murni' ? '1.5px solid #0F172A' : '1px solid var(--border-soft)',
+                  background: selectedGradeTab === 'Grade S Murni' ? '#0F172A' : 'var(--bg-surface)',
+                  color: selectedGradeTab === 'Grade S Murni' ? '#FFFFFF' : 'var(--text-primary)',
+                  fontSize: 11.5,
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  transition: 'all 0.15s'
+                }}
+              >
+                <span>🧅</span>
+                <span>Grade S Murni (100% Asli)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedGradeTab('Grade A Crispy')}
+                style={{
+                  padding: '8px 10px',
+                  borderRadius: 10,
+                  border: selectedGradeTab === 'Grade A Crispy' ? '1.5px solid #0F172A' : '1px solid var(--border-soft)',
+                  background: selectedGradeTab === 'Grade A Crispy' ? '#0F172A' : 'var(--bg-surface)',
+                  color: selectedGradeTab === 'Grade A Crispy' ? '#FFFFFF' : 'var(--text-primary)',
+                  fontSize: 11.5,
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  transition: 'all 0.15s'
+                }}
+              >
+                <span>🧄</span>
+                <span>Grade A Crispy (~5% Tepung)</span>
+              </button>
+            </div>
+
+            {/* List of SKU Presets for Selected Grade */}
+            <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
+              {BAWANG_GORENG_TEMPLATES.filter(t => t.grade === selectedGradeTab).map((tmpl) => {
+                const isSelected = form.sku === tmpl.sku
+                return (
+                  <button
+                    key={tmpl.sku}
+                    type="button"
+                    onClick={() => applyTemplate(tmpl)}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: 10,
+                      background: isSelected ? '#0F172A' : 'var(--bg-surface)',
+                      color: isSelected ? '#FFFFFF' : 'var(--text-primary)',
+                      border: isSelected ? '1.5px solid #0F172A' : '1px solid var(--border-soft)',
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'flex-start',
+                      gap: 2,
+                      minWidth: '130px',
+                      transition: 'all 0.15s',
+                      boxShadow: isSelected ? '0 4px 12px rgba(15,23,42,0.15)' : 'none'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: 6 }}>
+                      <span style={{ fontSize: 11, fontWeight: 800 }}>{tmpl.name}</span>
+                      <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4, background: isSelected ? 'rgba(255,255,255,0.2)' : '#F1F5F9', color: isSelected ? '#FFFFFF' : '#475569' }}>
+                        {tmpl.sku}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 10, opacity: isSelected ? 0.9 : 0.75, display: 'flex', gap: 6 }}>
+                      <span>Jual: <strong>Rp {fmt(tmpl.sell_price)}</strong></span>
+                      <span>·</span>
+                      <span>HPP: Rp {fmt(tmpl.avg_buy_price)}</span>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} style={{ padding: '16px 20px 0', display: 'flex', flexDirection: 'column', gap: 14 }}>
           {/* Nama produk */}
           <Field label="Nama Produk *">
@@ -295,7 +690,7 @@ function ProductSheet({ product, onClose, onDelete }) {
               id="product-name" name="product_name" type="text"
               value={form.product_name}
               onChange={e => set('product_name', e.target.value)}
-              placeholder="contoh: Minyak Goreng 2L (Dus / Karton)"
+              placeholder="contoh: [HERO] Murni Pouch 250g / Grade A Pouch 250g"
               style={inputStyle}
             />
           </Field>
@@ -404,7 +799,7 @@ function ProductSheet({ product, onClose, onDelete }) {
                   type="number"
                   value={form.conversion_rate}
                   onChange={e => set('conversion_rate', e.target.value)}
-                  placeholder="Contoh: 40 (1 Dus = 40 Pcs)"
+                  placeholder="Contoh: 20 (1 Karton = 20 Pouch)"
                   style={{ ...inputStyle, paddingLeft: 44 }}
                 />
                 <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 12, color: C.accent, fontWeight: 800 }}>1x</span>
@@ -413,11 +808,11 @@ function ProductSheet({ product, onClose, onDelete }) {
               {/* Quick Conversion Chips */}
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
                 {[
-                  { label: '50 (Sak/Karung)', val: 50 },
-                  { label: '40 (Karton)', val: 40 },
-                  { label: '20 (Dus/Bal)', val: 20 },
-                  { label: '12 (Lusin/Renceng)', val: 12 },
-                  { label: '10 (Pack/Pres)', val: 10 }
+                  { label: '20 (Karton / Dus)', val: 20 },
+                  { label: '40 (Karton Besar)', val: 40 },
+                  { label: '10 (Pack / Bal)', val: 10 },
+                  { label: '12 (Lusin)', val: 12 },
+                  { label: '50 (Sak / Bal Besar)', val: 50 }
                 ].map(chip => (
                   <button
                     key={chip.val}
@@ -616,82 +1011,333 @@ function ProductSheet({ product, onClose, onDelete }) {
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
-                style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}
+                style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 12 }}
               >
-                <p style={{ fontSize: 11, color: TEXT_SEC, margin: 0, lineHeight: 1.4 }}>
-                  Isi biaya per pcs dari bahan baku & packaging untuk menjumlahkan HPP otomatis:
-                </p>
+                {/* Header status bar */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6, background: '#F8FAFC', padding: '8px 12px', borderRadius: 10, border: '1px solid #E2E8F0' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 13 }}>📦</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#334155' }}>
+                      Database Kemasan: <strong>{rawMaterials.length} jenis bahan</strong> terdeteksi
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => autofillBomFromMaster()}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: 8,
+                      background: '#DCFCE7',
+                      border: '1px solid #86EFAC',
+                      color: '#15803D',
+                      fontSize: 10.5,
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4
+                    }}
+                  >
+                    ⚡ Auto-Match Semua Bahan
+                  </button>
+                </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                  <div>
-                    <label style={{ fontSize: 10, fontWeight: 700, color: TEXT_SEC, display: 'block', marginBottom: 4 }}>
-                      Modal Bawang Curah (Rp)
+                {/* 1. Modal Bawang Curah */}
+                <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-soft)', borderRadius: 12, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <label style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span>🧅</span> 1. Modal Bawang Curah / Mentah
                     </label>
+                    <span style={{ fontSize: 10.5, fontWeight: 700, color: '#0c3d0c' }}>
+                      {form.raw_ingredient_cost ? `Rp ${fmt(form.raw_ingredient_cost)}` : 'Rp 0'}
+                    </span>
+                  </div>
+
+                  {rawMaterials.length > 0 && (
+                    <select
+                      onChange={e => {
+                        const mat = rawMaterials.find(r => String(r.id) === e.target.value)
+                        if (mat) {
+                          const unitCost = Number(mat.unit_cost) || 0
+                          const isKg = (mat.unit || '').toLowerCase() === 'kg'
+                          let gram = 250
+                          if (form.product_name.includes('100')) gram = 100
+                          else if (form.product_name.includes('150')) gram = 150
+                          else if (form.product_name.includes('200')) gram = 200
+                          else if (form.product_name.includes('1 kg') || form.product_name.includes('1kg')) gram = 1000
+                          const cost = isKg ? Math.round(unitCost * gram / 1000) : Math.round(unitCost * gram)
+                          updateBomCost('raw_ingredient_cost', String(cost))
+                        }
+                      }}
+                      style={{ ...inputStyle, padding: '6px 8px', fontSize: 11, cursor: 'pointer' }}
+                    >
+                      <option value="">-- Pilih dari Stok Bawang Curah ({rawMaterials.filter(r => ['bawang_mentah', 'bawang_curah', 'mentah', 'bawang'].includes((r.category || '').toLowerCase()) || (r.material_name || '').toLowerCase().includes('bawang')).length} item) --</option>
+                      {rawMaterials
+                        .filter(r => ['bawang_mentah', 'bawang_curah', 'mentah', 'bawang'].includes((r.category || '').toLowerCase()) || (r.material_name || '').toLowerCase().includes('bawang'))
+                        .map(r => (
+                          <option key={r.id} value={r.id}>
+                            {r.material_name} (Stok: {r.current_stock || 0} {r.unit}) — Rp {fmt(r.unit_cost)} / {r.unit}
+                          </option>
+                        ))}
+                    </select>
+                  )}
+
+                  {/* Grammage quick buttons */}
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center', marginTop: 2 }}>
+                    <span style={{ fontSize: 10, color: TEXT_SEC, fontWeight: 700 }}>Hitung Cepat:</span>
+                    {[
+                      { label: '100g', g: 100 },
+                      { label: '150g', g: 150 },
+                      { label: '200g', g: 200 },
+                      { label: '250g', g: 250 },
+                      { label: '500g', g: 500 },
+                      { label: '1 Kg', g: 1000 }
+                    ].map(btn => (
+                      <button
+                        key={btn.label}
+                        type="button"
+                        onClick={() => {
+                          const bCurah = rawMaterials.find(r => ['bawang_mentah', 'bawang_curah', 'mentah'].includes((r.category || '').toLowerCase()) || (r.material_name || '').toLowerCase().includes('bawang'))
+                          const unitCost = bCurah ? Number(bCurah.unit_cost) || 120000 : 120000
+                          const cost = Math.round(unitCost * btn.g / 1000)
+                          updateBomCost('raw_ingredient_cost', String(cost))
+                        }}
+                        style={{
+                          padding: '2px 7px',
+                          borderRadius: 6,
+                          background: '#F1F5F9',
+                          border: '1px solid #CBD5E1',
+                          fontSize: 10,
+                          fontWeight: 700,
+                          color: '#334155',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {btn.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div style={{ position: 'relative', marginTop: 4 }}>
+                    <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 11, fontWeight: 700, color: '#94A3B8' }}>Rp</span>
                     <input
                       type="text"
                       inputMode="numeric"
                       value={form.raw_ingredient_cost ? fmt(form.raw_ingredient_cost) : ''}
                       onChange={e => updateBomCost('raw_ingredient_cost', e.target.value.replace(/\D/g, ''))}
-                      placeholder="0"
-                      style={inputStyle}
+                      placeholder="0 (Biaya bawang per pcs)"
+                      style={{ ...inputStyle, paddingLeft: 30, fontSize: 11 }}
                     />
                   </div>
-                  <div>
-                    <label style={{ fontSize: 10, fontWeight: 700, color: TEXT_SEC, display: 'block', marginBottom: 4 }}>
-                      Pouch / Toples (Rp)
+                </div>
+
+                {/* 2. Pouch / Toples (Kemasan Utama) */}
+                <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-soft)', borderRadius: 12, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <label style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span>🛍️</span> 2. Pouch / Toples (Kemasan Utama)
                     </label>
+                    <span style={{ fontSize: 10.5, fontWeight: 700, color: '#0c3d0c' }}>
+                      {form.pouch_cost ? `Rp ${fmt(form.pouch_cost)}` : 'Rp 0'}
+                    </span>
+                  </div>
+
+                  {rawMaterials.length > 0 && (
+                    <select
+                      onChange={e => {
+                        const mat = rawMaterials.find(r => String(r.id) === e.target.value)
+                        if (mat) updateBomCost('pouch_cost', String(Math.round(Number(mat.unit_cost) || 0)))
+                      }}
+                      style={{ ...inputStyle, padding: '6px 8px', fontSize: 11, cursor: 'pointer' }}
+                    >
+                      <option value="">-- Pilih dari Kemasan Pouch / Toples ({rawMaterials.filter(r => ['pouch', 'toples', 'kemasan', 'plastik'].includes((r.category || '').toLowerCase()) || (r.material_name || '').toLowerCase().includes('pouch') || (r.material_name || '').toLowerCase().includes('toples')).length} item) --</option>
+                      {rawMaterials
+                        .filter(r => ['pouch', 'toples', 'kemasan', 'plastik'].includes((r.category || '').toLowerCase()) || (r.material_name || '').toLowerCase().includes('pouch') || (r.material_name || '').toLowerCase().includes('toples'))
+                        .map(r => (
+                          <option key={r.id} value={r.id}>
+                            {r.material_name} (Stok: {r.current_stock || 0} {r.unit}) — Rp {fmt(r.unit_cost)} / {r.unit}
+                          </option>
+                        ))}
+                    </select>
+                  )}
+
+                  <div style={{ position: 'relative' }}>
+                    <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 11, fontWeight: 700, color: '#94A3B8' }}>Rp</span>
                     <input
                       type="text"
                       inputMode="numeric"
                       value={form.pouch_cost ? fmt(form.pouch_cost) : ''}
                       onChange={e => updateBomCost('pouch_cost', e.target.value.replace(/\D/g, ''))}
-                      placeholder="0"
-                      style={inputStyle}
+                      placeholder="0 (Harga per pouch/toples)"
+                      style={{ ...inputStyle, paddingLeft: 30, fontSize: 11 }}
                     />
                   </div>
                 </div>
 
+                {/* 3 & 4. Stiker Depan & Belakang */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                  <div>
-                    <label style={{ fontSize: 10, fontWeight: 700, color: TEXT_SEC, display: 'block', marginBottom: 4 }}>
-                      Stiker Depan (Rp)
-                    </label>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={form.sticker_front_cost ? fmt(form.sticker_front_cost) : ''}
-                      onChange={e => updateBomCost('sticker_front_cost', e.target.value.replace(/\D/g, ''))}
-                      placeholder="0"
-                      style={inputStyle}
-                    />
+                  {/* Stiker Depan */}
+                  <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-soft)', borderRadius: 12, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <label style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <span>🏷️</span> Stiker Depan
+                      </label>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: '#0c3d0c' }}>
+                        {form.sticker_front_cost ? `Rp ${fmt(form.sticker_front_cost)}` : 'Rp 0'}
+                      </span>
+                    </div>
+
+                    {rawMaterials.length > 0 && (
+                      <select
+                        onChange={e => {
+                          const mat = rawMaterials.find(r => String(r.id) === e.target.value)
+                          if (mat) updateBomCost('sticker_front_cost', String(Math.round(Number(mat.unit_cost) || 0)))
+                        }}
+                        style={{ ...inputStyle, padding: '5px 6px', fontSize: 10.5, cursor: 'pointer' }}
+                      >
+                        <option value="">-- Pilih Stiker Depan --</option>
+                        {rawMaterials
+                          .filter(r => ['sticker_depan', 'stiker', 'kemasan'].includes((r.category || '').toLowerCase()) || (r.material_name || '').toLowerCase().includes('depan') || (r.material_name || '').toLowerCase().includes('front'))
+                          .map(r => (
+                            <option key={r.id} value={r.id}>
+                              {r.material_name} (Rp {fmt(r.unit_cost)})
+                            </option>
+                          ))}
+                      </select>
+                    )}
+
+                    <div style={{ position: 'relative' }}>
+                      <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 11, fontWeight: 700, color: '#94A3B8' }}>Rp</span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={form.sticker_front_cost ? fmt(form.sticker_front_cost) : ''}
+                        onChange={e => updateBomCost('sticker_front_cost', e.target.value.replace(/\D/g, ''))}
+                        placeholder="0"
+                        style={{ ...inputStyle, paddingLeft: 30, fontSize: 11 }}
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label style={{ fontSize: 10, fontWeight: 700, color: TEXT_SEC, display: 'block', marginBottom: 4 }}>
-                      Stiker Belakang (Rp)
+
+                  {/* Stiker Belakang */}
+                  <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-soft)', borderRadius: 12, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <label style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <span>🏷️</span> Stiker Belakang
+                      </label>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: '#0c3d0c' }}>
+                        {form.sticker_back_cost ? `Rp ${fmt(form.sticker_back_cost)}` : 'Rp 0'}
+                      </span>
+                    </div>
+
+                    {rawMaterials.length > 0 && (
+                      <select
+                        onChange={e => {
+                          const mat = rawMaterials.find(r => String(r.id) === e.target.value)
+                          if (mat) updateBomCost('sticker_back_cost', String(Math.round(Number(mat.unit_cost) || 0)))
+                        }}
+                        style={{ ...inputStyle, padding: '5px 6px', fontSize: 10.5, cursor: 'pointer' }}
+                      >
+                        <option value="">-- Pilih Stiker Belakang --</option>
+                        {rawMaterials
+                          .filter(r => ['sticker_belakang', 'stiker', 'kemasan'].includes((r.category || '').toLowerCase()) || (r.material_name || '').toLowerCase().includes('belakang') || (r.material_name || '').toLowerCase().includes('back'))
+                          .map(r => (
+                            <option key={r.id} value={r.id}>
+                              {r.material_name} (Rp {fmt(r.unit_cost)})
+                            </option>
+                          ))}
+                      </select>
+                    )}
+
+                    <div style={{ position: 'relative' }}>
+                      <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 11, fontWeight: 700, color: '#94A3B8' }}>Rp</span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={form.sticker_back_cost ? fmt(form.sticker_back_cost) : ''}
+                        onChange={e => updateBomCost('sticker_back_cost', e.target.value.replace(/\D/g, ''))}
+                        placeholder="0"
+                        style={{ ...inputStyle, paddingLeft: 30, fontSize: 11 }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 5. Kardus / Safety Pack */}
+                <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-soft)', borderRadius: 12, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <label style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span>📦</span> 5. Kardus / Polymailer / Safety Packing
                     </label>
+                    <span style={{ fontSize: 10.5, fontWeight: 700, color: '#0c3d0c' }}>
+                      {form.other_packaging_cost ? `Rp ${fmt(form.other_packaging_cost)}` : 'Rp 0'}
+                    </span>
+                  </div>
+
+                  {rawMaterials.length > 0 && (
+                    <select
+                      onChange={e => {
+                        const mat = rawMaterials.find(r => String(r.id) === e.target.value)
+                        if (mat) updateBomCost('other_packaging_cost', String(Math.round(Number(mat.unit_cost) || 0)))
+                      }}
+                      style={{ ...inputStyle, padding: '6px 8px', fontSize: 11, cursor: 'pointer' }}
+                    >
+                      <option value="">-- Pilih Kardus / Polymailer / Bubblewrap ({rawMaterials.filter(r => ['kardus', 'polymailer', 'packing', 'kemasan'].includes((r.category || '').toLowerCase()) || (r.material_name || '').toLowerCase().includes('kardus') || (r.material_name || '').toLowerCase().includes('polymailer')).length} item) --</option>
+                      {rawMaterials
+                        .filter(r => ['kardus', 'polymailer', 'packing', 'kemasan'].includes((r.category || '').toLowerCase()) || (r.material_name || '').toLowerCase().includes('kardus') || (r.material_name || '').toLowerCase().includes('polymailer'))
+                        .map(r => (
+                          <option key={r.id} value={r.id}>
+                            {r.material_name} (Stok: {r.current_stock || 0} {r.unit}) — Rp {fmt(r.unit_cost)} / {r.unit}
+                          </option>
+                        ))}
+                    </select>
+                  )}
+
+                  <div style={{ position: 'relative' }}>
+                    <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 11, fontWeight: 700, color: '#94A3B8' }}>Rp</span>
                     <input
                       type="text"
                       inputMode="numeric"
-                      value={form.sticker_back_cost ? fmt(form.sticker_back_cost) : ''}
-                      onChange={e => updateBomCost('sticker_back_cost', e.target.value.replace(/\D/g, ''))}
+                      value={form.other_packaging_cost ? fmt(form.other_packaging_cost) : ''}
+                      onChange={e => updateBomCost('other_packaging_cost', e.target.value.replace(/\D/g, ''))}
                       placeholder="0"
-                      style={inputStyle}
+                      style={{ ...inputStyle, paddingLeft: 30, fontSize: 11 }}
                     />
                   </div>
                 </div>
 
-                <div>
-                  <label style={{ fontSize: 10, fontWeight: 700, color: TEXT_SEC, display: 'block', marginBottom: 4 }}>
-                    Kardus / Bubblewrap / Safety Pack (Rp)
-                  </label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={form.other_packaging_cost ? fmt(form.other_packaging_cost) : ''}
-                    onChange={e => updateBomCost('other_packaging_cost', e.target.value.replace(/\D/g, ''))}
-                    placeholder="0"
-                    style={inputStyle}
-                  />
+                {/* Total Live Summary */}
+                <div style={{
+                  background: '#F0FDF4',
+                  border: '1.5px solid #86EFAC',
+                  borderRadius: 12,
+                  padding: '10px 14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}>
+                  <div>
+                    <div style={{ fontSize: 10.5, fontWeight: 800, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      ⚡ Total HPP BOM Kemasan & Bahan
+                    </div>
+                    <div style={{ fontSize: 10, color: '#15803D', marginTop: 1 }}>
+                      Otomatis diterapkan ke field Harga Beli / HPP Produk
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 16, fontWeight: 900, color: '#0c3d0c' }}>
+                      Rp {fmt(
+                        (Number(form.raw_ingredient_cost) || 0) +
+                        (Number(form.pouch_cost) || 0) +
+                        (Number(form.sticker_front_cost) || 0) +
+                        (Number(form.sticker_back_cost) || 0) +
+                        (Number(form.other_packaging_cost) || 0)
+                      )}
+                    </div>
+                    <div style={{ fontSize: 9.5, color: '#166534', fontWeight: 700 }}>
+                      per {form.unit || 'pcs'}
+                    </div>
+                  </div>
                 </div>
               </motion.div>
             )}
@@ -757,7 +1403,7 @@ function ProductSheet({ product, onClose, onDelete }) {
               id="product-sku" name="sku" type="text"
               value={form.sku}
               onChange={e => set('sku', e.target.value.toUpperCase())}
-              placeholder="contoh: JB-BAMO-100G"
+              placeholder="contoh: JB-BGO-250G / JB-BMG-100G"
               style={inputStyle}
             />
           </Field>
@@ -779,7 +1425,7 @@ function ProductSheet({ product, onClose, onDelete }) {
               id="product-notes" name="notes"
               value={form.notes}
               onChange={e => set('notes', e.target.value)}
-              placeholder="Contoh: Kemasan 2 Liter, isi 6 pouch per dus"
+              placeholder="Contoh: Kemasan Pouch Standing Zipper 250g, 1 Karton = 20 Pouch"
               rows={2}
               style={{ ...inputStyle, resize: 'none', lineHeight: '1.5' }}
             />
@@ -1042,7 +1688,7 @@ export default function Produk() {
   const { data: rawMaterials = [], isLoading: isLoadingRaw, refetch: refetchRaw } = useSembakoRawMaterials()
   const deleteRawMut = useDeleteSembakoRawMaterial()
 
-  const [activeSubTab, setActiveSubTab] = useState('produk') // 'produk' | 'kemasan'
+  const [activeSubTab, setActiveSubTab] = useState('produk') // 'produk' | 'bahan_baku' | 'kemasan'
   const [search, setSearch] = useState('')
   const [catFilter, setCatFilter] = useState('Semua')
   const [sheet, setSheet] = useState(() => {
@@ -1054,17 +1700,23 @@ export default function Produk() {
   const [productToDelete, setProductToDelete] = useState(null)
   const [importCsvOpen, setImportCsvOpen] = useState(false)
 
-  // Raw Materials Sheet State
+  // Raw Materials Sheet, Restock Modal & Purchase History State
   const [rawSheetOpen, setRawSheetOpen] = useState(false)
   const [editingRawMaterial, setEditingRawMaterial] = useState(null)
   const [rawToDelete, setRawToDelete] = useState(null)
   const [rawTypeFilter, setRawTypeFilter] = useState('all')
+  const [restockMaterial, setRestockMaterial] = useState(null)
+  const [restockModalOpen, setRestockModalOpen] = useState(false)
+  const [historyMaterial, setHistoryMaterial] = useState(null)
+  const [historyModalOpen, setHistoryModalOpen] = useState(false)
 
   useEffect(() => {
     const params = new URLSearchParams(location.search)
     const action = params.get('action')
     const tab = params.get('tab')
-    if (tab === 'kemasan' || tab === 'bahan') {
+    if (tab === 'bahan' || tab === 'bahan_baku') {
+      setActiveSubTab('bahan_baku')
+    } else if (tab === 'kemasan') {
       setActiveSubTab('kemasan')
     }
     if (action === 'new' || action === 'tambah') {
@@ -1076,6 +1728,25 @@ export default function Produk() {
     const cats = [...new Set(products.map(p => p.category).filter(Boolean))]
     return ['Semua', ...cats]
   }, [products])
+
+  // Partition Bahan Baku vs Kemasan
+  const isBahanBakuItem = (r) => {
+    const cat = (r.category || r.material_type || '').toLowerCase()
+    const name = (r.material_name || '').toLowerCase()
+    return ['bawang_mentah', 'bawang_curah', 'bawang_putih', 'minyak_goreng', 'tepung_bumbu', 'bahan_baku', 'bahan_lain', 'mentah'].includes(cat) ||
+      name.includes('bawang') || name.includes('brambang') || name.includes('minyak') || name.includes('tepung') || name.includes('garam') ||
+      r.unit === 'kg' || r.unit === 'karung' || r.unit === 'liter'
+  }
+
+  const bahanBakuList = useMemo(() => {
+    return rawMaterials.filter(r => isBahanBakuItem(r))
+  }, [rawMaterials])
+
+  const kemasanList = useMemo(() => {
+    return rawMaterials.filter(r => !isBahanBakuItem(r))
+  }, [rawMaterials])
+
+  const currentRawList = activeSubTab === 'bahan_baku' ? bahanBakuList : kemasanList
 
   const filtered = useMemo(() => {
     return products.filter(p => {
@@ -1092,8 +1763,11 @@ export default function Produk() {
   }, [products, search, catFilter, showInactive])
 
   const filteredRaw = useMemo(() => {
-    return rawMaterials.filter(r => {
-      if (rawTypeFilter !== 'all' && r.material_type !== rawTypeFilter) return false
+    return currentRawList.filter(r => {
+      if (rawTypeFilter !== 'all') {
+        const cat = (r.category || r.material_type || '').toLowerCase()
+        if (cat !== rawTypeFilter) return false
+      }
       if (search) {
         const q = search.toLowerCase()
         const matchName = r.material_name?.toLowerCase().includes(q)
@@ -1103,7 +1777,7 @@ export default function Produk() {
       }
       return true
     })
-  }, [rawMaterials, rawTypeFilter, search])
+  }, [currentRawList, rawTypeFilter, search])
 
   const stats = useMemo(() => {
     const active = products.filter(p => p.is_active && !p.is_deleted)
@@ -1112,12 +1786,19 @@ export default function Produk() {
     return { total: active.length, lowStock: lowStock.length, nilaiStok }
   }, [products])
 
-  const rawStats = useMemo(() => {
-    const totalJenis = rawMaterials.length
-    const lowStock = rawMaterials.filter(r => r.min_stock_alert > 0 && r.current_stock <= r.min_stock_alert).length
-    const totalInvestasi = rawMaterials.reduce((s, r) => s + (Number(r.total_spent) || (Number(r.current_stock) * Number(r.unit_cost || 0))), 0)
+  const bahanStats = useMemo(() => {
+    const totalJenis = bahanBakuList.length
+    const lowStock = bahanBakuList.filter(r => r.min_stock_alert > 0 && r.current_stock <= r.min_stock_alert).length
+    const totalInvestasi = bahanBakuList.reduce((s, r) => s + (Number(r.total_spent) || (Number(r.current_stock) * Number(r.unit_cost || 0))), 0)
     return { totalJenis, lowStock, totalInvestasi }
-  }, [rawMaterials])
+  }, [bahanBakuList])
+
+  const kemasanStats = useMemo(() => {
+    const totalJenis = kemasanList.length
+    const lowStock = kemasanList.filter(r => r.min_stock_alert > 0 && r.current_stock <= r.min_stock_alert).length
+    const totalInvestasi = kemasanList.reduce((s, r) => s + (Number(r.total_spent) || (Number(r.current_stock) * Number(r.unit_cost || 0))), 0)
+    return { totalJenis, lowStock, totalInvestasi }
+  }, [kemasanList])
 
   const handleDelete = (product) => {
     setProductToDelete(product)
@@ -1154,27 +1835,49 @@ export default function Produk() {
   const summaryItems = activeSubTab === 'produk' ? [
     { label: 'Total Produk Aktif', value: stats.total, color: 'amber' },
     { label: 'Stok Menipis', value: stats.lowStock > 0 ? `${stats.lowStock} produk` : 'Stok Aman', color: stats.lowStock > 0 ? 'red' : 'green', subLabel: stats.lowStock > 0 ? 'perlu restock' : 'semua aman' },
-    { label: 'Total Nilai Stok', value: stats.nilaiStok, isCurrency: true, color: 'amber' },
+    { label: 'Total Nilai Stok Produk', value: stats.nilaiStok, isCurrency: true, color: 'amber' },
+  ] : activeSubTab === 'bahan_baku' ? [
+    { label: 'Total Bahan Baku Mentah', value: bahanStats.totalJenis, color: 'emerald', subLabel: 'Bawang Merah, Minyak, Tepung' },
+    { label: 'Bahan Mentah Menipis', value: bahanStats.lowStock > 0 ? `${bahanStats.lowStock} item` : 'Aman', color: bahanStats.lowStock > 0 ? 'red' : 'green', subLabel: bahanStats.lowStock > 0 ? 'perlu order ke Petani/Pengepul' : 'stok bahan cukup' },
+    { label: 'Total Nilai Stok Bahan Mentah', value: bahanStats.totalInvestasi, isCurrency: true, color: 'emerald' },
   ] : [
-    { label: 'Total Jenis Kemasan & Bahan', value: rawStats.totalJenis, color: 'amber', subLabel: 'Pouch, Stiker, Bawang' },
-    { label: 'Kemasan Menipis', value: rawStats.lowStock > 0 ? `${rawStats.lowStock} item` : 'Aman', color: rawStats.lowStock > 0 ? 'red' : 'green', subLabel: rawStats.lowStock > 0 ? 'perlu order pabrik' : 'stok packaging cukup' },
-    { label: 'Total Pembelian Bahan', value: rawStats.totalInvestasi, isCurrency: true, color: 'amber' },
+    { label: 'Total Jenis Kemasan & Pack', value: kemasanStats.totalJenis, color: 'amber', subLabel: 'Pouch, Stiker, Kardus, Polymailer' },
+    { label: 'Kemasan Menipis', value: kemasanStats.lowStock > 0 ? `${kemasanStats.lowStock} item` : 'Aman', color: kemasanStats.lowStock > 0 ? 'red' : 'green', subLabel: kemasanStats.lowStock > 0 ? 'perlu order ke Percetakan/Pabrik' : 'stok kemasan cukup' },
+    { label: 'Total Nilai Stok Kemasan', value: kemasanStats.totalInvestasi, isCurrency: true, color: 'amber' },
   ]
 
   const categoryFilters = categories.map(c => ({ id: c, label: c }))
 
   return (
     <div className="min-h-screen bg-background text-foreground pb-[max(140px,calc(110px+env(safe-area-inset-bottom,24px)))] text-left">
-      {!isDesktop && <BrokerMobileHeader title={activeSubTab === 'produk' ? 'Produk' : 'Bahan Baku'} onMenuClick={() => setSidebarOpen(true)} />}
+      {!isDesktop && <BrokerMobileHeader title={activeSubTab === 'produk' ? 'Produk' : activeSubTab === 'bahan_baku' ? 'Bahan Baku' : 'Kemasan'} onMenuClick={() => setSidebarOpen(true)} />}
 
       <div className="mx-auto max-w-7xl">
         <SembakoPageHeader
-          title={activeSubTab === 'produk' ? 'Manajemen Produk & SKU' : 'Bahan Baku & Kemasan (BOM)'}
-          subtitle={activeSubTab === 'produk' ? `Katalog & Harga Multi-Tier · ${stats.total} produk aktif` : `Pouch, Stiker, Kardus & Bawang Curah · Auto HPP Calculation`}
+          title={
+            activeSubTab === 'produk'
+              ? 'Manajemen Produk & SKU'
+              : activeSubTab === 'bahan_baku'
+              ? 'Bahan Baku Mentah (Suplai Petani)'
+              : 'Kemasan & Packaging (Suplai Vendor)'
+          }
+          subtitle={
+            activeSubTab === 'produk'
+              ? `Katalog & Harga Multi-Tier · ${stats.total} produk aktif`
+              : activeSubTab === 'bahan_baku'
+              ? `Bawang Merah Boyolali, Minyak & Bumbu · ${bahanBakuList.length} jenis komoditas mentah`
+              : `Pouch Ziplock, Stiker Label, Kardus & Polymailer · ${kemasanList.length} jenis packaging`
+          }
           isDesktop={isDesktop}
           searchQuery={search}
           onSearchChange={setSearch}
-          searchPlaceholder={activeSubTab === 'produk' ? 'Cari nama produk / SKU...' : 'Cari nama bahan, kemasan, supplier...'}
+          searchPlaceholder={
+            activeSubTab === 'produk'
+              ? 'Cari nama produk / SKU...'
+              : activeSubTab === 'bahan_baku'
+              ? 'Cari bawang mentah, minyak, supplier petani...'
+              : 'Cari pouch, stiker, kardus, supplier percetakan...'
+          }
           filters={activeSubTab === 'produk' ? categoryFilters : []}
           activeFilter={catFilter}
           onFilterChange={setCatFilter}
@@ -1197,6 +1900,17 @@ export default function Produk() {
                     <span>Tambah Produk</span>
                   </button>
                 </>
+              ) : activeSubTab === 'bahan_baku' ? (
+                <button
+                  onClick={() => {
+                    setEditingRawMaterial(null)
+                    setRawSheetOpen(true)
+                  }}
+                  className="flex items-center gap-2 px-4 h-10 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-500 text-white transition-all cursor-pointer shadow-lg shadow-emerald-600/20 active:scale-95 shrink-0"
+                >
+                  <Plus size={16} />
+                  <span>+ Tambah Bahan Baku Mentah</span>
+                </button>
               ) : (
                 <button
                   onClick={() => {
@@ -1206,37 +1920,57 @@ export default function Produk() {
                   className="flex items-center gap-2 px-4 h-10 rounded-xl font-bold text-xs bg-amber-500 hover:bg-amber-400 text-slate-950 transition-all cursor-pointer shadow-lg shadow-amber-500/20 active:scale-95 shrink-0"
                 >
                   <Plus size={16} />
-                  <span>Tambah Bahan / Kemasan</span>
+                  <span>+ Tambah Kemasan & Packaging</span>
                 </button>
               )}
             </div>
           }
         />
 
-        {/* ── SubTab Selector (Produk Jadi vs Bahan & Kemasan) ── */}
+        {/* ── SubTab Selector (Produk Jadi vs Bahan Baku vs Kemasan) ── */}
         <div className="px-4 sm:px-6 pt-2">
-          <div className="flex items-center gap-2 p-1.5 bg-muted/60 border border-border/80 rounded-2xl w-fit">
+          <div className="flex flex-wrap items-center gap-2 p-1.5 bg-muted/60 border border-border/80 rounded-2xl w-fit">
             <button
-              onClick={() => setActiveSubTab('produk')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              onClick={() => {
+                setActiveSubTab('produk')
+                setRawTypeFilter('all')
+              }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 activeSubTab === 'produk'
-                  ? 'bg-background text-foreground shadow-sm'
+                  ? 'bg-background text-foreground shadow-sm font-black'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               <Package size={15} />
-              <span>Produk Jadi / SKU ({products.length})</span>
+              <span>1. Produk Jadi / SKU ({products.length})</span>
             </button>
             <button
-              onClick={() => setActiveSubTab('kemasan')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              onClick={() => {
+                setActiveSubTab('bahan_baku')
+                setRawTypeFilter('all')
+              }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeSubTab === 'bahan_baku'
+                  ? 'bg-emerald-600 text-white shadow-sm font-black'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <span>🧅</span>
+              <span>2. Bahan Baku Mentah ({bahanBakuList.length})</span>
+            </button>
+            <button
+              onClick={() => {
+                setActiveSubTab('kemasan')
+                setRawTypeFilter('all')
+              }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 activeSubTab === 'kemasan'
                   ? 'bg-amber-500 text-slate-950 shadow-sm font-black'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               <Boxes size={15} />
-              <span>Bahan Baku & Kemasan ({rawMaterials.length})</span>
+              <span>3. Kemasan & Packaging ({kemasanList.length})</span>
             </button>
           </div>
         </div>
@@ -1258,79 +1992,88 @@ export default function Produk() {
             </div>
 
             {/* Product grid */}
-            <div className="px-4 sm:px-6 pt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
-              <AnimatePresence>
-                {filtered.length === 0 ? (
-                  <div className="col-span-full text-center py-16 bg-card border border-border/60 rounded-2xl">
-                    <Package size={40} className="mx-auto mb-3 opacity-40 text-muted-foreground" />
-                    <p className="font-bold text-base text-foreground mb-1">
-                      {search ? 'Produk tidak ditemukan' : 'Belum ada produk'}
-                    </p>
-                    <p className="text-xs text-muted-foreground mb-4">
-                      {search ? 'Coba kata kunci lain' : 'Mulai dengan menambahkan produk yang Anda jual'}
-                    </p>
-                    {!search && (
-                      <button
-                        onClick={() => setSheet('new')}
-                        className="inline-flex items-center gap-2 px-5 h-10 rounded-xl bg-[#0F172A] hover:bg-slate-900 text-white text-xs font-bold transition-all shadow-lg shadow-slate-950/10"
-                      >
-                        <Plus size={15} /> Tambah Produk Pertama
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  filtered.map(product => (
+            <div className="px-4 sm:px-6">
+              {filtered.length === 0 ? (
+                <SembakoEmptyState
+                  icon={Package}
+                  title="Belum ada produk"
+                  description={
+                    search || catFilter !== 'Semua'
+                      ? 'Tidak ada produk yang cocok dengan pencarian atau filter yang dipilih.'
+                      : 'Mulai dengan menambahkan produk sembako pertama Anda atau impor dari template master Bawang Goreng.'
+                  }
+                  actionLabel="Tambah Produk"
+                  onAction={() => setSheet('new')}
+                />
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                  {filtered.map(product => (
                     <ProductCard
                       key={product.id}
                       product={product}
-                      onEdit={setSheet}
+                      onEdit={(p) => setSheet(p)}
                       onDelete={handleDelete}
                     />
-                  ))
-                )}
-              </AnimatePresence>
+                  ))}
+                </div>
+              )}
             </div>
           </>
         )}
 
-        {/* ── TAB BAHAN BAKU & KEMASAN ── */}
-        {activeSubTab === 'kemasan' && (
+        {/* ── TAB BAHAN BAKU MENTAH (SUPLAI PETANI) ── */}
+        {activeSubTab === 'bahan_baku' && (
           <div className="px-4 sm:px-6 pt-2 space-y-4">
-            {/* Filter Jenis Kemasan */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-1">
-              {[
-                { id: 'all', label: 'Semua Bahan' },
-                { id: 'pouch', label: 'Pouch & Kemasan' },
-                { id: 'sticker_depan', label: 'Stiker Depan' },
-                { id: 'sticker_belakang', label: 'Stiker Belakang' },
-                { id: 'kardus', label: 'Kardus & Safety' },
-                { id: 'bawang_mentah', label: 'Bawang Mentah/Curah' },
-                { id: 'minyak_bumbu', label: 'Minyak & Bumbu' },
-              ].map(f => (
-                <button
-                  key={f.id}
-                  onClick={() => setRawTypeFilter(f.id)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
-                    rawTypeFilter === f.id
-                      ? 'bg-[#0F172A] text-white'
-                      : 'bg-muted text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  {f.label}
-                </button>
-              ))}
+            {/* Filter Jenis Bahan Baku Mentah */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 overflow-x-auto pb-1">
+              <div className="flex items-center gap-2 overflow-x-auto">
+                {[
+                  { id: 'all', label: 'Semua Bahan Mentah' },
+                  { id: 'bawang_mentah', label: '🧅 Bawang Merah Mentah' },
+                  { id: 'bawang_putih', label: '🧄 Bawang Putih' },
+                  { id: 'minyak_goreng', label: '🛢️ Minyak Goreng' },
+                  { id: 'tepung_bumbu', label: '🌾 Tepung & Bumbu' },
+                  { id: 'bahan_lain', label: '📦 Lainnya' },
+                ].map(f => (
+                  <button
+                    key={f.id}
+                    onClick={() => setRawTypeFilter(f.id)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                      rawTypeFilter === f.id
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-muted text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                onClick={() => {
+                  setHistoryMaterial(null)
+                  setHistoryModalOpen(true)
+                }}
+                className="shrink-0 px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                title="Rekap Riwayat Pembelian Bahan Baku Mentah"
+              >
+                <History size={14} />
+                <span>Rekap Belanja Petani</span>
+              </button>
             </div>
 
-            {/* Grid Bahan & Kemasan */}
+            {/* Grid Bahan Baku */}
             {isLoadingRaw ? (
-              <div className="p-12 text-center text-xs text-muted-foreground">Memuat data kemasan & bahan...</div>
+              <div className="p-12 text-center text-xs text-muted-foreground">Memuat data bahan baku mentah...</div>
             ) : filteredRaw.length === 0 ? (
               <div className="p-12 text-center bg-card border border-border/80 rounded-3xl space-y-3">
-                <Boxes size={40} className="mx-auto text-muted-foreground/40" />
+                <div className="w-12 h-12 rounded-2xl bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 flex items-center justify-center mx-auto text-2xl">
+                  🧅
+                </div>
                 <div>
-                  <p className="font-bold text-sm text-foreground">Belum ada Bahan Baku / Kemasan</p>
+                  <p className="font-bold text-sm text-foreground">Belum ada Bahan Baku Mentah</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Tambahkan pouch 100g, 200g, 250g, stiker, atau kardus pengiriman dengan sistem auto-kalkulator HPP.
+                    Catat stok komoditas mentah seperti Bawang Merah Boyolali, Bawang Putih, Minyak Goreng, dan Tepung dari Petani/Pengepul.
                   </p>
                 </div>
                 <button
@@ -1338,9 +2081,174 @@ export default function Produk() {
                     setEditingRawMaterial(null)
                     setRawSheetOpen(true)
                   }}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold cursor-pointer transition"
                 >
-                  <Plus size={15} /> Tambah Bahan Sekarang
+                  <Plus size={15} /> Tambah Bahan Baku Mentah Sekarang
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                {filteredRaw.map(raw => {
+                  const isLow = raw.min_stock_alert > 0 && raw.current_stock <= raw.min_stock_alert
+                  return (
+                    <motion.div
+                      key={raw.id}
+                      layout
+                      className="bg-card border border-border/80 hover:border-emerald-500/50 rounded-2xl p-4 flex flex-col justify-between transition-all"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                            {raw.category?.replace('_', ' ') || raw.material_type?.replace('_', ' ') || 'BAHAN MENTAH'}
+                          </span>
+                          {isLow && (
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-500/10 text-rose-600 border border-rose-500/20">
+                              Stok Menipis
+                            </span>
+                          )}
+                        </div>
+
+                        <h3 className="font-bold text-sm text-foreground">{raw.material_name}</h3>
+                        {raw.notes && <p className="text-[11px] text-muted-foreground line-clamp-1 mt-0.5">{raw.notes}</p>}
+
+                        <div className="mt-3 p-2.5 rounded-xl bg-muted/40 border border-border/50 space-y-1.5 text-xs">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Stok Tersedia:</span>
+                            <span className="font-bold text-foreground">{fmt(raw.current_stock)} {raw.unit}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">HPP Beli per {raw.unit}:</span>
+                            <span className="font-extrabold text-emerald-600 dark:text-emerald-400">
+                              Rp {fmt(raw.unit_cost)} / {raw.unit}
+                            </span>
+                          </div>
+                          {Number(raw.total_spent) > 0 && (
+                            <div className="flex justify-between text-[11px] pt-1 border-t border-border/40">
+                              <span className="text-muted-foreground">Total Nota Petani:</span>
+                              <span className="font-semibold text-foreground">Rp {fmt(raw.total_spent)}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="mt-3 pt-2.5 border-t border-border/60 space-y-2">
+                        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                          <span>{raw.supplier_name ? `Petani/Suplier: ${raw.supplier_name}` : 'Petani / Pengepul Mandiri'}</span>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => {
+                                setHistoryMaterial(raw)
+                                setHistoryModalOpen(true)
+                              }}
+                              className="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 transition-colors cursor-pointer"
+                              title="Riwayat Pembelian Bahan Baku Ini"
+                            >
+                              <History size={12} />
+                            </button>
+                            <button
+                              onClick={() => {
+                                setEditingRawMaterial(raw)
+                                setRawSheetOpen(true)
+                              }}
+                              className="p-1.5 rounded-lg bg-muted hover:bg-muted/80 text-foreground transition-colors cursor-pointer"
+                              title="Edit Detail Bahan Mentah"
+                            >
+                              <Edit3 size={12} />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteRaw(raw)}
+                              className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 transition-colors cursor-pointer"
+                              title="Hapus Bahan Mentah"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => {
+                              setRestockMaterial(raw)
+                              setRestockModalOpen(true)
+                            }}
+                            className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold text-xs shadow-sm hover:shadow transition-all cursor-pointer"
+                          >
+                            <PackagePlus size={14} />
+                            <span>+ Tambah Stok ({raw.unit})</span>
+                          </button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── TAB KEMASAN & PACKAGING (SUPLAI PERCETAKAN & VENDOR) ── */}
+        {activeSubTab === 'kemasan' && (
+          <div className="px-4 sm:px-6 pt-2 space-y-4">
+            {/* Filter Jenis Kemasan & Rekap Belanja */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 overflow-x-auto pb-1">
+              <div className="flex items-center gap-2 overflow-x-auto">
+                {[
+                  { id: 'all', label: 'Semua Kemasan' },
+                  { id: 'pouch', label: '🛍️ Pouch Ziplock' },
+                  { id: 'toples', label: '🫙 Toples Plastik' },
+                  { id: 'sticker_depan', label: '🏷️ Stiker Depan' },
+                  { id: 'sticker_belakang', label: '🏷️ Stiker Belakang' },
+                  { id: 'kardus', label: '📦 Kardus Dus' },
+                  { id: 'polymailer', label: '✉️ Polymailer' },
+                  { id: 'bubblewrap_safety', label: '🛡️ Safety Pack' },
+                ].map(f => (
+                  <button
+                    key={f.id}
+                    onClick={() => setRawTypeFilter(f.id)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                      rawTypeFilter === f.id
+                        ? 'bg-amber-500 text-slate-950'
+                        : 'bg-muted text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                onClick={() => {
+                  setHistoryMaterial(null)
+                  setHistoryModalOpen(true)
+                }}
+                className="shrink-0 px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/20 flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                title="Rekap Riwayat Pembelian Semua Kemasan"
+              >
+                <History size={14} />
+                <span>Rekap Belanja Kemasan</span>
+              </button>
+            </div>
+
+            {/* Grid Kemasan */}
+            {isLoadingRaw ? (
+              <div className="p-12 text-center text-xs text-muted-foreground">Memuat data kemasan & packaging...</div>
+            ) : filteredRaw.length === 0 ? (
+              <div className="p-12 text-center bg-card border border-border/80 rounded-3xl space-y-3">
+                <Boxes size={40} className="mx-auto text-muted-foreground/40" />
+                <div>
+                  <p className="font-bold text-sm text-foreground">Belum ada Kemasan & Packaging</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Tambahkan pouch 100g, 200g, 250g, stiker label, kardus, atau polymailer dari percetakan/vendor.
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setEditingRawMaterial(null)
+                    setRawSheetOpen(true)
+                  }}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold cursor-pointer transition"
+                >
+                  <Plus size={15} /> Tambah Kemasan Sekarang
                 </button>
               </div>
             ) : (
@@ -1356,7 +2264,7 @@ export default function Produk() {
                       <div>
                         <div className="flex items-center justify-between gap-2 mb-2">
                           <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
-                            {raw.material_type?.replace('_', ' ') || 'KEMASAN'}
+                            {raw.category?.replace('_', ' ') || raw.material_type?.replace('_', ' ') || 'KEMASAN'}
                           </span>
                           {isLow && (
                             <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-500/10 text-rose-600 border border-rose-500/20">
@@ -1388,27 +2296,50 @@ export default function Produk() {
                         </div>
                       </div>
 
-                      <div className="mt-3 pt-2.5 border-t border-border/60 flex items-center justify-between">
-                        <span className="text-[11px] text-muted-foreground">
-                          {raw.supplier_name ? `Supplier: ${raw.supplier_name}` : 'Supplier Mandiri'}
-                        </span>
+                      <div className="mt-3 pt-2.5 border-t border-border/60 space-y-2">
+                        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                          <span>{raw.supplier_name ? `Percetakan/Vendor: ${raw.supplier_name}` : 'Vendor Percetakan'}</span>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => {
+                                setHistoryMaterial(raw)
+                                setHistoryModalOpen(true)
+                              }}
+                              className="p-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/20 transition-colors cursor-pointer"
+                              title="Riwayat Pembelian Kemasan Ini"
+                            >
+                              <History size={12} />
+                            </button>
+                            <button
+                              onClick={() => {
+                                setEditingRawMaterial(raw)
+                                setRawSheetOpen(true)
+                              }}
+                              className="p-1.5 rounded-lg bg-muted hover:bg-muted/80 text-foreground transition-colors cursor-pointer"
+                              title="Edit Detail Kemasan"
+                            >
+                              <Edit3 size={12} />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteRaw(raw)}
+                              className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 transition-colors cursor-pointer"
+                              title="Hapus Kemasan"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        </div>
+
                         <div className="flex items-center gap-1.5">
                           <button
                             onClick={() => {
-                              setEditingRawMaterial(raw)
-                              setRawSheetOpen(true)
+                              setRestockMaterial(raw)
+                              setRestockModalOpen(true)
                             }}
-                            className="p-1.5 rounded-lg bg-muted hover:bg-muted/80 text-foreground"
-                            title="Edit Bahan"
+                            className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold text-xs shadow-sm hover:shadow transition-all cursor-pointer"
                           >
-                            <Edit3 size={13} />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteRaw(raw)}
-                            className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-600"
-                            title="Hapus Bahan"
-                          >
-                            <Trash2 size={13} />
+                            <PackagePlus size={14} />
+                            <span>+ Tambah Stok</span>
                           </button>
                         </div>
                       </div>
@@ -1432,7 +2363,7 @@ export default function Produk() {
         )}
       </AnimatePresence>
 
-      {/* Sheet Bahan Baku & Kemasan */}
+      {/* Sheet Bahan Baku & Kemasan (Full Edit/Create) */}
       <SembakoBahanBakuSheet
         open={rawSheetOpen}
         onClose={() => {
@@ -1440,6 +2371,35 @@ export default function Produk() {
           setEditingRawMaterial(null)
         }}
         initialData={editingRawMaterial}
+        targetType={activeSubTab === 'bahan_baku' ? 'bahan_baku' : 'kemasan'}
+      />
+
+      {/* Modal Restok Cepat (Quick Add Stock) */}
+      <SembakoRestockBahanModal
+        open={restockModalOpen}
+        onOpenChange={(v) => {
+          setRestockModalOpen(v)
+          if (!v) setRestockMaterial(null)
+        }}
+        material={restockMaterial}
+        onClose={() => {
+          setRestockModalOpen(false)
+          setRestockMaterial(null)
+        }}
+      />
+
+      {/* Modal Riwayat Belanja / Batch History */}
+      <SembakoBahanBeliHistoryModal
+        open={historyModalOpen}
+        onOpenChange={(v) => {
+          setHistoryModalOpen(v)
+          if (!v) setHistoryMaterial(null)
+        }}
+        material={historyMaterial}
+        onClose={() => {
+          setHistoryModalOpen(false)
+          setHistoryMaterial(null)
+        }}
       />
 
       {/* Modal Hapus Bahan Baku */}

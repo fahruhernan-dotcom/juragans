@@ -71,9 +71,14 @@ class SyncEngine {
       }
 
       // Pull Audit Logs
-      const { data: auditLogs } = await supabase.from('sembako_audit_logs').select('*').eq('tenant_id', tenantId).order('timestamp', { ascending: false }).limit(100)
+      const { data: auditLogs } = await supabase.from('sembako_audit_logs').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: false }).limit(100)
       if (auditLogs && auditLogs.length > 0) {
-        await db.audit_logs.bulkPut(auditLogs)
+        const mappedLogs = auditLogs.map(l => ({
+          ...l,
+          timestamp: l.created_at || l.timestamp || new Date().toISOString(),
+          user_role: l.role || l.user_role || 'staff',
+        }))
+        await db.audit_logs.bulkPut(mappedLogs)
       }
 
       await db.app_metadata.put({ key: 'last_sync_timestamp', value: new Date().toISOString() })
@@ -138,7 +143,16 @@ class SyncEngine {
             }
           } else if (item.entity === 'audit_logs') {
             if (item.action === 'CREATE') {
-              const { error } = await supabase.from('sembako_audit_logs').insert(item.payload)
+              const payload = {
+                tenant_id: item.payload.tenant_id,
+                user_name: item.payload.user_name || 'Sistem',
+                role: item.payload.user_role || item.payload.role || 'staff',
+                action_type: item.payload.action_type || 'AUDIT',
+                product_name: item.payload.product_name,
+                notes: item.payload.notes,
+                created_at: item.payload.timestamp || item.payload.created_at || new Date().toISOString()
+              }
+              const { error } = await supabase.from('sembako_audit_logs').insert(payload)
               if (error) throw error
             }
           }

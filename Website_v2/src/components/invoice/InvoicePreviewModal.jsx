@@ -55,7 +55,7 @@ export default function InvoicePreviewModal({ type = 'sembako_sale', data, isOpe
   const payments = inv?.sembako_payments || data.payments || data.sembako_payments || []
 
   const paperData = {
-    tenant: data.tenant || tenant || { business_name: 'GPK', phone: '-' },
+    tenant: data.tenant || tenant || { business_name: 'Juragans', phone: '-' },
     invoice_number: invNo,
     transaction_date: txnDate,
     due_date: dueDate,
@@ -101,7 +101,7 @@ export default function InvoicePreviewModal({ type = 'sembako_sale', data, isOpe
       items={normalizedItems}
       payments={payments}
       invoiceNumber={invNo}
-      generatedBy={data.generatedBy || 'Admin GPK'}
+      generatedBy={data.generatedBy || 'Admin Juragans'}
       showProfit={data.showProfit ?? false}
     />
   )

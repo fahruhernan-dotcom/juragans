@@ -1,6 +1,6 @@
 import Dexie from 'dexie'
 
-export const db = new Dexie('VirginERP_OfflineDB')
+export const db = new Dexie('Juragans_OfflineDB')
 
 db.version(2).stores({
   products: 'id, product_name, category, is_active, is_deleted, min_stock_alert',

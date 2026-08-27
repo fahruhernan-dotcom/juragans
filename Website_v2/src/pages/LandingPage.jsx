@@ -38,9 +38,9 @@ const LandingPage = () => {
     {
       "@context": "https://schema.org",
       "@type": "Organization",
-      "@id": "https://virgin.dashboard.app/#organization",
-      "name": cfg.company_name ?? "Virgin Master ERP",
-      "url": cfg.company_url ?? "https://virgin.dashboard.app",
+      "@id": "https://juragans.id/#organization",
+      "name": cfg.company_name ?? "Juragans by Anak Bawang",
+      "url": cfg.company_url ?? "https://juragans.id",
       "logo": cfg.company_logo_url ?? "/logo.png",
       "description": cfg.company_description ?? "Platform SaaS ERP, POS Kasir & Manajemen Inventaris FIFO Batch Multi-Satuan #1 di Indonesia. Fitur: Kasir POS, Multi-Gudang, Piutang Pelanggan, Multi-Tier Harga, Laporan Laba Rugi P&L Realtime, dan Offline-First IndexedDB Sync.",
       "contactPoint": {
@@ -60,8 +60,8 @@ const LandingPage = () => {
   return (
     <div className="bg-bg-base min-h-screen text-text-primary font-body overflow-x-hidden">
       <SEO
-        title="Virgin Master Dashboard - Enterprise POS, Multi-Tier Inventory & Financial OS"
-        description="Sistem Operasi Kasir POS, Manajemen Inventaris Batch FIFO Atomik & Financial Intelligence Terpadu. Dukung perdagangan retail, grosir, apotek, bahan bangunan, elektronik, fashion, dan sembako."
+        title="Juragans Dashboard - POS Kasir, Multi-Gudang & Inventaris Bawang Goreng Premium"
+        description="Sistem Operasi Kasir POS, Manajemen Inventaris Batch FIFO Atomik & Financial Intelligence Terpadu Juragans by Anak Bawang. Dukung penjualan, inventaris gudang, dan distribusi premium."
         path="/"
         schema={hubSchema}
       />

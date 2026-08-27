@@ -48,8 +48,7 @@ export function useCapacitorBackNavigation() {
             currentPath === '/' ||
             currentPath === '/beranda' ||
             currentPath.endsWith('/beranda') ||
-            currentPath === '/login' ||
-            currentPath === '/register'
+            currentPath === '/login'
 
           // ── Prioritas 2: Navigasi Mundur (Jika berada di sub-halaman) ──
           if (!isRootPage) {

@@ -1,10 +1,10 @@
 /**
  * ==============================================================================
- * 👑 VIRGIN MASTER DASHBOARD — CENTRALIZED BUSINESS CONFIGURATION
+ * 👑 JURAGANS DASHBOARD — CENTRALIZED BUSINESS CONFIGURATION
  * ==============================================================================
  * Berkas ini adalah PUSAT KENDALI TUNGGAL untuk menyesuaikan seluruh identitas,
  * terminologi industri, mata uang, kategori barang, satuan dinamis, tier harga,
- * serta menyalakan/mematikan fitur (feature toggles) untuk berbagai macam bisnis.
+ * serta menyalakan/mematikan fitur (feature toggles) untuk platform Juragans.
  * ==============================================================================
  */
 

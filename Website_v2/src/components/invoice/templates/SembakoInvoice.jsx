@@ -312,10 +312,10 @@ export function SembakoInvoice({
         {/* HEADER */}
         <View style={s.header}>
           <View>
-            <Text style={s.companyName}>{tenant?.business_name || 'GPK'}</Text>
+            <Text style={s.companyName}>{tenant?.business_name || 'Juragans'}</Text>
             <Text style={s.companyDetail}>{tenant?.location || '-'}</Text>
             <Text style={s.companyDetail}>Tel: {tenant?.phone || '-'}</Text>
-            <Text style={s.companyDetail}>Dashboard GPK — Platform Manajemen Bisnis</Text>
+            <Text style={s.companyDetail}>Juragans — Platform Penjualan & Inventaris Bawang Goreng</Text>
           </View>
           <View>
             <Text style={s.docTitle}>INVOICE</Text>
@@ -578,7 +578,7 @@ export function SembakoInvoice({
           <Text style={s.footerText}>
             {invoiceNumber} | Ref: {invoice?.invoice_number || '-'} | {formatDatePDF(new Date())} | {generatedBy || '-'}
           </Text>
-          <Text style={s.footerText}>Powered by Dashboard GPK</Text>
+          <Text style={s.footerText}>Powered by Juragans Dashboard</Text>
         </View>
 
       </Page>

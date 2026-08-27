@@ -12,6 +12,7 @@ import { toast } from 'sonner'
 import { getBrokerBasePath, getPeternakBasePath, useAuth } from '../lib/hooks/useAuth'
 import { setRememberMe as saveRememberMe } from '@/lib/supabaseStorage'
 import Particles from '@/components/reactbits/Particles'
+import { isCapacitor } from '@/lib/capacitor'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -28,7 +29,7 @@ export default function Login() {
     setIsLoading(true)
     try {
       const mockProf = loginAsBypass(roleKey)
-      toast.success(`Mode Template Aktif: Masuk sebagai ${mockProf.full_name}`)
+      toast.success(`Mode Demo Juragans: Masuk sebagai ${mockProf.full_name}`)
       if (roleKey === 'dev') {
         navigate('/admin', { replace: true })
       } else {
@@ -204,9 +205,9 @@ function DesktopLoginView({ email, setEmail, password, setPassword, showPassword
           </div>
           <div>
             <div className="font-extrabold text-sm text-slate-900 tracking-tight flex items-center gap-2">
-              Virgin Dashboard <span className="text-[10px] bg-[#0c3d0c]/10 text-[#0c3d0c] border border-[#0c3d0c]/20 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">ERP v2.4</span>
+              Juragans Dashboard <span className="text-[10px] bg-[#0c3d0c]/10 text-[#0c3d0c] border border-[#0c3d0c]/20 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">ERP v2.4</span>
             </div>
-            <div className="text-[10px] text-slate-500 font-semibold tracking-wide">Platform Finansial, POS & Inventaris Terpadu</div>
+            <div className="text-[10px] text-slate-500 font-semibold tracking-wide">Platform Penjualan, POS & Inventaris Bawang Goreng Premium</div>
           </div>
         </div>
 
@@ -291,7 +292,7 @@ function DesktopLoginView({ email, setEmail, password, setPassword, showPassword
               </div>
               <div>
                 <div className="text-xs font-bold text-slate-900">H. Subagyo</div>
-                <div className="text-[10px] text-slate-500">Distributor Sembako Jaya, Surabaya</div>
+                <div className="text-[10px] text-slate-500">Distributor Bawang Goreng, Boyolali</div>
               </div>
             </div>
           </div>
@@ -299,7 +300,7 @@ function DesktopLoginView({ email, setEmail, password, setPassword, showPassword
         </div>
 
         <div className="relative z-10 pt-4 text-xs text-slate-400 text-left shrink-0">
-          © 2026 Virgin Dashboard Core ERP. Hak cipta dilindungi.
+          © 2026 Juragans by Anak Bawang. Hak cipta dilindungi.
         </div>
       </motion.div>
 
@@ -313,31 +314,33 @@ function DesktopLoginView({ email, setEmail, password, setPassword, showPassword
         >
           
           <div className="mb-6 text-left">
-            <Link
-              to="/"
-              className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-900 font-semibold mb-4 transition-colors group"
-            >
-              <ArrowLeft size={14} className="transition-transform group-hover:-translate-x-0.5" />
-              <span>Kembali ke Website</span>
-            </Link>
+            {!isCapacitor() && (
+              <Link
+                to="/"
+                className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-900 font-semibold mb-4 transition-colors group"
+              >
+                <ArrowLeft size={14} className="transition-transform group-hover:-translate-x-0.5" />
+                <span>Kembali ke Website</span>
+              </Link>
+            )}
             <h2 className="text-2xl font-black tracking-tight text-slate-950 mb-1.5">
               Selamat Datang Kembali
             </h2>
             <p className="text-xs text-slate-500 leading-relaxed font-medium">
-              Masukkan akun atau pilih mode bypass 1-klik untuk testing template.
+              Masukkan akun atau pilih mode bypass 1-klik untuk akses demo instan.
             </p>
           </div>
 
-          {/* ⚡ 1-CLICK BYPASS / TEMPLATE MODE CARD */}
+          {/* ⚡ 1-CLICK BYPASS / DEMO JURAGANS CARD */}
           <div className="mb-6 p-4 rounded-2xl bg-amber-500/[0.08] border border-amber-500/25 text-left">
             <div className="flex items-center gap-1.5 mb-1.5">
               <Zap size={14} className="text-amber-600 animate-pulse" />
               <span className="text-xs font-black text-amber-950 uppercase tracking-wide">
-                1-Klik Bypass Mode Template
+                1-Klik Masuk Mode Demo Juragans
               </span>
             </div>
             <p className="text-[11px] text-amber-900/80 mb-3 leading-relaxed">
-              Masuk langsung ke dashboard tanpa perlu konfigurasi login Supabase:
+              Masuk langsung ke dashboard Juragans tanpa konfigurasi auth:
             </p>
             <div className="grid grid-cols-3 gap-2">
               <button
@@ -346,7 +349,7 @@ function DesktopLoginView({ email, setEmail, password, setPassword, showPassword
                 className="py-2.5 px-2 text-center bg-white hover:bg-emerald-50 border border-emerald-600/30 hover:border-emerald-600 rounded-xl text-emerald-900 font-bold text-xs shadow-sm hover:shadow transition-all flex flex-col items-center gap-0.5 cursor-pointer active:scale-95"
               >
                 <span>👑 Owner</span>
-                <span className="text-[9px] font-semibold text-emerald-600">Pemilik Toko</span>
+                <span className="text-[9px] font-semibold text-emerald-600">Juragan Bawang</span>
               </button>
               <button
                 type="button"
@@ -362,7 +365,7 @@ function DesktopLoginView({ email, setEmail, password, setPassword, showPassword
                 className="py-2.5 px-2 text-center bg-white hover:bg-sky-50 border border-sky-600/30 hover:border-sky-600 rounded-xl text-sky-900 font-bold text-xs shadow-sm hover:shadow transition-all flex flex-col items-center gap-0.5 cursor-pointer active:scale-95"
               >
                 <span>💼 Kasir</span>
-                <span className="text-[9px] font-semibold text-sky-600">Staf Admin</span>
+                <span className="text-[9px] font-semibold text-sky-600">Staf Toko</span>
               </button>
             </div>
           </div>
@@ -386,7 +389,7 @@ function DesktopLoginView({ email, setEmail, password, setPassword, showPassword
                 <Mail size={16} className="text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
-                  placeholder="owner@sembako.id atau username"
+                  placeholder="owner@juragans.id atau username"
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   className="w-full h-11 pl-10 pr-4 bg-[#F8FAFC] border border-slate-200 rounded-xl text-slate-900 text-sm outline-none focus:border-[#0c3d0c] focus:ring-4 focus:ring-[#0c3d0c]/10 placeholder:text-slate-400 transition-all box-border"
@@ -484,22 +487,24 @@ function MobileLoginView({ email, setEmail, password, setPassword, showPassword,
           <Store size={22} className="text-white" strokeWidth={2.2} />
         </div>
         <h1 className="text-xl font-black text-slate-900 flex items-center justify-center gap-1.5 tracking-tight">
-          Virgin Dashboard <span className="text-[9px] bg-[#0c3d0c]/10 text-[#0c3d0c] border border-[#0c3d0c]/20 px-2 py-0.5 rounded-full uppercase tracking-wider font-bold">ERP v2.4</span>
+          Juragans Dashboard <span className="text-[9px] bg-[#0c3d0c]/10 text-[#0c3d0c] border border-[#0c3d0c]/20 px-2 py-0.5 rounded-full uppercase tracking-wider font-bold">ERP v2.4</span>
         </h1>
-        <p className="text-[10px] text-slate-500 font-medium tracking-wide mt-1">Platform Finansial, POS & Inventaris Terpadu</p>
+        <p className="text-[10px] text-slate-500 font-medium tracking-wide mt-1">Platform Penjualan, POS & Inventaris Bawang Goreng Premium</p>
       </div>
 
       {/* FORM CARD */}
       <div className="w-full max-w-[360px] mx-auto bg-white border border-slate-200/80 rounded-3xl p-6 sm:p-7 shadow-[0_16px_40px_-10px_rgba(15,23,42,0.06)]">
         
         <div className="mb-4">
-          <Link
-            to="/"
-            className="inline-flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-900 font-semibold mb-3 transition-colors"
-          >
-            <ArrowLeft size={13} />
-            <span>Kembali ke Website</span>
-          </Link>
+          {!isCapacitor() && (
+            <Link
+              to="/"
+              className="inline-flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-900 font-semibold mb-3 transition-colors"
+            >
+              <ArrowLeft size={13} />
+              <span>Kembali ke Website</span>
+            </Link>
+          )}
           <h2 className="text-lg font-black text-slate-950 tracking-tight">Masuk Akun</h2>
           <p className="text-xs text-slate-500 mt-0.5">Pilih mode bypass atau masukkan akun terdaftar.</p>
         </div>
@@ -509,7 +514,7 @@ function MobileLoginView({ email, setEmail, password, setPassword, showPassword,
           <div className="flex items-center gap-1.5 mb-1">
             <Zap size={13} className="text-amber-600 animate-pulse" />
             <span className="text-[11px] font-black text-amber-950 uppercase tracking-wide">
-              1-Klik Bypass Mode Template
+              1-Klik Masuk Mode Demo Juragans
             </span>
           </div>
           <div className="grid grid-cols-3 gap-1.5 mt-2.5">
@@ -519,7 +524,7 @@ function MobileLoginView({ email, setEmail, password, setPassword, showPassword,
               className="py-2 px-1 text-center bg-white hover:bg-emerald-50 border border-emerald-600/30 rounded-xl text-emerald-900 font-bold text-[11px] shadow-sm transition-all flex flex-col items-center gap-0.5 cursor-pointer active:scale-95"
             >
               <span>👑 Owner</span>
-              <span className="text-[8.5px] font-semibold text-emerald-600">Pemilik</span>
+              <span className="text-[8.5px] font-semibold text-emerald-600">Juragan</span>
             </button>
             <button
               type="button"
@@ -527,7 +532,7 @@ function MobileLoginView({ email, setEmail, password, setPassword, showPassword,
               className="py-2 px-1 text-center bg-white hover:bg-indigo-50 border border-indigo-600/30 rounded-xl text-indigo-900 font-bold text-[11px] shadow-sm transition-all flex flex-col items-center gap-0.5 cursor-pointer active:scale-95"
             >
               <span>🛠️ Dev</span>
-              <span className="text-[8.5px] font-semibold text-indigo-600">Admin Hub</span>
+              <span className="text-[8.5px] font-semibold text-indigo-600">Superadmin</span>
             </button>
             <button
               type="button"
@@ -535,7 +540,7 @@ function MobileLoginView({ email, setEmail, password, setPassword, showPassword,
               className="py-2 px-1 text-center bg-white hover:bg-sky-50 border border-sky-600/30 rounded-xl text-sky-900 font-bold text-[11px] shadow-sm transition-all flex flex-col items-center gap-0.5 cursor-pointer active:scale-95"
             >
               <span>💼 Kasir</span>
-              <span className="text-[8.5px] font-semibold text-sky-600">Staf POS</span>
+              <span className="text-[8.5px] font-semibold text-sky-600">Staf Toko</span>
             </button>
           </div>
         </div>

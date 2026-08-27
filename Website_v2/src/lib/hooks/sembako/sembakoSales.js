@@ -178,11 +178,139 @@ export const useSembakoSales = () => {
   })
 }
 
+// ── Helper to deduct BOM & Packaging materials from sembako_raw_materials ──────
+async function deductRawMaterialsAndPackaging({ tenant_id, items, packing_details, invoice_number }) {
+  if (!tenant_id || !Array.isArray(items) || items.length === 0) return
+
+  try {
+    const { data: rawMaterials, error } = await supabase
+      .from('sembako_raw_materials')
+      .select('*')
+      .eq('tenant_id', tenant_id)
+      .eq('is_deleted', false)
+
+    if (error || !rawMaterials || rawMaterials.length === 0) return
+
+    const materialDeductions = {} // { material_id: { material, deductQty, reason } }
+
+    // 1. Deduct Product-specific BOM (Pouch, Stiker Depan, Stiker Belakang, Bawang Curah)
+    for (const item of items) {
+      const itemQty = Number(item.quantity) || 0
+      if (itemQty <= 0) continue
+
+      const nameLower = (item.product_name || '').toLowerCase()
+
+      // Find matching pouch based on gram/name
+      let matchedPouch = null
+      if (nameLower.includes('100')) {
+        matchedPouch = rawMaterials.find(r => r.category === 'pouch' && r.material_name.includes('100'))
+      } else if (nameLower.includes('200')) {
+        matchedPouch = rawMaterials.find(r => r.category === 'pouch' && r.material_name.includes('200'))
+      } else if (nameLower.includes('250')) {
+        matchedPouch = rawMaterials.find(r => r.category === 'pouch' && r.material_name.includes('250'))
+      }
+      if (!matchedPouch) {
+        matchedPouch = rawMaterials.find(r => r.category === 'pouch')
+      }
+
+      if (matchedPouch) {
+        materialDeductions[matchedPouch.id] = {
+          material: matchedPouch,
+          deductQty: (materialDeductions[matchedPouch.id]?.deductQty || 0) + itemQty,
+          reason: `Pouch ${item.product_name}`
+        }
+      }
+
+      // Match Stiker Depan
+      const stickerDepan = rawMaterials.find(r => r.category === 'sticker_depan' || r.material_name.toLowerCase().includes('stiker depan'))
+      if (stickerDepan) {
+        materialDeductions[stickerDepan.id] = {
+          material: stickerDepan,
+          deductQty: (materialDeductions[stickerDepan.id]?.deductQty || 0) + itemQty,
+          reason: `Stiker Depan ${item.product_name}`
+        }
+      }
+
+      // Match Stiker Belakang
+      const stickerBelakang = rawMaterials.find(r => r.category === 'sticker_belakang' || r.material_name.toLowerCase().includes('stiker belakang'))
+      if (stickerBelakang) {
+        materialDeductions[stickerBelakang.id] = {
+          material: stickerBelakang,
+          deductQty: (materialDeductions[stickerBelakang.id]?.deductQty || 0) + itemQty,
+          reason: `Stiker Belakang ${item.product_name}`
+        }
+      }
+
+      // Match Bawang Curah
+      const bawangCurah = rawMaterials.find(r => r.category === 'bawang_mentah' || r.material_name.toLowerCase().includes('bawang'))
+      if (bawangCurah) {
+        let gramPerPcs = 100
+        if (nameLower.includes('250')) gramPerPcs = 250
+        else if (nameLower.includes('200')) gramPerPcs = 200
+        else if (nameLower.includes('100')) gramPerPcs = 100
+
+        const isKg = (bawangCurah.unit || '').toLowerCase() === 'kg'
+        const deductAmt = isKg ? (itemQty * gramPerPcs / 1000) : (itemQty * gramPerPcs)
+
+        materialDeductions[bawangCurah.id] = {
+          material: bawangCurah,
+          deductQty: (materialDeductions[bawangCurah.id]?.deductQty || 0) + deductAmt,
+          reason: `Bawang curah ${item.product_name}`
+        }
+      }
+    }
+
+    // 2. Deduct Transaction Secondary Packing (Polymailer per 1-4 pouch / Kardus)
+    const polymailerQty = packing_details?.quantity !== undefined
+      ? Number(packing_details.quantity)
+      : Math.ceil(items.reduce((s, i) => s + (Number(i.quantity) || 0), 0) / 4)
+
+    if (polymailerQty > 0 && packing_details?.packing_type !== 'none') {
+      const packingMatName = packing_details?.material_name || 'Plastik Packing Polymailer Hitam'
+      const polymailerMat = rawMaterials.find(r => 
+        r.material_name.toLowerCase().includes(packingMatName.toLowerCase()) ||
+        r.category === 'kardus' ||
+        r.material_name.toLowerCase().includes('polymailer')
+      ) || rawMaterials.find(r => r.material_name.toLowerCase().includes('polymailer'))
+
+      if (polymailerMat) {
+        materialDeductions[polymailerMat.id] = {
+          material: polymailerMat,
+          deductQty: (materialDeductions[polymailerMat.id]?.deductQty || 0) + polymailerQty,
+          reason: `Packing Transaksi #${invoice_number || 'Sale'}`
+        }
+      }
+    }
+
+    // 3. Perform database updates
+    for (const [matId, entry] of Object.entries(materialDeductions)) {
+      const currentStock = Number(entry.material.current_stock) || 0
+      const newStock = Math.max(0, currentStock - entry.deductQty)
+
+      await supabase
+        .from('sembako_raw_materials')
+        .update({ current_stock: newStock })
+        .eq('id', matId)
+
+      recordAuditLog({
+        action_type: 'BOM_DEDUCT',
+        product_name: entry.material.material_name,
+        old_value: `${currentStock} ${entry.material.unit}`,
+        new_value: `${newStock} ${entry.material.unit} (-${entry.deductQty} ${entry.material.unit})`,
+        notes: `Pemakaian bahan untuk penjualan #${invoice_number || 'Sale'} (${entry.reason})`,
+        tenant_id
+      })
+    }
+  } catch (err) {
+    console.warn('[deductRawMaterialsAndPackaging] Non-blocking error:', err)
+  }
+}
+
 export const useCreateSembakoSale = () => {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async ({ customer_id, customer_name, transaction_date,
-      due_date, items, delivery_cost, other_cost, notes }) => {
+      due_date, items, delivery_cost, other_cost, notes, packing_details }) => {
       const tenant_id = await getTenantId()
 
       // ── ATOMIC SUPABASE RPC TRANSACTION (Primary) ──────────────────────────
@@ -200,6 +328,13 @@ export const useCreateSembakoSale = () => {
         })
 
         if (!rpcError && rpcData?.id) {
+          // Deduct linked BOM and polymailer packing materials
+          await deductRawMaterialsAndPackaging({
+            tenant_id,
+            items,
+            packing_details,
+            invoice_number: rpcData.invoice_number
+          })
           return rpcData
         }
         if (rpcError) {
@@ -346,6 +481,14 @@ export const useCreateSembakoSale = () => {
           const newCurrent = (bTotals || []).reduce((s, b) => s + (b.qty_sisa || 0), 0)
           await supabase.from('sembako_products').update({ current_stock: newCurrent }).eq('id', item.product_id)
         }
+
+        // Deduct linked BOM and polymailer packing materials
+        await deductRawMaterialsAndPackaging({
+          tenant_id,
+          items,
+          packing_details,
+          invoice_number: sale.invoice_number
+        })
       } catch (deductErr) {
         await supabase.from('sembako_sale_items').delete().eq('sale_id', sale.id)
         await supabase.from('sembako_sales').delete().eq('id', sale.id)
@@ -359,6 +502,8 @@ export const useCreateSembakoSale = () => {
       queryClient.invalidateQueries({ queryKey: ['sembako-customers'] })
       queryClient.invalidateQueries({ queryKey: ['sembako-customer-invoices'] })
       queryClient.invalidateQueries({ queryKey: ['sembako-dashboard-stats'] })
+      queryClient.invalidateQueries({ queryKey: ['sembako-raw-materials'] })
+      queryClient.invalidateQueries({ queryKey: ['sembako-audit-logs'] })
       toast.success('Invoice berhasil dibuat')
     },
     onError: (err) => toast.error(normalizeSupabaseError(err).message),

@@ -193,10 +193,10 @@ export default function AppSidebar({ open, onClose }) {
               </div>
               <div className="text-left min-w-0 flex-1">
                 <p className="font-['Sora'] text-[13px] font-bold text-foreground truncate leading-tight">
-                  {tenant?.business_name || tenant?.name || 'Virgin Master ERP'}
+                  {tenant?.business_name || tenant?.name || 'Juragans by Anak Bawang'}
                 </p>
                 <p className="text-[10px] text-muted-foreground font-medium truncate mt-0.5">
-                  {tenant?.city || 'Distributor & Retail'}
+                  {tenant?.city || 'Bawang Goreng Premium'}
                 </p>
               </div>
             </div>
@@ -235,9 +235,9 @@ export default function AppSidebar({ open, onClose }) {
                           }`}
                         >
                           <div className="min-w-0 flex-1 pr-2">
-                            <p className="truncate font-bold">{t?.business_name || t?.name || 'Toko'}</p>
+                            <p className="truncate font-bold">{t?.business_name || t?.name || 'Juragans by Anak Bawang'}</p>
                             <p className={`text-[10px] truncate ${isCurrent ? 'text-slate-300' : 'text-muted-foreground'}`}>
-                              {p.role || 'Staff'} · {t?.city || 'Retail'}
+                              {p.role || 'Staff'} · {t?.city || 'Juragan Bawang'}
                             </p>
                           </div>
                           {isCurrent && <Check size={14} className="shrink-0" />}
@@ -475,7 +475,7 @@ export default function AppSidebar({ open, onClose }) {
         <SheetContent side="left" hideClose className="p-0 border-r border-border w-[285px] max-w-[85vw] flex flex-col h-full overflow-hidden" style={{ background: 'var(--bg-1-val)' }}>
           <SheetHeader className="sr-only">
             <SheetTitle>Navigasi Sidebar</SheetTitle>
-            <SheetDescription>Menu navigasi utama aplikasi Virgin Dashboard ERP.</SheetDescription>
+            <SheetDescription>Menu navigasi utama aplikasi Juragans Dashboard.</SheetDescription>
           </SheetHeader>
           <Sidebar collapsible="none" className="border-none bg-transparent select-none cursor-default flex flex-col h-full w-full overflow-hidden">
             {sidebarContent}

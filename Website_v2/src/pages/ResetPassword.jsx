@@ -9,6 +9,7 @@ import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import Particles from '@/components/reactbits/Particles'
 import { logError } from '@/lib/logger/errorLogger'
+import { isCapacitor } from '@/lib/capacitor'
 
 export default function ResetPassword() {
   const navigate = useNavigate()
@@ -137,7 +138,7 @@ export default function ResetPassword() {
         className="w-full max-w-[420px] relative z-10"
       >
         {/* Logo */}
-        <Link to="/" className="flex items-center justify-center gap-2 mb-10 group">
+        <Link to={isCapacitor() ? "/login" : "/"} className="flex items-center justify-center gap-2 mb-10 group">
           <img
             src="/logo.png"
             alt="TernakOS"

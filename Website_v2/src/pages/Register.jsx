@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { supabase } from '@/lib/supabase'
-import { getOAuthRedirectUrl } from '@/lib/capacitor'
+import { getOAuthRedirectUrl, isCapacitor } from '@/lib/capacitor'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -275,7 +275,7 @@ export default function Register() {
 
         <Particles quantity={30} color="#10B981" opacity={0.15} className="absolute inset-0 pointer-events-none" />
 
-        <Link to="/" className="absolute top-8 left-12 flex items-center gap-[10px] z-50 hover:opacity-80 transition-opacity">
+        <Link to={isCapacitor() ? "/login" : "/"} className="absolute top-8 left-12 flex items-center gap-[10px] z-50 hover:opacity-80 transition-opacity">
           <img src="/logo.png" alt="TernakOS" style={{ width: 36, height: 36, borderRadius: '10px', objectFit: 'cover' }} />
           <span style={{ fontFamily: 'Sora', fontSize: '20px', fontWeight: 800, color: '#F1F5F9', letterSpacing: '-0.3px' }}>TernakOS</span>
         </Link>

@@ -64,7 +64,7 @@ export function DesktopBeranda({
             Selamat datang, {name}
           </h1>
           <p className="text-xs font-bold tracking-widest text-slate-500 uppercase">
-            {profile?.tenants?.business_name?.toUpperCase() || profile?.business_name?.toUpperCase() || 'DASHBOARD INVENTARIS & BISNIS'}
+            {profile?.tenants?.business_name?.toUpperCase() || profile?.business_name?.toUpperCase() || 'JURAGANS BY ANAK BAWANG'}
           </p>
           <SmartInsight insight={insight} className="mt-2" />
         </div>

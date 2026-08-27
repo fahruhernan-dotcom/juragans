@@ -11,6 +11,17 @@ export function GlobalErrorDialog() {
         const filename = event?.filename || ''
         const lineno = event?.lineno || ''
 
+        // Abaikan error dari ekstensi browser (Chrome extensions, add-ons)
+        if (
+          filename.includes('chrome-extension://') ||
+          filename.includes('moz-extension://') ||
+          stack.includes('chrome-extension://') ||
+          stack.includes('moz-extension://') ||
+          message.includes('chrome-extension://')
+        ) {
+          return
+        }
+
         console.error('[GlobalErrorCaught]:', message, stack)
         setErrorInfo({
           type: 'Runtime Error',
@@ -29,6 +40,16 @@ export function GlobalErrorDialog() {
         const reason = event?.reason
         const message = reason?.message || String(reason || 'Unhandled Promise Rejection')
         const stack = reason?.stack || 'No stack trace'
+
+        // Abaikan promise rejection dari ekstensi browser pihak ketiga
+        if (
+          stack.includes('chrome-extension://') ||
+          stack.includes('moz-extension://') ||
+          message.includes('chrome-extension://') ||
+          (typeof reason === 'string' && reason.includes('chrome-extension://'))
+        ) {
+          return
+        }
 
         console.error('[UnhandledPromiseRejectionCaught]:', message, stack)
         setErrorInfo({
@@ -55,7 +76,7 @@ export function GlobalErrorDialog() {
   if (!errorInfo) return null
 
   const copyToClipboard = () => {
-    const text = `=== GPK ERROR DIAGNOSTIC REPORT ===\nType: ${errorInfo.type}\nTime: ${errorInfo.timestamp}\nSource: ${errorInfo.source}\nMessage: ${errorInfo.message}\nStack: ${errorInfo.stack}\nUserAgent: ${navigator.userAgent}`
+    const text = `=== JURAGANS ERROR DIAGNOSTIC REPORT ===\nType: ${errorInfo.type}\nTime: ${errorInfo.timestamp}\nSource: ${errorInfo.source}\nMessage: ${errorInfo.message}\nStack: ${errorInfo.stack}\nUserAgent: ${navigator.userAgent}`
     navigator.clipboard?.writeText?.(text).then(() => {
       alert('Info error berhasil disalin ke clipboard!')
     }).catch(() => {

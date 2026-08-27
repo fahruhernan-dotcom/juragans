@@ -66,7 +66,7 @@ export default function DrawerLainnya({ isOpen, onClose, userType }) {
               <div className="flex justify-between items-center mb-6">
                 <div>
                   <h2 className="font-display text-lg font-bold text-foreground">Menu Navigasi</h2>
-                  <p className="text-xs text-muted-foreground">{model.name || 'Virgin Master ERP'}</p>
+                  <p className="text-xs text-muted-foreground">{model.name || 'Juragans Dashboard'}</p>
                 </div>
                 <button onClick={onClose} className="p-2 bg-muted/40 hover:bg-muted rounded-full text-muted-foreground transition-colors cursor-pointer border-none">
                   <X size={18} />

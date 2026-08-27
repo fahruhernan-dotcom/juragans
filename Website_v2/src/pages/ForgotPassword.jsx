@@ -9,6 +9,7 @@ import { Mail, ArrowLeft, Loader2, CheckCircle2, AlertCircle, ShieldAlert } from
 import Particles from '@/components/reactbits/Particles'
 import { useAntiSpam } from '@/lib/hooks/useAntiSpam'
 import { logError } from '@/lib/logger/errorLogger'
+import { isCapacitor } from '@/lib/capacitor'
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('')
@@ -107,7 +108,7 @@ export default function ForgotPassword() {
         className="w-full max-w-[420px] relative z-10"
       >
         {/* Logo */}
-        <Link to="/" className="flex items-center justify-center gap-2 mb-10 group">
+        <Link to={isCapacitor() ? "/login" : "/"} className="flex items-center justify-center gap-2 mb-10 group">
           <img
             src="/logo.png"
             alt="TernakOS"

@@ -126,7 +126,7 @@ export async function exportInvoicePDF(pdfDoc, fileName = 'Invoice.pdf', meta = 
  */
 export function generateWhatsAppInvoiceText(data) {
   const invNo = data.invoice_number || data.invoiceNumber || 'INV'
-  const businessName = data.tenant?.business_name || data.businessName || 'GPK Sembako'
+  const businessName = data.tenant?.business_name || data.businessName || 'Juragans by Anak Bawang'
   const customerName = data.customer_name || data.customerName || 'Pelanggan'
   const txnDate = formatDatePDF(data.transaction_date || data.transactionDate || new Date(), true)
   const dueDate = data.due_date ? formatDatePDF(data.due_date) : null

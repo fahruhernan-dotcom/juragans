@@ -21,6 +21,10 @@ import LicenseBanner from './components/license/LicenseBanner'
 import { initPushNotifications } from './lib/services/pushNotificationService'
 import { useCapacitorBackNavigation } from './lib/hooks/useCapacitorBackNavigation'
 
+import { isCapacitor } from './lib/capacitor'
+import { getBrokerBasePath } from './lib/hooks/useAuth'
+import { isDevUser } from '@/lib/auth/business-roles'
+
 const SuperadminDashboard = React.lazy(() => import('./dashboard/superadmin/SuperadminDashboardPage'))
 
 // Landing & Company Profile pages
@@ -127,7 +131,35 @@ const ScrollToTop = () => {
   return null
 }
 
-import { isDevUser } from '@/lib/auth/business-roles'
+function RootRoute() {
+  const { loading, user, profile, isSuperadmin } = useAuth()
+
+  // Jika diakses dari Web Browser biasa: Tampilkan Landing Page
+  if (!isCapacitor()) {
+    return <LandingPage />
+  }
+
+  // Jika diakses dari Capacitor Mobile App (Android APK):
+  if (loading) {
+    return <LoadingScreen />
+  }
+
+  // Jika belum login -> langsung lempar ke halaman login
+  if (!user) {
+    return <Navigate to="/login" replace />
+  }
+
+  // Jika sudah login di mobile app -> langsung ke Dashboard
+  if (isSuperadmin) {
+    return <Navigate to="/admin" replace />
+  }
+
+  if (profile && !profile.onboarded) {
+    return <Navigate to="/onboarding" replace />
+  }
+
+  return <Navigate to={`${getBrokerBasePath(profile?.tenants, profile)}/beranda`} replace />
+}
 
 function ProtectedRoute({ children }) {
   const { loading, user, tenant, profile } = useAuth()
@@ -214,7 +246,7 @@ function AppContentLayout() {
       <Suspense fallback={<LoadingScreen />}>
         <Routes>
           {/* ── Public Landing & Company Profile Routes ── */}
-          <Route path="/" element={<LandingPage />} />
+          <Route path="/" element={<RootRoute />} />
           <Route path="/about-us" element={<AboutUsPage />} />
           <Route path="/links" element={<BioLinksPage />} />
           <Route path="/bio" element={<BioLinksPage />} />
