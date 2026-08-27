@@ -1178,6 +1178,7 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
         const packagingTag = factor > 1 ? `[${inputQty} ${inputUnit}]` : ''
         const cleanName = (i.product_name || '').replace(/\s*\[\d+[^\]]+\]/g, '').trim()
         const prod = products.find(p => p.id === i.product_id)
+        const finalName = packagingTag ? `${cleanName} ${packagingTag}` : (cleanName || prod?.product_name || i.product_name || 'Produk')
 
         return {
           ...i,
