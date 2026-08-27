@@ -376,7 +376,7 @@ export function calculateSaleFinancials(sale, returnsList = [], products = []) {
   // sale.total_amount bisa corrupted jika DB di-update salah; items tidak bisa circular.
   // Jika items kosong, percaya sale.total_amount dari hook (hook juga pakai items saat pertama load).
   const grandTotal = itemsSubtotalFromItems > 0
-    ? Math.max(0, itemsSubtotalFromItems - totalReturnAmount)
+    ? Math.max(0, itemsSubtotalFromItems + deliveryCost - totalReturnAmount)
     : Math.max(0, Number(sale.total_amount) || 0)
 
   const payments = Array.isArray(sale.sembako_payments) ? sale.sembako_payments.filter(p => !p.is_deleted) : []

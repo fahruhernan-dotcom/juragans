@@ -868,7 +868,7 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
   }, [allSales, editId])
 
   const selectedCust = customers.find(c => c.id === custId)
-  const totalAmount  = items.reduce((s, i) => {
+  const productSubtotal = items.reduce((s, i) => {
     const factor = getFactor(i.selectedUnit || i.unit || 'pcs')
     const isMultiUnitPackaging = factor > 1
     const mode = i.priceMode || 'per_base'
@@ -878,13 +878,14 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
       : (Number(i.quantity) || 0) * inputPrice
     return s + Math.round(sub)
   }, 0)
+  const totalAmount  = productSubtotal + Number(deliveryCost || 0)
   const totalCogs    = items.reduce((s, i) => {
     const factor = getFactor(i.selectedUnit || i.unit || 'pcs')
     return s + Math.round((i.quantity || 0) * factor * (i.cogs_per_unit || 0))
   }, 0)
-  const grossProfit  = totalAmount - totalCogs
-  const netProfit    = grossProfit - deliveryCost - otherCost
-  const netMarginPct = totalAmount > 0 ? Math.round((netProfit / totalAmount) * 100) : 0
+  const grossProfit  = productSubtotal - totalCogs
+  const netProfit    = grossProfit - otherCost
+  const netMarginPct = productSubtotal > 0 ? Math.round((netProfit / productSubtotal) * 100) : 0
 
   // ── Edit prefill ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -1848,8 +1849,8 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
 
                     {/* Running total */}
                     <div className="flex items-center justify-between px-4 py-3 rounded-xl" style={{ background: '#F8FAFC' }}>
-                      <span className="text-[11px] font-black uppercase tracking-widest" style={{ color: MUTED }}>Total Sementara</span>
-                      <span className="text-base font-black" style={{ color: TEXT }}>{formatIDR(totalAmount)}</span>
+                      <span className="text-[11px] font-black uppercase tracking-widest" style={{ color: MUTED }}>Subtotal Produk</span>
+                      <span className="text-base font-black" style={{ color: TEXT }}>{formatIDR(productSubtotal)}</span>
                     </div>
                   </>
                 )}
@@ -2383,6 +2384,24 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
                           </div>
                         </div>
                       )}
+
+                      {/* Live Running Total in Step 2 */}
+                      <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200/80 dark:border-white/10 space-y-1.5 text-xs mt-3">
+                        <div className="flex justify-between items-center text-slate-600 dark:text-slate-400">
+                          <span>Subtotal Produk:</span>
+                          <span className="font-bold text-slate-900 dark:text-white">{formatIDR(productSubtotal)}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-slate-600 dark:text-slate-400">
+                          <span>Ongkos Kirim Ditagihkan:</span>
+                          <span className={`font-bold ${deliveryCost > 0 ? 'text-indigo-600 dark:text-indigo-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                            {deliveryCost > 0 ? `+${formatIDR(deliveryCost)}` : '🎁 Bebas Ongkir (Rp 0)'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center pt-1.5 border-t border-slate-200/60 dark:border-white/10 font-black text-slate-900 dark:text-white">
+                          <span>Total Sementara:</span>
+                          <span className="font-mono text-sm text-sky-600 dark:text-sky-400">{formatIDR(totalAmount)}</span>
+                        </div>
+                      </div>
                     </div>
                   </>
                 )}
@@ -2464,7 +2483,7 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
                       <div className="pt-2 border-t border-slate-100 dark:border-white/10 space-y-2 text-xs">
                         <div className="flex justify-between items-center text-slate-600 dark:text-slate-400">
                           <span>Subtotal Produk</span>
-                          <span className="font-bold text-slate-900 dark:text-white">{formatIDR(Math.max(0, totalAmount - deliveryCost))}</span>
+                          <span className="font-bold text-slate-900 dark:text-white">{formatIDR(productSubtotal)}</span>
                         </div>
 
                         <div className="flex justify-between items-center text-slate-600 dark:text-slate-400">

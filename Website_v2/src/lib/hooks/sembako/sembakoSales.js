@@ -58,9 +58,9 @@ export function processSaleRow(sale, returnsData = [], itemsBySaleId = {}) {
 
   const initialSubtotal = itemsSubtotal > 0
     ? itemsSubtotal
-    : (Number(sale.subtotal) > 0 ? Number(sale.subtotal) : Number(sale.total_amount) + totalReturnAmount)
+    : (Number(sale.subtotal) > 0 ? Number(sale.subtotal) : Math.max(0, Number(sale.total_amount) - deliveryCost + totalReturnAmount))
 
-  const total_amount = Math.max(0, initialSubtotal - totalReturnAmount)
+  const total_amount = Math.max(0, initialSubtotal + deliveryCost - totalReturnAmount)
 
   const netPaidFromPayments = Math.max(0, paidFromPayments - refundFromPayments)
   const raw_paid = Math.max(Number(sale.paid_amount || 0), netPaidFromPayments)
@@ -565,11 +565,12 @@ export const useCreateSembakoSale = () => {
         itemBatchCache[item.product_id] = batches || []
       }
 
-      const total_amount = items.reduce((s, i) => s + Math.round(i.quantity * i.price_per_unit), 0)
+      const items_subtotal = items.reduce((s, i) => s + Math.round(i.quantity * i.price_per_unit), 0)
+      const total_amount = items_subtotal + (Number(delivery_cost) || 0)
       const total_cogs = items.reduce((s, i) => s + Math.round(i.quantity * (i.product_id ? (itemFifoCogs[i.product_id] ?? i.cogs_per_unit ?? 0) : (i.cogs_per_unit || 0))), 0)
 
       // Compute net_profit at insert time so DB always has an accurate value
-      const net_profit_insert = Math.max(0, total_amount - total_cogs - (delivery_cost || 0) - (other_cost || 0))
+      const net_profit_insert = Math.max(0, items_subtotal - total_cogs - (other_cost || 0))
 
       const { data: sale, error: saleErr } = await supabase
         .from('sembako_sales').insert({
