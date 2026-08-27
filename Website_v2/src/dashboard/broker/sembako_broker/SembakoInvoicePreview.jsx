@@ -33,7 +33,7 @@ export function SembakoInvoicePaper({ data, mode = 'invoice' }) {
   const companyName = data.tenant?.business_name || 'Gudang Juragans'
   const companyPhone = data.tenant?.phone || '-'
   const customerName = data.customerName || data.customer_name || 'Pelanggan Umum'
-  const customerType = data.customerType || data.customer_type || 'warung'
+  const customerType = data.customerType || data.customer_type || 'perseorangan'
   const customerPhone = data.customerPhone || data.customer_phone || '-'
   const customerAddress = data.customerAddress || data.customer_address || ''
 
@@ -637,7 +637,7 @@ export default function SembakoInvoicePreview({ data, mode = 'invoice', onClose 
           }}
           customer={{
             customer_name: data.customerName || data.customer_name || 'Customer',
-            customer_type: data.customerType || data.customer_type || 'warung',
+            customer_type: data.customerType || data.customer_type || 'perseorangan',
             phone: data.customerPhone || data.customer_phone || '-',
             address: data.customerAddress || data.customer_address || '',
           }}

@@ -927,7 +927,7 @@ function EditProfileForm({ profile: targetProfile, isCustomer, onClose, onReques
   const [form, setForm] = useState({
     customer_name: targetProfile?.customer_name || '',
     supplier_name: targetProfile?.supplier_name || '',
-    customer_type: targetProfile?.customer_type || 'warung',
+    customer_type: targetProfile?.customer_type || 'perseorangan',
     phone: targetProfile?.phone || '',
     area: targetProfile?.area || '',
     address: targetProfile?.address || '',

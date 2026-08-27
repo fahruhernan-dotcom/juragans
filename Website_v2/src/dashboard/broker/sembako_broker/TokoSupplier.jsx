@@ -56,6 +56,7 @@ import { cn } from '@/lib/utils'
 const MotionButton = motion.button
 
 const CUSTOMER_TYPES = [
+  'perseorangan',
   'warung',
   'toko_retail',
   'supermarket',
@@ -64,7 +65,6 @@ const CUSTOMER_TYPES = [
   'grosir',
   'semi_grosir',
   'sales_keliling',
-  'perseorangan',
   'lainnya',
 ]
 
@@ -425,7 +425,7 @@ function TokoActions({ compact = false, open: externalOpen, onOpenChange: extern
   const createCustomer = useCreateSembakoCustomer()
   const [form, setForm] = useState({
     customer_name: '',
-    customer_type: 'warung',
+    customer_type: 'perseorangan',
     phone: '',
     address: '',
     area: '',
@@ -440,7 +440,7 @@ function TokoActions({ compact = false, open: externalOpen, onOpenChange: extern
     setOpen(false)
     setForm({
       customer_name: '',
-      customer_type: 'warung',
+      customer_type: 'perseorangan',
       phone: '',
       address: '',
       area: '',

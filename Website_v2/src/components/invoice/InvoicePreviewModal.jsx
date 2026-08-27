@@ -60,7 +60,7 @@ export default function InvoicePreviewModal({ type = 'sembako_sale', data, isOpe
     transaction_date: txnDate,
     due_date: dueDate,
     customer_name: cust?.customer_name || inv?.customer_name || data.customerName || 'Customer',
-    customer_type: cust?.customer_type || 'warung',
+    customer_type: cust?.customer_type || 'perseorangan',
     customer_phone: cust?.phone || data.customerPhone || '-',
     customer_address: cust?.address || data.customerAddress || '',
     total_amount: totalAmount,

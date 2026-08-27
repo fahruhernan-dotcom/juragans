@@ -779,7 +779,7 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
 
   const [showCustSearch, setShowCustSearch] = useState(false)
   const [quickAddCust, setQuickAddCust]     = useState(false)
-  const [newCustForm, setNewCustForm]       = useState({ customer_name: '', customer_type: 'warung', phone: '', address: '', payment_terms: 'cash' })
+  const [newCustForm, setNewCustForm]       = useState({ customer_name: '', customer_type: 'perseorangan', phone: '', address: '', payment_terms: 'cash' })
   const [quickAddProd, setQuickAddProd]     = useState(false)
   const [newProdForm, setNewProdForm]       = useState({ product_name: '', category: 'lainnya', unit: 'pcs', sell_price: 0 })
   const [showCostConfirm, setShowCostConfirm] = useState(false)
@@ -1023,7 +1023,7 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
       if (res?.id) {
         handleSelectCustomer(res.id)
         setQuickAddCust(false)
-        setNewCustForm({ customer_name: '', customer_type: 'warung', phone: '', address: '', payment_terms: 'cash' })
+        setNewCustForm({ customer_name: '', customer_type: 'perseorangan', phone: '', address: '', payment_terms: 'cash' })
         toast.success(`Toko "${trimmedName}" berhasil ditambahkan`)
         return res.id
       }

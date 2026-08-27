@@ -24,7 +24,7 @@ export const PAYMENT_TERMS_DAYS = { cash: 0, net3: 3, net7: 7, net14: 14, net30:
 export const PAYMENT_TERMS_LABEL = { cash: 'Cash', net3: 'NET 3', net7: 'NET 7', net14: 'NET 14', net30: 'NET 30' }
 
 export const CUSTOMER_TYPES = [
-  'warung', 'toko_retail', 'supermarket', 'restoran', 'catering', 'grosir', 'semi_grosir', 'sales_keliling', 'perseorangan', 'lainnya'
+  'perseorangan', 'warung', 'toko_retail', 'supermarket', 'restoran', 'catering', 'grosir', 'semi_grosir', 'sales_keliling', 'lainnya'
 ]
 export const CUSTOMER_TYPE_OPTIONS = CUSTOMER_TYPES.map(t => ({ value: t, label: t.replace(/_/g, ' ').toUpperCase() }))
 export const PAYMENT_METHOD_OPTIONS = [
