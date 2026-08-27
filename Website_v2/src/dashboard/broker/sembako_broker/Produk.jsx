@@ -2779,6 +2779,10 @@ export default function Produk() {
       {/* Sheet Bahan Baku & Kemasan (Full Edit/Create) */}
       <SembakoBahanBakuSheet
         open={rawSheetOpen}
+        onOpenChange={(v) => {
+          setRawSheetOpen(v)
+          if (!v) setEditingRawMaterial(null)
+        }}
         onClose={() => {
           setRawSheetOpen(false)
           setEditingRawMaterial(null)

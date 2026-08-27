@@ -142,7 +142,13 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
   const isSaving = createMutation.isPending || updateMutation.isPending
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet
+      open={open}
+      onOpenChange={(val) => {
+        if (!val) handleClose()
+        if (onOpenChange) onOpenChange(val)
+      }}
+    >
       <SheetContent side="right" className="w-full sm:max-w-lg bg-white text-slate-900 border-l border-slate-200 p-0 flex flex-col shadow-2xl">
         <SheetHeader className="p-5 border-b border-slate-100 bg-slate-50/80">
           <div className="flex items-center gap-2.5">
@@ -151,8 +157,8 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
             </div>
             <div>
               <SheetTitle className="text-base font-bold text-slate-900 font-['Sora']">
-                {editItem 
-                  ? `Edit ${isBahanBakuMode ? 'Bahan Baku Mentah' : 'Kemasan & Packaging'}` 
+                {activeItem 
+                  ? `Edit / Adjust ${isBahanBakuMode ? 'Bahan Baku Mentah' : 'Kemasan & Packaging'}` 
                   : `Tambah ${isBahanBakuMode ? 'Bahan Baku Mentah (Petani)' : 'Kemasan & Packaging (Vendor)'}`
                 }
               </SheetTitle>
