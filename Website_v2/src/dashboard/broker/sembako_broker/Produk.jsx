@@ -64,10 +64,15 @@ const BAWANG_GORENG_TEMPLATES = [
     conversion_rate: 20,
     sku: 'JBM-250',
     sell_price: 40000,
-    avg_buy_price: 34700,
-    harga_solo_rp: 40000,
+    avg_buy_price: 29943,
+    harga_solo_rp: 39500,
     harga_luar_kota_rp: 43500,
     harga_grosir_rp: 39500,
+    raw_ingredient_cost: 26250,
+    pouch_cost: 1283,
+    sticker_front_cost: 1083,
+    sticker_back_cost: 1083,
+    other_packaging_cost: 244,
     min_stock_alert: 10,
     notes: '100% Bawang Asli Boyolali Murni, Pouch Ziplock 250g (1 Karton = 20 Pouch)',
   },
@@ -81,10 +86,15 @@ const BAWANG_GORENG_TEMPLATES = [
     conversion_rate: 20,
     sku: 'JBM-200',
     sell_price: 34500,
-    avg_buy_price: 28200,
+    avg_buy_price: 24538,
     harga_solo_rp: 34500,
     harga_luar_kota_rp: 37500,
     harga_grosir_rp: 32000,
+    raw_ingredient_cost: 21000,
+    pouch_cost: 1128,
+    sticker_front_cost: 1083,
+    sticker_back_cost: 1083,
+    other_packaging_cost: 244,
     min_stock_alert: 10,
     notes: '100% Bawang Asli Boyolali Murni, Pouch Ziplock 200g (1 Karton = 20 Pouch)',
   },
@@ -98,10 +108,15 @@ const BAWANG_GORENG_TEMPLATES = [
     conversion_rate: 20,
     sku: 'JBM-150',
     sell_price: 26000,
-    avg_buy_price: 21700,
+    avg_buy_price: 19360,
     harga_solo_rp: 26000,
     harga_luar_kota_rp: 26500,
     harga_grosir_rp: 25000,
+    raw_ingredient_cost: 15750,
+    pouch_cost: 1200,
+    sticker_front_cost: 1083,
+    sticker_back_cost: 1083,
+    other_packaging_cost: 244,
     min_stock_alert: 10,
     notes: '100% Bawang Asli Boyolali Murni, Pouch Ziplock 150g (1 Karton = 20 Pouch)',
   },
@@ -115,10 +130,15 @@ const BAWANG_GORENG_TEMPLATES = [
     conversion_rate: 40,
     sku: 'JBM-100-TRIAL',
     sell_price: 21600,
-    avg_buy_price: 15400,
+    avg_buy_price: 14135,
     harga_solo_rp: 21600,
     harga_luar_kota_rp: 23500,
     harga_grosir_rp: 18000,
+    raw_ingredient_cost: 10500,
+    pouch_cost: 1225,
+    sticker_front_cost: 1083,
+    sticker_back_cost: 1083,
+    other_packaging_cost: 244,
     min_stock_alert: 15,
     notes: 'Trial Pack Tester 100g Murni (1 Karton = 40 Pouch)',
   },
@@ -132,10 +152,15 @@ const BAWANG_GORENG_TEMPLATES = [
     conversion_rate: 10,
     sku: 'JBM-1K',
     sell_price: 152000,
-    avg_buy_price: 127200,
+    avg_buy_price: 107500,
     harga_solo_rp: 152000,
     harga_luar_kota_rp: 165500,
     harga_grosir_rp: 135000,
+    raw_ingredient_cost: 105000,
+    pouch_cost: 0,
+    sticker_front_cost: 1083,
+    sticker_back_cost: 0,
+    other_packaging_cost: 1417,
     min_stock_alert: 5,
     notes: 'Kemasan Bal PE Grosir 1 Kg Murni (1 Bal = 10 Kg)',
   },
@@ -149,10 +174,15 @@ const BAWANG_GORENG_TEMPLATES = [
     conversion_rate: 10,
     sku: 'JBM-HORECA-2KG',
     sell_price: 304000,
-    avg_buy_price: 247200,
+    avg_buy_price: 215000,
     harga_solo_rp: 304000,
     harga_luar_kota_rp: 331000,
     harga_grosir_rp: 270000,
+    raw_ingredient_cost: 210000,
+    pouch_cost: 0,
+    sticker_front_cost: 1083,
+    sticker_back_cost: 0,
+    other_packaging_cost: 3917,
     min_stock_alert: 5,
     notes: 'Suplai Restoran & Kuliner Bal PE 2 kg (1 Bal = 10 Kg)',
   },
@@ -168,10 +198,15 @@ const BAWANG_GORENG_TEMPLATES = [
     conversion_rate: 20,
     sku: 'JBA-250',
     sell_price: 35000,
-    avg_buy_price: 30950,
+    avg_buy_price: 27443,
     harga_solo_rp: 35000,
     harga_luar_kota_rp: 37500,
     harga_grosir_rp: 32500,
+    raw_ingredient_cost: 23750,
+    pouch_cost: 1283,
+    sticker_front_cost: 1083,
+    sticker_back_cost: 1083,
+    other_packaging_cost: 244,
     min_stock_alert: 10,
     notes: 'Grade A Crispy Renyah Mantap 250g (1 Karton = 20 Pouch)',
   },
@@ -185,10 +220,15 @@ const BAWANG_GORENG_TEMPLATES = [
     conversion_rate: 20,
     sku: 'JBA-200',
     sell_price: 31000,
-    avg_buy_price: 25100,
+    avg_buy_price: 22538,
     harga_solo_rp: 31000,
     harga_luar_kota_rp: 31500,
     harga_grosir_rp: 26000,
+    raw_ingredient_cost: 19000,
+    pouch_cost: 1128,
+    sticker_front_cost: 1083,
+    sticker_back_cost: 1083,
+    other_packaging_cost: 244,
     min_stock_alert: 10,
     notes: 'Grade A Crispy Renyah Mantap 200g (1 Karton = 20 Pouch)',
   },
@@ -202,10 +242,15 @@ const BAWANG_GORENG_TEMPLATES = [
     conversion_rate: 20,
     sku: 'JBA-150',
     sell_price: 25000,
-    avg_buy_price: 19450,
+    avg_buy_price: 17860,
     harga_solo_rp: 25000,
     harga_luar_kota_rp: 26500,
     harga_grosir_rp: 21000,
+    raw_ingredient_cost: 14250,
+    pouch_cost: 1200,
+    sticker_front_cost: 1083,
+    sticker_back_cost: 1083,
+    other_packaging_cost: 244,
     min_stock_alert: 10,
     notes: 'Grade A Crispy Renyah Mantap 150g (1 Karton = 20 Pouch)',
   },
@@ -219,10 +264,15 @@ const BAWANG_GORENG_TEMPLATES = [
     conversion_rate: 40,
     sku: 'JBA-100-TRIAL',
     sell_price: 18900,
-    avg_buy_price: 13900,
+    avg_buy_price: 13135,
     harga_solo_rp: 18900,
     harga_luar_kota_rp: 20500,
     harga_grosir_rp: 15000,
+    raw_ingredient_cost: 9500,
+    pouch_cost: 1225,
+    sticker_front_cost: 1083,
+    sticker_back_cost: 1083,
+    other_packaging_cost: 244,
     min_stock_alert: 15,
     notes: 'Trial Pack Tester 100g Grade A (1 Karton = 40 Pouch)',
   },
@@ -236,10 +286,15 @@ const BAWANG_GORENG_TEMPLATES = [
     conversion_rate: 10,
     sku: 'JBA-1K',
     sell_price: 125000,
-    avg_buy_price: 112200,
+    avg_buy_price: 97500,
     harga_solo_rp: 125000,
     harga_luar_kota_rp: 135500,
     harga_grosir_rp: 116000,
+    raw_ingredient_cost: 95000,
+    pouch_cost: 0,
+    sticker_front_cost: 1083,
+    sticker_back_cost: 0,
+    other_packaging_cost: 1417,
     min_stock_alert: 5,
     notes: 'Kemasan Bal PE Grosir 1 Kg Grade A (1 Bal = 10 Kg)',
   },
@@ -253,12 +308,107 @@ const BAWANG_GORENG_TEMPLATES = [
     conversion_rate: 10,
     sku: 'JBA-HORECA-2KG',
     sell_price: 250000,
-    avg_buy_price: 217200,
+    avg_buy_price: 195000,
     harga_solo_rp: 250000,
     harga_luar_kota_rp: 271000,
     harga_grosir_rp: 232000,
+    raw_ingredient_cost: 190000,
+    pouch_cost: 0,
+    sticker_front_cost: 1083,
+    sticker_back_cost: 0,
+    other_packaging_cost: 3917,
     min_stock_alert: 5,
     notes: 'Suplai Restoran & Kuliner Bal PE 2 kg Grade A (1 Bal = 10 Kg)',
+  },
+
+  // ── PAKET BUNDLING & COMBO ──
+  {
+    grade: 'Paket Bundling & Combo',
+    gradeLabel: '🎁 Paket Bundling & Combo',
+    name: 'Paket Hemat Bundling (2x 250g Murni)',
+    category: 'Paket Bundling & Combo',
+    unit: 'pack',
+    secondary_unit: '',
+    conversion_rate: '',
+    sku: 'BDL-MURNI-2X250',
+    sell_price: 87000,
+    avg_buy_price: 59886,
+    harga_solo_rp: 80000,
+    harga_luar_kota_rp: 87000,
+    harga_grosir_rp: 78000,
+    raw_ingredient_cost: 52500,
+    pouch_cost: 2566,
+    sticker_front_cost: 2166,
+    sticker_back_cost: 2166,
+    other_packaging_cost: 488,
+    min_stock_alert: 5,
+    notes: 'Paket Hemat Bundling 2x 250g Murni (Hemat Rp 5.000)',
+  },
+  {
+    grade: 'Paket Bundling & Combo',
+    gradeLabel: '🎁 Paket Bundling & Combo',
+    name: 'Paket Combo Rumahan (150g + 250g Murni)',
+    category: 'Paket Bundling & Combo',
+    unit: 'pack',
+    secondary_unit: '',
+    conversion_rate: '',
+    sku: 'BDL-MURNI-150-250',
+    sell_price: 70000,
+    avg_buy_price: 49303,
+    harga_solo_rp: 65000,
+    harga_luar_kota_rp: 70000,
+    harga_grosir_rp: 63000,
+    raw_ingredient_cost: 42000,
+    pouch_cost: 2483,
+    sticker_front_cost: 2166,
+    sticker_back_cost: 2166,
+    other_packaging_cost: 488,
+    min_stock_alert: 5,
+    notes: 'Paket Combo Rumahan 150g + 250g Murni',
+  },
+  {
+    grade: 'Paket Bundling & Combo',
+    gradeLabel: '🎁 Paket Bundling & Combo',
+    name: 'Paket Hemat Bundling (2x 250g Grade A)',
+    category: 'Paket Bundling & Combo',
+    unit: 'pack',
+    secondary_unit: '',
+    conversion_rate: '',
+    sku: 'BDL-GRDA-2X250',
+    sell_price: 75000,
+    avg_buy_price: 54886,
+    harga_solo_rp: 70000,
+    harga_luar_kota_rp: 75000,
+    harga_grosir_rp: 65000,
+    raw_ingredient_cost: 47500,
+    pouch_cost: 2566,
+    sticker_front_cost: 2166,
+    sticker_back_cost: 2166,
+    other_packaging_cost: 488,
+    min_stock_alert: 5,
+    notes: 'Paket Hemat Bundling 2x 250g Grade A Crispy',
+  },
+  {
+    grade: 'Paket Bundling & Combo',
+    gradeLabel: '🎁 Paket Bundling & Combo',
+    name: 'Paket Combo Rumahan (150g + 250g Grade A)',
+    category: 'Paket Bundling & Combo',
+    unit: 'pack',
+    secondary_unit: '',
+    conversion_rate: '',
+    sku: 'BDL-GRDA-150-250',
+    sell_price: 64000,
+    avg_buy_price: 45303,
+    harga_solo_rp: 60000,
+    harga_luar_kota_rp: 64000,
+    harga_grosir_rp: 53500,
+    raw_ingredient_cost: 38000,
+    pouch_cost: 2483,
+    sticker_front_cost: 2166,
+    sticker_back_cost: 2166,
+    other_packaging_cost: 488,
+    min_stock_alert: 5,
+    notes: 'Paket Combo Rumahan 150g + 250g Grade A Crispy',
   },
 ]
 
@@ -358,6 +508,13 @@ function ProductSheet({ product, onClose, onDelete }) {
     sticker_back_cost: product?.sticker_back_cost || '',
     other_packaging_cost: product?.other_packaging_cost || '',
   })
+  const [bomSelections, setBomSelections] = useState({
+    bawangId: '',
+    pouchId: '',
+    stickerFrontId: '',
+    stickerBackId: '',
+    packagingId: ''
+  })
   const [selectedGradeTab, setSelectedGradeTab] = useState('Grade S Murni')
   const [showBomCalculator, setShowBomCalculator] = useState(false)
   const [catOpen, setCatOpen] = useState(false)
@@ -369,6 +526,85 @@ function ProductSheet({ product, onClose, onDelete }) {
   const hasGrosirUnit = Boolean(form.secondary_unit && Number(form.conversion_rate) > 0)
 
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }))
+
+  // Helper to match rawMaterials based on saved costs / product name
+  const detectBomSelections = (formObj, materials) => {
+    if (!materials || materials.length === 0) return {}
+    const nameLower = (formObj.product_name || '').toLowerCase()
+    
+    // Match Bawang
+    let matchedBawang = null
+    if (nameLower.includes('murni') || formObj.category === 'Grade S Murni') {
+      matchedBawang = materials.find(r => r.material_name.toLowerCase().includes('murni')) || materials.find(r => ['bawang_mentah', 'bawang_curah'].includes(r.category))
+    } else {
+      matchedBawang = materials.find(r => r.material_name.toLowerCase().includes('kripsy') || r.material_name.toLowerCase().includes('grade a')) || materials.find(r => ['bawang_mentah', 'bawang_curah'].includes(r.category))
+    }
+    if (!matchedBawang) {
+      matchedBawang = materials.find(r => ['bawang_mentah', 'bawang_curah', 'mentah', 'bawang'].includes((r.category || '').toLowerCase()) || (r.material_name || '').toLowerCase().includes('bawang'))
+    }
+
+    // Match Pouch
+    let matchedPouch = null
+    if (nameLower.includes('100')) {
+      matchedPouch = materials.find(r => r.category === 'pouch' && r.material_name.includes('100'))
+    } else if (nameLower.includes('150')) {
+      matchedPouch = materials.find(r => r.category === 'pouch' && (r.material_name.includes('150') || r.material_name.includes('100') || r.material_name.includes('200')))
+    } else if (nameLower.includes('200')) {
+      matchedPouch = materials.find(r => r.category === 'pouch' && r.material_name.includes('200'))
+    } else if (nameLower.includes('250')) {
+      matchedPouch = materials.find(r => r.category === 'pouch' && r.material_name.includes('250'))
+    }
+    if (!matchedPouch) matchedPouch = materials.find(r => r.category === 'pouch' || r.material_name.toLowerCase().includes('pouch'))
+
+    // Match Sticker Front
+    const sFront = materials.find(r => r.category === 'sticker_depan' || r.material_name.toLowerCase().includes('stiker depan') || r.material_name.toLowerCase().includes('label depan'))
+
+    // Match Sticker Back
+    const sBack = materials.find(r => r.category === 'sticker_belakang' || r.material_name.toLowerCase().includes('stiker belakang'))
+
+    // Match Packaging
+    const pPack = materials.find(r => ['polymailer', 'kardus', 'packing'].includes(r.category) || r.material_name.toLowerCase().includes('polymailer') || r.material_name.toLowerCase().includes('plastik'))
+
+    return {
+      bawangId: matchedBawang?.id ? String(matchedBawang.id) : '',
+      pouchId: matchedPouch?.id ? String(matchedPouch.id) : '',
+      stickerFrontId: sFront?.id ? String(sFront.id) : '',
+      stickerBackId: sBack?.id ? String(sBack.id) : '',
+      packagingId: pPack?.id ? String(pPack.id) : ''
+    }
+  }
+
+  // Synchronize form & BOM dropdown selections when product prop changes in Edit mode
+  useEffect(() => {
+    if (product?.id) {
+      const initialForm = {
+        product_name: product.product_name || '',
+        category: product.category || 'Grade S Murni',
+        unit: product.unit || 'pcs',
+        sku: product.sku || '',
+        sell_price: product.sell_price || '',
+        avg_buy_price: product.avg_buy_price || '',
+        current_stock: product.current_stock || 0,
+        min_stock_alert: product.min_stock_alert || '',
+        notes: product.notes || '',
+        is_active: product.is_active ?? true,
+        secondary_unit: product.secondary_unit || '',
+        conversion_rate: product.conversion_rate || '',
+        harga_solo_rp: product.harga_solo_rp || '',
+        harga_luar_kota_rp: product.harga_luar_kota_rp || '',
+        harga_grosir_rp: product.harga_grosir_rp || '',
+        raw_ingredient_cost: product.raw_ingredient_cost || '',
+        pouch_cost: product.pouch_cost || '',
+        sticker_front_cost: product.sticker_front_cost || '',
+        sticker_back_cost: product.sticker_back_cost || '',
+        other_packaging_cost: product.other_packaging_cost || '',
+      }
+      setForm(initialForm)
+      if (rawMaterials.length > 0) {
+        setBomSelections(detectBomSelections(initialForm, rawMaterials))
+      }
+    }
+  }, [product, rawMaterials])
 
   // Auto calculate total HPP from BOM components if user changes any BOM field
   const updateBomCost = (key, val) => {
@@ -402,6 +638,8 @@ function ProductSheet({ product, onClose, onDelete }) {
     let matchedPouch = null
     if (nameLower.includes('100')) {
       matchedPouch = rawMaterials.find(r => r.category === 'pouch' && r.material_name.includes('100'))
+    } else if (nameLower.includes('150')) {
+      matchedPouch = rawMaterials.find(r => r.category === 'pouch' && (r.material_name.includes('150') || r.material_name.includes('100') || r.material_name.includes('200')))
     } else if (nameLower.includes('200')) {
       matchedPouch = rawMaterials.find(r => r.category === 'pouch' && r.material_name.includes('200'))
     } else if (nameLower.includes('250')) {
@@ -411,7 +649,7 @@ function ProductSheet({ product, onClose, onDelete }) {
     if (matchedPouch) pouchCost = Math.round(Number(matchedPouch.unit_cost) || 0)
 
     // Match Sticker Front
-    const sFront = rawMaterials.find(r => r.category === 'sticker_depan' || r.material_name.toLowerCase().includes('stiker depan'))
+    const sFront = rawMaterials.find(r => r.category === 'sticker_depan' || r.material_name.toLowerCase().includes('stiker depan') || r.material_name.toLowerCase().includes('label depan'))
     if (sFront) stickerFrontCost = Math.round(Number(sFront.unit_cost) || 0)
 
     // Match Sticker Back
@@ -419,13 +657,22 @@ function ProductSheet({ product, onClose, onDelete }) {
     if (sBack) stickerBackCost = Math.round(Number(sBack.unit_cost) || 0)
 
     // Match Bawang Curah
-    const bCurah = rawMaterials.find(r => r.category === 'bawang_mentah' || r.material_name.toLowerCase().includes('bawang'))
+    let bCurah = null
+    if (nameLower.includes('murni') || form.category === 'Grade S Murni') {
+      bCurah = rawMaterials.find(r => r.material_name.toLowerCase().includes('murni')) || rawMaterials.find(r => ['bawang_mentah', 'bawang_curah'].includes(r.category))
+    } else {
+      bCurah = rawMaterials.find(r => r.material_name.toLowerCase().includes('kripsy') || r.material_name.toLowerCase().includes('grade a')) || rawMaterials.find(r => ['bawang_mentah', 'bawang_curah'].includes(r.category))
+    }
+    if (!bCurah) bCurah = rawMaterials.find(r => r.category === 'bawang_mentah' || r.material_name.toLowerCase().includes('bawang'))
+
     if (bCurah) {
       let gram = 100
       if (nameLower.includes('250')) gram = 250
       else if (nameLower.includes('200')) gram = 200
+      else if (nameLower.includes('150')) gram = 150
       else if (nameLower.includes('100')) gram = 100
       else if (nameLower.includes('1 kg') || nameLower.includes('1kg')) gram = 1000
+      else if (nameLower.includes('2 kg') || nameLower.includes('2kg')) gram = 2000
 
       const isKg = (bCurah.unit || '').toLowerCase() === 'kg'
       const unitCost = Number(bCurah.unit_cost) || 0
@@ -433,7 +680,7 @@ function ProductSheet({ product, onClose, onDelete }) {
     }
 
     // Match Polymailer / Packing
-    const pPack = rawMaterials.find(r => r.category === 'kardus' || r.material_name.toLowerCase().includes('polymailer') || r.material_name.toLowerCase().includes('plastik'))
+    const pPack = rawMaterials.find(r => ['polymailer', 'kardus', 'packing'].includes(r.category) || r.material_name.toLowerCase().includes('polymailer') || r.material_name.toLowerCase().includes('plastik'))
     if (pPack) otherPackCost = Math.round(Number(pPack.unit_cost) || 0)
 
     const totalHpp = rawIngredientCost + pouchCost + stickerFrontCost + stickerBackCost + otherPackCost
@@ -447,6 +694,14 @@ function ProductSheet({ product, onClose, onDelete }) {
       other_packaging_cost: otherPackCost || f.other_packaging_cost,
       avg_buy_price: totalHpp > 0 ? totalHpp : f.avg_buy_price
     }))
+
+    setBomSelections({
+      bawangId: bCurah?.id ? String(bCurah.id) : '',
+      pouchId: matchedPouch?.id ? String(matchedPouch.id) : '',
+      stickerFrontId: sFront?.id ? String(sFront.id) : '',
+      stickerBackId: sBack?.id ? String(sBack.id) : '',
+      packagingId: pPack?.id ? String(pPack.id) : ''
+    })
 
     return { rawIngredientCost, pouchCost, stickerFrontCost, stickerBackCost, otherPackCost, totalHpp }
   }
@@ -468,11 +723,11 @@ function ProductSheet({ product, onClose, onDelete }) {
       harga_grosir_rp: tmpl.harga_grosir_rp || f.harga_grosir_rp,
       min_stock_alert: tmpl.min_stock_alert,
       notes: tmpl.notes,
-      raw_ingredient_cost: bomRes.rawIngredientCost || '',
-      pouch_cost: bomRes.pouchCost || '',
-      sticker_front_cost: bomRes.stickerFrontCost || '',
-      sticker_back_cost: bomRes.stickerBackCost || '',
-      other_packaging_cost: bomRes.otherPackCost || '',
+      raw_ingredient_cost: tmpl.raw_ingredient_cost || bomRes.rawIngredientCost || '',
+      pouch_cost: tmpl.pouch_cost !== undefined ? tmpl.pouch_cost : (bomRes.pouchCost || ''),
+      sticker_front_cost: tmpl.sticker_front_cost !== undefined ? tmpl.sticker_front_cost : (bomRes.stickerFrontCost || ''),
+      sticker_back_cost: tmpl.sticker_back_cost !== undefined ? tmpl.sticker_back_cost : (bomRes.stickerBackCost || ''),
+      other_packaging_cost: tmpl.other_packaging_cost !== undefined ? tmpl.other_packaging_cost : (bomRes.otherPackCost || ''),
     }))
     toast.success(`Template ${tmpl.category} "${tmpl.name}" diterapkan!`)
   }
@@ -1055,8 +1310,11 @@ function ProductSheet({ product, onClose, onDelete }) {
 
                   {rawMaterials.length > 0 && (
                     <select
+                      value={bomSelections.bawangId || ''}
                       onChange={e => {
-                        const mat = rawMaterials.find(r => String(r.id) === e.target.value)
+                        const val = e.target.value
+                        setBomSelections(prev => ({ ...prev, bawangId: val }))
+                        const mat = rawMaterials.find(r => String(r.id) === val)
                         if (mat) {
                           const unitCost = Number(mat.unit_cost) || 0
                           const isKg = (mat.unit || '').toLowerCase() === 'kg'
@@ -1065,6 +1323,7 @@ function ProductSheet({ product, onClose, onDelete }) {
                           else if (form.product_name.includes('150')) gram = 150
                           else if (form.product_name.includes('200')) gram = 200
                           else if (form.product_name.includes('1 kg') || form.product_name.includes('1kg')) gram = 1000
+                          else if (form.product_name.includes('2 kg') || form.product_name.includes('2kg')) gram = 2000
                           const cost = isKg ? Math.round(unitCost * gram / 1000) : Math.round(unitCost * gram)
                           updateBomCost('raw_ingredient_cost', String(cost))
                         }
@@ -1091,16 +1350,18 @@ function ProductSheet({ product, onClose, onDelete }) {
                       { label: '200g', g: 200 },
                       { label: '250g', g: 250 },
                       { label: '500g', g: 500 },
-                      { label: '1 Kg', g: 1000 }
+                      { label: '1 Kg', g: 1000 },
+                      { label: '2 Kg', g: 2000 }
                     ].map(btn => (
                       <button
                         key={btn.label}
                         type="button"
                         onClick={() => {
-                          const bCurah = rawMaterials.find(r => ['bawang_mentah', 'bawang_curah', 'mentah'].includes((r.category || '').toLowerCase()) || (r.material_name || '').toLowerCase().includes('bawang'))
-                          const unitCost = bCurah ? Number(bCurah.unit_cost) || 120000 : 120000
+                          const bCurah = rawMaterials.find(r => String(r.id) === bomSelections.bawangId) || rawMaterials.find(r => ['bawang_mentah', 'bawang_curah', 'mentah'].includes((r.category || '').toLowerCase()) || (r.material_name || '').toLowerCase().includes('bawang'))
+                          const unitCost = bCurah ? Number(bCurah.unit_cost) || 105000 : 105000
                           const cost = Math.round(unitCost * btn.g / 1000)
                           updateBomCost('raw_ingredient_cost', String(cost))
+                          if (bCurah) setBomSelections(prev => ({ ...prev, bawangId: String(bCurah.id) }))
                         }}
                         style={{
                           padding: '2px 7px',
@@ -1144,8 +1405,11 @@ function ProductSheet({ product, onClose, onDelete }) {
 
                   {rawMaterials.length > 0 && (
                     <select
+                      value={bomSelections.pouchId || ''}
                       onChange={e => {
-                        const mat = rawMaterials.find(r => String(r.id) === e.target.value)
+                        const val = e.target.value
+                        setBomSelections(prev => ({ ...prev, pouchId: val }))
+                        const mat = rawMaterials.find(r => String(r.id) === val)
                         if (mat) updateBomCost('pouch_cost', String(Math.round(Number(mat.unit_cost) || 0)))
                       }}
                       style={{ ...inputStyle, padding: '6px 8px', fontSize: 11, cursor: 'pointer' }}
@@ -1189,15 +1453,18 @@ function ProductSheet({ product, onClose, onDelete }) {
 
                     {rawMaterials.length > 0 && (
                       <select
+                        value={bomSelections.stickerFrontId || ''}
                         onChange={e => {
-                          const mat = rawMaterials.find(r => String(r.id) === e.target.value)
+                          const val = e.target.value
+                          setBomSelections(prev => ({ ...prev, stickerFrontId: val }))
+                          const mat = rawMaterials.find(r => String(r.id) === val)
                           if (mat) updateBomCost('sticker_front_cost', String(Math.round(Number(mat.unit_cost) || 0)))
                         }}
                         style={{ ...inputStyle, padding: '5px 6px', fontSize: 10.5, cursor: 'pointer' }}
                       >
                         <option value="">-- Pilih Stiker Depan --</option>
                         {rawMaterials
-                          .filter(r => ['sticker_depan', 'stiker', 'kemasan'].includes((r.category || '').toLowerCase()) || (r.material_name || '').toLowerCase().includes('depan') || (r.material_name || '').toLowerCase().includes('front'))
+                          .filter(r => ['sticker_depan', 'stiker', 'kemasan'].includes((r.category || '').toLowerCase()) || (r.material_name || '').toLowerCase().includes('depan') || (r.material_name || '').toLowerCase().includes('front') || (r.material_name || '').toLowerCase().includes('label'))
                           .map(r => (
                             <option key={r.id} value={r.id}>
                               {r.material_name} (Rp {fmt(r.unit_cost)})
@@ -1232,8 +1499,11 @@ function ProductSheet({ product, onClose, onDelete }) {
 
                     {rawMaterials.length > 0 && (
                       <select
+                        value={bomSelections.stickerBackId || ''}
                         onChange={e => {
-                          const mat = rawMaterials.find(r => String(r.id) === e.target.value)
+                          const val = e.target.value
+                          setBomSelections(prev => ({ ...prev, stickerBackId: val }))
+                          const mat = rawMaterials.find(r => String(r.id) === val)
                           if (mat) updateBomCost('sticker_back_cost', String(Math.round(Number(mat.unit_cost) || 0)))
                         }}
                         style={{ ...inputStyle, padding: '5px 6px', fontSize: 10.5, cursor: 'pointer' }}
@@ -1276,8 +1546,11 @@ function ProductSheet({ product, onClose, onDelete }) {
 
                   {rawMaterials.length > 0 && (
                     <select
+                      value={bomSelections.packagingId || ''}
                       onChange={e => {
-                        const mat = rawMaterials.find(r => String(r.id) === e.target.value)
+                        const val = e.target.value
+                        setBomSelections(prev => ({ ...prev, packagingId: val }))
+                        const mat = rawMaterials.find(r => String(r.id) === val)
                         if (mat) updateBomCost('other_packaging_cost', String(Math.round(Number(mat.unit_cost) || 0)))
                       }}
                       style={{ ...inputStyle, padding: '6px 8px', fontSize: 11, cursor: 'pointer' }}
