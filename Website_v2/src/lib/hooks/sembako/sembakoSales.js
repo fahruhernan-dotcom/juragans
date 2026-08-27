@@ -81,7 +81,7 @@ export function processSaleRow(sale, returnsData = [], itemsBySaleId = {}) {
   const effectiveCogs = Math.max(0, totalCogs - returnCogs)
   // gross_profit = Revenue (after returns) - COGS (after returns) — valid metric, not an estimate
   const grossProfit = Math.max(0, (itemsSubtotal - totalReturnAmount) - effectiveCogs)
-  const totalExpenses = deliveryCost + otherCost
+  const totalExpenses = otherCost
   const computedNetProfit = Math.max(0, grossProfit - totalExpenses)
   // Fallback: use DB net_profit if > 0 and no returns, otherwise compute from transaction data
   const net_profit = (totalReturnAmount > 0)

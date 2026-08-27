@@ -2682,15 +2682,22 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
                       </div>
                       <div className="grid grid-cols-2 gap-2 text-[11px]">
                         <div>
-                          <span style={{ color: MUTED }}>Gross Profit (Tagihan - HPP)</span>
+                          <span style={{ color: MUTED }}>Gross Profit (Subtotal - HPP)</span>
                           <p className="font-black mt-0.5" style={{ color: grossProfit >= 0 ? '#10B981' : '#EF4444' }}>
                             {formatIDR(grossProfit)} {totalCogs === 0 && <span className="text-[9px] font-normal text-amber-400/80">(HPP Rp 0)</span>}
                           </p>
                         </div>
-                        {(deliveryCost > 0 || otherCost > 0) && (
+                        {effectiveOtherCost > 0 ? (
                           <div>
-                            <span style={{ color: MUTED }}>Dikurangi Biaya Operasional</span>
-                            <p className="font-black mt-0.5" style={{ color: '#EF4444' }}>-{formatIDR(deliveryCost + otherCost)}</p>
+                            <span style={{ color: MUTED }}>
+                              {shippingBorneBy === 'seller' && effectiveSellerShippingExpense > 0 ? 'Beban Ongkir & Ops Toko' : 'Biaya Operasional Toko'}
+                            </span>
+                            <p className="font-black mt-0.5" style={{ color: '#EF4444' }}>-{formatIDR(effectiveOtherCost)}</p>
+                          </div>
+                        ) : (
+                          <div>
+                            <span style={{ color: MUTED }}>Biaya Operasional Toko</span>
+                            <p className="font-bold mt-0.5 text-slate-400 dark:text-slate-500">Rp 0 (Tidak Ada)</p>
                           </div>
                         )}
                       </div>
