@@ -40,7 +40,7 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
   const [notes, setNotes] = useState('')
 
   // Track which field user typed last for bi-directional auto math
-  const [lastEdited, setLastEdited] = useState('totalSpent')
+  const [lastEdited, setLastEdited] = useState('unitCost')
 
   useEffect(() => {
     if (activeItem) {
@@ -53,6 +53,7 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
       setMinStockAlert(String(activeItem.min_stock_alert || '50'))
       setSupplierName(activeItem.supplier_name || '')
       setNotes(activeItem.notes || '')
+      setLastEdited('unitCost')
     } else {
       setName('')
       setCategory(isBahanBakuMode ? 'bawang_mentah' : 'pouch')
@@ -63,7 +64,7 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
       setMinStockAlert(isBahanBakuMode ? '20' : '50')
       setSupplierName('')
       setNotes('')
-      setLastEdited('totalSpent')
+      setLastEdited('unitCost')
     }
   }, [activeItem, open, isBahanBakuMode])
 
@@ -74,19 +75,14 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
     return isNaN(num) ? '' : num.toLocaleString('id-ID')
   }
 
-  // Bi-directional dynamic math calculator
+  // Dynamic math calculator: adjusting Qty keeps unitCost fixed
   const handleQtyChange = (val) => {
     const rawVal = val.replace(/[^0-9.]/g, '')
     setQty(rawVal)
     const nQty = parseFloat(rawVal) || 0
-    if (nQty > 0) {
-      if (lastEdited === 'totalSpent' && totalSpent) {
-        const nTotal = parseFloat(totalSpent) || 0
-        setUnitCost(String(Math.round(nTotal / nQty)))
-      } else if (lastEdited === 'unitCost' && unitCost) {
-        const nUnit = parseFloat(unitCost) || 0
-        setTotalSpent(String(Math.round(nUnit * nQty)))
-      }
+    const nUnit = parseFloat(unitCost) || 0
+    if (nQty > 0 && nUnit > 0) {
+      setTotalSpent(String(Math.round(nUnit * nQty)))
     }
   }
 
