@@ -588,7 +588,7 @@ function ProductSheet({ product, onClose, onDelete }) {
         category: product.category || 'Grade S Murni',
         unit: product.unit || 'pcs',
         sku: product.sku || '',
-        sell_price: product.sell_price || '',
+        sell_price: product.sell_price || product.harga_solo_rp || '',
         avg_buy_price: product.avg_buy_price || '',
         current_stock: product.current_stock || 0,
         min_stock_alert: product.min_stock_alert || '',
@@ -596,7 +596,7 @@ function ProductSheet({ product, onClose, onDelete }) {
         is_active: product.is_active ?? true,
         secondary_unit: product.secondary_unit || '',
         conversion_rate: product.conversion_rate || '',
-        harga_solo_rp: product.harga_solo_rp || '',
+        harga_solo_rp: product.harga_solo_rp || product.sell_price || '',
         harga_luar_kota_rp: product.harga_luar_kota_rp || '',
         harga_grosir_rp: product.harga_grosir_rp || '',
         raw_ingredient_cost: product.raw_ingredient_cost || '',
@@ -740,14 +740,18 @@ function ProductSheet({ product, onClose, onDelete }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!form.product_name.trim()) return toast.error('Nama produk wajib diisi')
+    const rawSellPrice = form.sell_price ? Number(String(form.sell_price).replace(/\D/g, '')) : null
+    const rawSoloPrice = form.harga_solo_rp ? Number(String(form.harga_solo_rp).replace(/\D/g, '')) : null
+    const resolvedSellPrice = rawSellPrice || rawSoloPrice || null
+    const resolvedSoloPrice = rawSoloPrice || rawSellPrice || null
+
     const payload = {
       ...form,
-      sell_price: form.sell_price ? Number(String(form.sell_price).replace(/\D/g, '')) : null,
+      sell_price: resolvedSellPrice,
+      harga_solo_rp: resolvedSoloPrice,
       avg_buy_price: form.avg_buy_price ? Number(String(form.avg_buy_price).replace(/\D/g, '')) : null,
       min_stock_alert: form.min_stock_alert ? Number(String(form.min_stock_alert).replace(/\D/g, '')) : null,
       conversion_rate: form.conversion_rate ? Number(form.conversion_rate) : null,
-      harga_solo_rp: form.harga_solo_rp ? Number(String(form.harga_solo_rp).replace(/\D/g, '')) : null,
       harga_luar_kota_rp: form.harga_luar_kota_rp ? Number(String(form.harga_luar_kota_rp).replace(/\D/g, '')) : null,
       harga_grosir_rp: form.harga_grosir_rp ? Number(String(form.harga_grosir_rp).replace(/\D/g, '')) : null,
       raw_ingredient_cost: form.raw_ingredient_cost ? Number(String(form.raw_ingredient_cost).replace(/\D/g, '')) : null,
@@ -1163,9 +1167,18 @@ function ProductSheet({ product, onClose, onDelete }) {
                       const val = e.target.value.replace(/\D/g, '')
                       if (hasGrosirUnit && priceInputUnit === 'secondary') {
                         setTempGrosirSellPrice(val)
-                        set('sell_price', val ? Math.round(Number(val) / convRate) : '')
+                        const baseVal = val ? Math.round(Number(val) / convRate) : ''
+                        setForm(prev => ({
+                          ...prev,
+                          sell_price: baseVal,
+                          harga_solo_rp: (!prev.harga_solo_rp || String(prev.harga_solo_rp) === String(prev.sell_price)) ? baseVal : prev.harga_solo_rp
+                        }))
                       } else {
-                        set('sell_price', val)
+                        setForm(prev => ({
+                          ...prev,
+                          sell_price: val,
+                          harga_solo_rp: (!prev.harga_solo_rp || String(prev.harga_solo_rp) === String(prev.sell_price)) ? val : prev.harga_solo_rp
+                        }))
                         if (hasGrosirUnit) setTempGrosirSellPrice(val ? Math.round(Number(val) * convRate) : '')
                       }
                     }}
@@ -1173,14 +1186,14 @@ function ProductSheet({ product, onClose, onDelete }) {
                     style={{ ...inputStyle, paddingLeft: 36 }}
                   />
                 </div>
-                {hasGrosirUnit && (
-                  <p style={{ fontSize: 10, color: '#0c3d0c', marginTop: 4, fontWeight: 700 }}>
-                    {priceInputUnit === 'secondary'
-                      ? `💡 = Rp ${fmt(form.sell_price || 0)} / ${form.unit}`
-                      : `💡 = Rp ${fmt(Math.round(Number(form.sell_price || 0) * convRate))} / ${form.secondary_unit}`
-                    }
-                  </p>
-                )}
+                <p style={{ fontSize: 10, color: '#0c3d0c', marginTop: 4, fontWeight: 700 }}>
+                  {hasGrosirUnit && priceInputUnit === 'secondary'
+                    ? `💡 = Rp ${fmt(form.sell_price || 0)} / ${form.unit}`
+                    : hasGrosirUnit
+                    ? `💡 = Rp ${fmt(Math.round(Number(form.sell_price || 0) * convRate))} / ${form.secondary_unit}`
+                    : `💡 Terhubung ke Harga Solo Raya: Rp ${fmt(form.harga_solo_rp || form.sell_price || 0)}`
+                  }
+                </p>
               </Field>
 
               {/* Harga Beli / HPP */}
@@ -1667,16 +1680,27 @@ function ProductSheet({ product, onClose, onDelete }) {
             </span>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
               <div>
-                <label style={{ fontSize: 10, fontWeight: 700, color: TEXT_SEC, display: 'block', marginBottom: 4 }}>
-                  Solo Raya (Rp)
+                <label style={{ fontSize: 10, fontWeight: 800, color: '#0c3d0c', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
+                  <span>Solo Raya (Rp)</span>
+                  <span style={{ fontSize: 9, background: '#DCFCE7', color: '#166534', padding: '1px 5px', borderRadius: 4 }}>Utama</span>
                 </label>
                 <input
                   type="text"
                   inputMode="numeric"
                   value={form.harga_solo_rp ? fmt(form.harga_solo_rp) : ''}
-                  onChange={e => set('harga_solo_rp', e.target.value.replace(/\D/g, ''))}
+                  onChange={e => {
+                    const val = e.target.value.replace(/\D/g, '')
+                    setForm(prev => ({
+                      ...prev,
+                      harga_solo_rp: val,
+                      sell_price: (!prev.sell_price || String(prev.sell_price) === String(prev.harga_solo_rp)) ? val : prev.sell_price
+                    }))
+                    if (hasGrosirUnit && priceInputUnit === 'secondary') {
+                      setTempGrosirSellPrice(val ? String(Math.round(Number(val) * convRate)) : '')
+                    }
+                  }}
                   placeholder="0"
-                  style={inputStyle}
+                  style={{ ...inputStyle, borderColor: '#86EFAC' }}
                 />
               </div>
               <div>
