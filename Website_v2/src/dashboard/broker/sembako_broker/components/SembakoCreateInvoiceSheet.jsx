@@ -771,11 +771,21 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
     return totalPouchesCount > 0 ? Math.ceil(totalPouchesCount / 4) : 0
   }, [totalPouchesCount])
 
+  const autoKardusQty = useMemo(() => {
+    return totalPouchesCount > 0 ? Math.ceil(totalPouchesCount / 24) : 0
+  }, [totalPouchesCount])
+
+  const defaultPackingQty = useMemo(() => {
+    if (packingType === 'kardus') return autoKardusQty || 1
+    if (packingType === 'polymailer_hitam') return autoPolymailerQty || 1
+    return 0
+  }, [packingType, autoKardusQty, autoPolymailerQty])
+
   const effectivePackingQty = useMemo(() => {
     if (packingType === 'none') return 0
     if (customPackingQty !== '') return Math.max(0, Number(customPackingQty) || 0)
-    return autoPolymailerQty
-  }, [packingType, customPackingQty, autoPolymailerQty])
+    return defaultPackingQty
+  }, [packingType, customPackingQty, defaultPackingQty])
 
   const [showCustSearch, setShowCustSearch] = useState(false)
   const [quickAddCust, setQuickAddCust]     = useState(false)
@@ -2112,12 +2122,16 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
                               Kemasan & Packing Ekspedisi
                             </p>
                             <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                              Otomatis 1 Polymailer per 1–4 pouch (Total: <strong>{totalPouchesCount} pouch</strong>)
+                              {packingType === 'kardus' 
+                                ? `Kardus Master Box (Kapasitas ~24 pouch / box, Total: ${totalPouchesCount} pouch)` 
+                                : packingType === 'polymailer_hitam' 
+                                ? `Otomatis 1 Polymailer per 1–4 pouch (Total: ${totalPouchesCount} pouch)` 
+                                : 'Pengambilan langsung tanpa kemasan pelindung'}
                             </p>
                           </div>
                         </div>
                         <span className="px-2.5 py-1 rounded-xl text-xs font-black bg-amber-500 text-slate-950 shadow-sm">
-                          {effectivePackingQty} pcs Packing
+                          {effectivePackingQty} pcs {packingType === 'kardus' ? 'Kardus' : packingType === 'none' ? 'Kemasan' : 'Plastik'}
                         </span>
                       </div>
 
@@ -2132,7 +2146,7 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
                               : 'bg-white dark:bg-white/5 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-white/10 hover:border-amber-500/40'
                           }`}
                         >
-                          <p className="text-[11px] font-black">Polymailer Hitam</p>
+                          <p className="text-[11px] font-black">✉️ Polymailer Hitam</p>
                           <p className="text-[10px] opacity-75 mt-0.5">Auto ({autoPolymailerQty} pcs)</p>
                         </button>
 
@@ -2145,8 +2159,8 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
                               : 'bg-white dark:bg-white/5 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-white/10 hover:border-amber-500/40'
                           }`}
                         >
-                          <p className="text-[11px] font-black">Kardus Box</p>
-                          <p className="text-[10px] opacity-75 mt-0.5">Packing Tebal</p>
+                          <p className="text-[11px] font-black">📦 Kardus Box</p>
+                          <p className="text-[10px] opacity-75 mt-0.5">Auto ({autoKardusQty || 1} pcs)</p>
                         </button>
 
                         <button
@@ -2158,25 +2172,59 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
                               : 'bg-white dark:bg-white/5 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-white/10 hover:border-amber-500/40'
                           }`}
                         >
-                          <p className="text-[11px] font-black">Tanpa Kemasan</p>
+                          <p className="text-[11px] font-black">🚫 Tanpa Kemasan</p>
                           <p className="text-[10px] opacity-75 mt-0.5">Ambil Langsung</p>
                         </button>
                       </div>
 
-                      {/* Custom quantity input if needed */}
+                      {/* Custom quantity input with steppers */}
                       {packingType !== 'none' && (
-                        <div className="flex items-center justify-between pt-1 text-xs">
-                          <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                            Jumlah Plastik / Kardus Digunakan:
-                          </span>
-                          <div className="flex items-center gap-1.5 w-28">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-amber-200/60 dark:border-amber-500/20 text-xs">
+                          <div>
+                            <span className="text-[11px] font-bold text-slate-800 dark:text-slate-200">
+                              {packingType === 'kardus' ? 'Jumlah Kardus Box Digunakan:' : 'Jumlah Plastik Polymailer Digunakan:'}
+                            </span>
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                              * Otomatis memotong stok gudang saat transaksi disimpan
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1.5 self-end sm:self-auto">
+                            {customPackingQty !== '' && (
+                              <button
+                                type="button"
+                                onClick={() => setCustomPackingQty('')}
+                                className="px-2 py-1 text-[10px] font-bold rounded-lg bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700/50 hover:bg-amber-200"
+                              >
+                                ↺ Reset ({defaultPackingQty})
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const current = Number(customPackingQty !== '' ? customPackingQty : defaultPackingQty)
+                                setCustomPackingQty(String(Math.max(0, current - 1)))
+                              }}
+                              className="w-8 h-8 rounded-lg bg-white dark:bg-white/10 border border-slate-300 dark:border-white/20 text-slate-800 dark:text-white font-black hover:bg-slate-100 flex items-center justify-center cursor-pointer active:scale-95"
+                            >
+                              -
+                            </button>
                             <input
                               type="number"
                               min="0"
-                              value={customPackingQty !== '' ? customPackingQty : autoPolymailerQty}
+                              value={customPackingQty !== '' ? customPackingQty : defaultPackingQty}
                               onChange={e => setCustomPackingQty(e.target.value)}
-                              className="w-full text-center h-8 rounded-lg bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 text-xs font-black text-slate-900 dark:text-white"
+                              className="w-14 text-center h-8 rounded-lg bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 text-xs font-black text-slate-900 dark:text-white"
                             />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const current = Number(customPackingQty !== '' ? customPackingQty : defaultPackingQty)
+                                setCustomPackingQty(String(current + 1))
+                              }}
+                              className="w-8 h-8 rounded-lg bg-white dark:bg-white/10 border border-slate-300 dark:border-white/20 text-slate-800 dark:text-white font-black hover:bg-slate-100 flex items-center justify-center cursor-pointer active:scale-95"
+                            >
+                              +
+                            </button>
                             <span className="text-[11px] font-bold text-slate-500">pcs</span>
                           </div>
                         </div>
@@ -2221,8 +2269,13 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
                         />
                       )}
                       <div className="h-px my-1" style={{ background: BORDER }} />
-                      <SummaryLine label="Total Barang" value={formatIDR(totalAmount)} bold />
-                      <SummaryLine label="Estimasi HPP" value={formatIDR(totalCogs)} />
+                      <SummaryLine label="Subtotal Produk" value={formatIDR(Math.max(0, totalAmount - deliveryCost))} />
+                      <SummaryLine 
+                        label="Ongkos Kirim" 
+                        value={deliveryCost > 0 ? `+${formatIDR(deliveryCost)}` : <span className="text-emerald-600 font-bold">GRATIS (Rp 0)</span>} 
+                      />
+                      <SummaryLine label="Total Tagihan Pelanggan" value={formatIDR(totalAmount)} bold />
+                      <SummaryLine label="Estimasi HPP Produk" value={formatIDR(totalCogs)} />
                     </div>
 
                     {/* Profit preview card */}
@@ -2324,17 +2377,53 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
                       </div>
                     )}
 
-
                     {/* Cost inputs */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className={labelCn}>Ongkos Kirim (Ke Pelanggan)</label>
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <label className={labelCn}>Ongkos Kirim (Ke Pelanggan)</label>
+                          <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                            deliveryCost === 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-indigo-100 text-indigo-800'
+                          }`}>
+                            {deliveryCost === 0 ? '🎁 Bebas Ongkir' : `+${formatIDR(deliveryCost)}`}
+                          </span>
+                        </div>
                         <InputRupiah id="delivery-cost-input" value={deliveryCost} onChange={setDeliveryCost} />
+                        
+                        {/* Quick Ongkir Presets */}
+                        <div className="flex flex-wrap items-center gap-1 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => setDeliveryCost(0)}
+                            className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
+                              deliveryCost === 0
+                                ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                                : 'bg-white text-slate-600 border-slate-200 hover:border-emerald-400'
+                            }`}
+                          >
+                            🎁 Bebas Ongkir (Rp 0)
+                          </button>
+                          {[10000, 15000, 20000, 25000].map(amt => (
+                            <button
+                              key={amt}
+                              type="button"
+                              onClick={() => setDeliveryCost(amt)}
+                              className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
+                                deliveryCost === amt
+                                  ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                                  : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'
+                              }`}
+                            >
+                              {amt / 1000}k
+                            </button>
+                          ))}
+                        </div>
                         <p className="text-[10px] text-slate-500 mt-1 font-medium italic">
-                          * Ditagihkan ke nota customer (menambah total invoice).
+                          * Tercetak di nota customer ({deliveryCost === 0 ? 'GRATIS / Bebas Ongkir' : 'menambah tagihan'}).
                         </p>
                       </div>
-                      <div>
+
+                      <div className="space-y-1.5">
                         <label className={labelCn}>Biaya Operasional Internal (Sopir/BBM)</label>
                         <InputRupiah value={otherCost} onChange={setOtherCost} />
                         <p className="text-[10px] text-emerald-700 mt-1 font-medium italic">

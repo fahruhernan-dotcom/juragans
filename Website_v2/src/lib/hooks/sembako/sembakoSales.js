@@ -298,18 +298,16 @@ async function deductRawMaterialsAndPackaging({ tenant_id, items, packing_detail
       : Math.ceil(items.reduce((s, i) => s + (Number(i.quantity) || 0), 0) / 4)
 
     if (polymailerQty > 0 && packing_details?.packing_type !== 'none') {
-      const packingMatName = packing_details?.material_name || 'Plastik Packing Polymailer Hitam'
-      const polymailerMat = rawMaterials.find(r => 
-        r.material_name.toLowerCase().includes(packingMatName.toLowerCase()) ||
-        r.category === 'kardus' ||
-        r.material_name.toLowerCase().includes('polymailer')
-      ) || rawMaterials.find(r => r.material_name.toLowerCase().includes('polymailer'))
+      const isKardus = packing_details?.packing_type === 'kardus'
+      const packingMat = isKardus
+        ? (rawMaterials.find(r => (r.category || '').toLowerCase() === 'kardus' || (r.material_name || '').toLowerCase().includes('kardus') || (r.material_name || '').toLowerCase().includes('box')) || rawMaterials.find(r => (r.category || '').toLowerCase() === 'kardus'))
+        : (rawMaterials.find(r => (r.category || '').toLowerCase() === 'polymailer' || (r.material_name || '').toLowerCase().includes('polymailer') || (r.material_name || '').toLowerCase().includes('plastik')) || rawMaterials.find(r => (r.category || '').toLowerCase() === 'polymailer'))
 
-      if (polymailerMat) {
-        materialDeductions[polymailerMat.id] = {
-          material: polymailerMat,
-          deductQty: (materialDeductions[polymailerMat.id]?.deductQty || 0) + polymailerQty,
-          reason: `Packing Transaksi #${invoice_number || 'Sale'}`
+      if (packingMat) {
+        materialDeductions[packingMat.id] = {
+          material: packingMat,
+          deductQty: (materialDeductions[packingMat.id]?.deductQty || 0) + polymailerQty,
+          reason: `Kemasan ${isKardus ? 'Kardus Box' : 'Polymailer'} #${invoice_number || 'Sale'}`
         }
       }
     }

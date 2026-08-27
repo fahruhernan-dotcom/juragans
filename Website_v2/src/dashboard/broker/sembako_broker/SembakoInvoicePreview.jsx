@@ -270,10 +270,15 @@ export function SembakoInvoicePaper({ data, mode = 'invoice' }) {
               <span>Subtotal Produk</span>
               <span className="font-bold text-slate-900">{formatIDR(itemsSubtotal)}</span>
             </div>
-            {deliveryCost > 0 && (
+            {deliveryCost > 0 ? (
               <div className="flex justify-between items-center text-xs text-slate-600">
                 <span>Ongkos Kirim</span>
                 <span className="font-semibold text-slate-800">+{formatIDR(deliveryCost)}</span>
+              </div>
+            ) : (
+              <div className="flex justify-between items-center text-xs text-emerald-700">
+                <span>Ongkos Kirim</span>
+                <span className="font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200/60">GRATIS (Bebas Ongkir)</span>
               </div>
             )}
             <div className="flex justify-between items-center text-xs pt-1.5 border-t border-slate-200">
@@ -504,19 +509,23 @@ export function SembakoThermalReceipt({ data }) {
 
       {/* ── Total Breakdown ── */}
       <div className="py-2.5 border-b border-dashed border-slate-400 space-y-1 text-[11px]">
-        {deliveryCost > 0 && (
-          <div className="flex justify-between text-slate-600">
-            <span>Ongkos Kirim:</span>
-            <span>+{formatIDR(deliveryCost)}</span>
-          </div>
-        )}
+        <div className="flex justify-between text-slate-600">
+          <span>Subtotal Produk:</span>
+          <span>{formatIDR(itemsSubtotal)}</span>
+        </div>
+        <div className="flex justify-between text-slate-600">
+          <span>Ongkos Kirim:</span>
+          <span className={deliveryCost > 0 ? "font-bold text-slate-900" : "font-bold text-emerald-700"}>
+            {deliveryCost > 0 ? `+${formatIDR(deliveryCost)}` : 'GRATIS'}
+          </span>
+        </div>
         {otherCost > 0 && (
           <div className="flex justify-between text-slate-600">
             <span>Biaya Lain:</span>
             <span>+{formatIDR(otherCost)}</span>
           </div>
         )}
-        <div className="flex justify-between font-black text-xs pt-1 text-slate-900">
+        <div className="flex justify-between font-black text-xs pt-1 text-slate-900 border-t border-dashed border-slate-300">
           <span>TOTAL:</span>
           <span>{formatIDR(totalAmount)}</span>
         </div>

@@ -299,6 +299,15 @@ export function SembakoInvoice({
   const isLunas       = invoice?.payment_status === 'lunas'
   const sc            = statusColors[invoice?.payment_status] || statusColors.belum_lunas
   const statusLabel   = statusLabels[invoice?.payment_status] || '-'
+  const calculatedItemsSubtotal = items.reduce((s, i) => {
+    const qty = Number(i.quantity || i.quantity_kg || 0)
+    const price = Number(i.sell_price ?? i.price_per_unit ?? i.price_per_kg ?? i.unit_price ?? 0)
+    return s + (Number(i.subtotal) || (qty * price))
+  }, 0)
+  const itemsSubtotal = calculatedItemsSubtotal > 0
+    ? calculatedItemsSubtotal
+    : (deliveryCost > 0 && totalAmount > deliveryCost ? (totalAmount - deliveryCost) : totalAmount)
+
   const marginPct     = totalAmount > 0 ? ((netProfit / totalAmount) * 100).toFixed(1) : '0.0'
 
   const rawPayments   = payments.length > 0 ? payments : (Array.isArray(invoice?.sembako_payments) ? invoice.sembako_payments : (Array.isArray(invoice?.payments) ? invoice.payments : []))
@@ -468,14 +477,14 @@ export function SembakoInvoice({
           <View style={s.summaryBox}>
             <View style={s.summaryRow}>
               <Text style={s.summaryLabel}>Subtotal Produk</Text>
-              <Text style={s.summaryVal}>{formatRupiahPDF(items.reduce((s, i) => s + Number(i.subtotal ?? (Number(i.quantity_kg || i.quantity || 0) * Number(i.price_per_kg || i.price_per_unit || 0))), 0) || totalAmount)}</Text>
+              <Text style={s.summaryVal}>{formatRupiahPDF(itemsSubtotal)}</Text>
             </View>
-            {deliveryCost > 0 && (
-              <View style={s.summaryRow}>
-                <Text style={s.summaryLabel}>Ongkos Kirim</Text>
-                <Text style={s.summaryVal}>+{formatRupiahPDF(deliveryCost)}</Text>
-              </View>
-            )}
+            <View style={s.summaryRow}>
+              <Text style={s.summaryLabel}>Ongkos Kirim</Text>
+              <Text style={[s.summaryVal, deliveryCost === 0 ? { color: '#047857' } : {}]}>
+                {deliveryCost > 0 ? `+${formatRupiahPDF(deliveryCost)}` : 'GRATIS (Bebas Ongkir)'}
+              </Text>
+            </View>
             <View style={[s.summaryRow, { borderTopWidth: 1, borderTopColor: C.border, paddingTop: 4, marginTop: 2 }]}>
               <Text style={[s.summaryLabel, { fontFamily: 'Helvetica-Bold' }]}>Total Tagihan</Text>
               <Text style={[s.summaryVal, { fontFamily: 'Helvetica-Bold' }]}>{formatRupiahPDF(totalAmount)}</Text>
