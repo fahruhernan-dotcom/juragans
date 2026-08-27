@@ -804,6 +804,7 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
   const [deliveryArea, setDeliveryArea]         = useState(() => getSavedInvoiceDraft()?.deliveryArea ?? '')
   const [shippingBorneBy, setShippingBorneBy]   = useState(() => getSavedInvoiceDraft()?.shippingBorneBy ?? 'buyer') // 'buyer' | 'seller'
   const [sellerShippingFee, setSellerShippingFee] = useState(() => getSavedInvoiceDraft()?.sellerShippingFee ?? 0)
+  const [showOtherCostSetting, setShowOtherCostSetting] = useState(false)
   const [fuelCost, setFuelCost]                 = useState(() => getSavedInvoiceDraft()?.fuelCost ?? 0)
   const [addKurir, setAddKurir]                 = useState(false)
   const [newKurirForm, setNewKurirForm]         = useState({ full_name: '', phone: '' })
@@ -2656,9 +2657,9 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
                       </div>
                     </div>
 
-                    {/* Profit preview card */}
+                    {/* Profit preview card with Inline Biaya Operasional Setting */}
                     <div
-                      className="rounded-2xl p-4 space-y-3"
+                      className="rounded-2xl p-4 space-y-3.5"
                       style={{
                         background: netProfit >= 0 ? 'rgba(16, 185, 129,0.08)' : 'rgba(239,68,68,0.05)',
                         border: `1px solid ${netProfit >= 0 ? 'rgba(16, 185, 129,0.25)' : 'rgba(239,68,68,0.2)'}`,
@@ -2680,27 +2681,135 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
                           Net Margin {netMarginPct}%
                         </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-2 text-[11px]">
+
+                      <div className="grid grid-cols-2 gap-2 text-[11px] pt-1 border-t border-emerald-500/20">
                         <div>
                           <span style={{ color: MUTED }}>Gross Profit (Subtotal - HPP)</span>
                           <p className="font-black mt-0.5" style={{ color: grossProfit >= 0 ? '#10B981' : '#EF4444' }}>
                             {formatIDR(grossProfit)} {totalCogs === 0 && <span className="text-[9px] font-normal text-amber-400/80">(HPP Rp 0)</span>}
                           </p>
                         </div>
-                        {effectiveOtherCost > 0 ? (
-                          <div>
+
+                        <div>
+                          <div className="flex items-center justify-between">
                             <span style={{ color: MUTED }}>
                               {shippingBorneBy === 'seller' && effectiveSellerShippingExpense > 0 ? 'Beban Ongkir & Ops Toko' : 'Biaya Operasional Toko'}
                             </span>
-                            <p className="font-black mt-0.5" style={{ color: '#EF4444' }}>-{formatIDR(effectiveOtherCost)}</p>
+                            <button
+                              type="button"
+                              onClick={() => setShowOtherCostSetting(v => !v)}
+                              className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 hover:underline cursor-pointer"
+                            >
+                              {showOtherCostSetting ? 'Tutup ✕' : '✏️ Atur'}
+                            </button>
                           </div>
-                        ) : (
-                          <div>
-                            <span style={{ color: MUTED }}>Biaya Operasional Toko</span>
-                            <p className="font-bold mt-0.5 text-slate-400 dark:text-slate-500">Rp 0 (Tidak Ada)</p>
-                          </div>
-                        )}
+                          <p className="font-black mt-0.5" style={{ color: effectiveOtherCost > 0 ? '#EF4444' : '#64748B' }}>
+                            {effectiveOtherCost > 0 ? `-${formatIDR(effectiveOtherCost)}` : 'Rp 0 (Tidak Ada)'}
+                          </p>
+                        </div>
                       </div>
+
+                      {/* Interactive Biaya Operasional Settings Panel */}
+                      <AnimatePresence>
+                        {showOtherCostSetting && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="pt-2 border-t border-emerald-500/20 space-y-2.5 overflow-hidden"
+                          >
+                            <div className="flex items-center justify-between">
+                              <label className="text-[11px] font-black text-slate-800 dark:text-slate-200">
+                                Setting Nominal Biaya Operasional Toko
+                              </label>
+                              <span className="text-[10px] font-bold text-slate-500">
+                                (Bensin, Parkir, Makan, Tips)
+                              </span>
+                            </div>
+
+                            {/* Input Rupiah */}
+                            <InputRupiah
+                              id="step3-other-cost-input"
+                              value={otherCost}
+                              onChange={setOtherCost}
+                            />
+
+                            {/* Quick presets */}
+                            <div className="flex flex-wrap items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => { setOtherCost(0); setSelectedCostChips([]); }}
+                                className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
+                                  otherCost === 0
+                                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                                    : 'bg-white dark:bg-white/5 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-white/10 hover:border-slate-400'
+                                }`}
+                              >
+                                Reset (Rp 0)
+                              </button>
+                              {[
+                                { label: '+2k Parkir', val: 2000, chip: 'Tol / Parkir' },
+                                { label: '+5k Bensin', val: 5000, chip: 'BBM / Bensin' },
+                                { label: '+10k Makan', val: 10000, chip: 'Uang Makan / Konsumsi' },
+                                { label: '+15k Ops', val: 15000, chip: 'Tips / Kuli Bongkar' },
+                                { label: '+20k', val: 2000, chip: 'Biaya Lainnya' },
+                                { label: '+50k', val: 50000, chip: 'Biaya Lainnya' }
+                              ].map(item => (
+                                <button
+                                  key={item.label}
+                                  type="button"
+                                  onClick={() => {
+                                    setOtherCost(c => Number(c || 0) + item.val)
+                                    if (!selectedCostChips.includes(item.chip)) {
+                                      setSelectedCostChips(prev => [...prev, item.chip])
+                                    }
+                                  }}
+                                  className="px-2 py-1 rounded-lg text-[10px] font-bold border bg-white dark:bg-white/5 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-white/10 hover:border-emerald-500 cursor-pointer active:scale-95 transition-all"
+                                >
+                                  {item.label}
+                                </button>
+                              ))}
+                            </div>
+
+                            {/* Category chips */}
+                            <div className="space-y-1">
+                              <p className="text-[10px] font-bold text-slate-500">Kategori Biaya Operasional:</p>
+                              <div className="flex flex-wrap gap-1">
+                                {['BBM / Bensin', 'Uang Makan / Konsumsi', 'Tol / Parkir', 'Tips / Kuli Bongkar', 'Biaya Lainnya'].map(chip => {
+                                  const active = selectedCostChips.includes(chip)
+                                  return (
+                                    <button
+                                      key={chip}
+                                      type="button"
+                                      onClick={() => {
+                                        setSelectedCostChips(prev =>
+                                          active ? prev.filter(c => c !== chip) : [...prev, chip]
+                                        )
+                                      }}
+                                      className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition-all cursor-pointer ${
+                                        active
+                                          ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white'
+                                          : 'bg-white dark:bg-white/5 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-white/10 hover:border-slate-400'
+                                      }`}
+                                    >
+                                      {chip}
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                            </div>
+
+                            {/* Optional text notes */}
+                            <input
+                              type="text"
+                              value={otherCostNotes}
+                              onChange={e => setOtherCostNotes(e.target.value)}
+                              placeholder="Catatan tambahan biaya operasional (opsional)..."
+                              className="w-full h-8 px-3 rounded-lg text-xs bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white placeholder:text-slate-400"
+                            />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
 
                     {/* Medium #5: overpayment warning (edit mode only) */}
