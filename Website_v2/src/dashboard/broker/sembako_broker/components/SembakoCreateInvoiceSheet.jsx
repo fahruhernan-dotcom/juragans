@@ -2400,40 +2400,98 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
                     )}
 
                     {/* Summary review card */}
-                    <div className="rounded-2xl p-4 space-y-2.5" style={{ background: SURFACE, border: `1px solid ${BORDER}` }}>
-                      <div className="flex items-center justify-between pb-1 border-b border-slate-200 dark:border-white/10">
-                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                          Review Ringkasan Tagihan
-                        </p>
+                    <div className="rounded-2xl p-4 sm:p-5 space-y-3.5 bg-white dark:bg-white/5 border border-slate-200/90 dark:border-white/10 shadow-xs">
+                      {/* Header */}
+                      <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-white/10">
+                        <div className="flex items-center gap-2">
+                          <span className="text-base">📋</span>
+                          <span className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider">
+                            Ringkasan Tagihan
+                          </span>
+                        </div>
                         <button
                           type="button"
                           onClick={() => setStep(2)}
-                          className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                          className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 bg-blue-50 dark:bg-blue-950/50 px-2.5 py-1 rounded-lg border border-blue-200/60 dark:border-blue-800/40 cursor-pointer transition-all active:scale-95"
                         >
-                          Ubah Pengiriman ✏️
+                          <span>✏️ Ubah Pengiriman</span>
                         </button>
                       </div>
-                      
-                      <SummaryLine
-                        label="Toko / Customer"
-                        value={selectedCust?.customer_name || <span className="text-red-500 font-bold">⚠️ Belum Dipilih</span>}
-                        bold
-                      />
-                      <SummaryLine label="Jumlah Item" value={`${items.filter(i => i.product_id).length} Item (${totalPouchesCount} pouch)`} />
-                      {effectivePackingQty > 0 && (
-                        <SummaryLine
-                          label="Kemasan Digunakan"
-                          value={`${effectivePackingQty} pcs ${packingType === 'kardus' ? 'Kardus Box' : 'Plastik Polymailer Hitam'}`}
-                        />
-                      )}
-                      <div className="h-px my-1" style={{ background: BORDER }} />
-                      <SummaryLine label="Subtotal Produk" value={formatIDR(Math.max(0, totalAmount - deliveryCost))} />
-                      <SummaryLine 
-                        label="Ongkos Kirim" 
-                        value={deliveryCost > 0 ? `+${formatIDR(deliveryCost)}` : <span className="text-emerald-600 font-bold">GRATIS (Rp 0)</span>} 
-                      />
-                      <SummaryLine label="Total Tagihan Pelanggan" value={formatIDR(totalAmount)} bold />
-                      <SummaryLine label="Estimasi HPP Produk" value={formatIDR(totalCogs)} />
+
+                      {/* Meta Pills (Customer, Qty, Packaging, Method) */}
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200/60 dark:border-white/5 space-y-0.5">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pelanggan</p>
+                          <p className="font-black text-slate-900 dark:text-white truncate">
+                            {selectedCust?.customer_name || 'Pelanggan Tunai'}
+                          </p>
+                        </div>
+
+                        <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200/60 dark:border-white/5 space-y-0.5">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Pesanan</p>
+                          <p className="font-black text-slate-900 dark:text-white">
+                            {items.filter(i => i.product_id).length} Item ({totalPouchesCount} pouch)
+                          </p>
+                        </div>
+
+                        <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200/60 dark:border-white/5 space-y-0.5">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Kemasan Ekspedisi</p>
+                          <p className="font-black text-slate-900 dark:text-white truncate">
+                            {effectivePackingQty > 0 
+                              ? `${effectivePackingQty} pcs ${packingType === 'kardus' ? 'Kardus Box' : 'Polymailer Hitam'}`
+                              : 'Tanpa Kemasan'}
+                          </p>
+                        </div>
+
+                        <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200/60 dark:border-white/5 space-y-0.5">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Metode Pengiriman</p>
+                          <p className="font-black text-slate-900 dark:text-white truncate">
+                            {deliveryMethod === 'ekspedisi' ? '📦 Ekspedisi / Cargo' : deliveryMethod === 'kurir_toko' ? '🛵 Kurir Toko' : '🏪 Ambil Sendiri'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Billing Line Items */}
+                      <div className="pt-2 border-t border-slate-100 dark:border-white/10 space-y-2 text-xs">
+                        <div className="flex justify-between items-center text-slate-600 dark:text-slate-400">
+                          <span>Subtotal Produk</span>
+                          <span className="font-bold text-slate-900 dark:text-white">{formatIDR(Math.max(0, totalAmount - deliveryCost))}</span>
+                        </div>
+
+                        <div className="flex justify-between items-center text-slate-600 dark:text-slate-400">
+                          <span>Ongkos Kirim</span>
+                          {deliveryCost > 0 ? (
+                            <span className="font-bold text-slate-900 dark:text-white">+{formatIDR(deliveryCost)}</span>
+                          ) : (
+                            <span className="font-black text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-md border border-emerald-200/70 dark:border-emerald-800/40">
+                              🎁 GRATIS (Rp 0)
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Grand Total Box */}
+                      <div className="rounded-xl p-3 bg-slate-900 dark:bg-white text-white dark:text-slate-950 flex justify-between items-center shadow-sm">
+                        <div>
+                          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                            Total Tagihan Pelanggan
+                          </p>
+                          <p className="text-xs font-bold opacity-90">
+                            {deliveryCost === 0 ? 'Termasuk Bebas Ongkir' : `Subtotal + Ongkir`}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-lg font-black font-mono tracking-tight">
+                            {formatIDR(totalAmount)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Internal Estimasi HPP Caption */}
+                      <div className="flex justify-between items-center pt-1 text-[11px] text-slate-400 dark:text-slate-500 font-medium">
+                        <span>ℹ️ Estimasi HPP Pokok Produk (BOM):</span>
+                        <span className="font-bold text-slate-600 dark:text-slate-300">{formatIDR(totalCogs)}</span>
+                      </div>
                     </div>
 
                     {/* Profit preview card */}
