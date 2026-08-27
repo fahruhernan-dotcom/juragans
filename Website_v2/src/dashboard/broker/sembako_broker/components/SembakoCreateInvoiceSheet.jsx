@@ -1165,11 +1165,13 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
 
         const packagingTag = factor > 1 ? `[${inputQty} ${inputUnit}]` : ''
         const cleanName = (i.product_name || '').replace(/\s*\[\d+[^\]]+\]/g, '').trim()
-        const finalName = packagingTag ? `${cleanName} ${packagingTag}` : cleanName
+        const prod = products.find(p => p.id === i.product_id)
 
         return {
           ...i,
           product_name: finalName,
+          category: prod?.category || i.category || '',
+          notes: prod?.notes || i.notes || '',
           unit: i.unit || 'pcs',
           quantity: baseQty,
           price_per_unit: basePrice,
