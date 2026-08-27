@@ -674,41 +674,70 @@ function SupplierBatchList({ batches }) {
       <EmptyState
         icon={History}
         title="Belum ada stok masuk"
-        description="Riwayat pembelian dari supplier akan muncul di sini."
+        description="Riwayat pembelian bahan, kemasan, atau produk dari supplier akan muncul di sini."
       />
     )
   }
 
   return (
     <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-3">
-      {batches.map(batch => (
-        <motion.div key={batch.id} variants={fadeUp}>
-          <Card className="bg-muted/30 border border-border/60 hover:border-border rounded-2xl p-4.5 space-y-3 shadow-sm transition-all">
-            <div className="flex justify-between items-start">
-              <div className="space-y-0.5">
-                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">{formatDate(batch.purchase_date)}</p>
-                <p className="text-base font-black text-foreground uppercase tracking-tight">{batch.sembako_products?.product_name || 'Produk'}</p>
-              </div>
-              <Badge className="bg-muted text-muted-foreground border border-border/60 text-[10px] font-black px-2.5 py-1 rounded-lg shadow-none">
-                {batch.qty_masuk} {batch.sembako_products?.unit || 'Unit'}
-              </Badge>
-            </div>
+      {batches.map(batch => {
+        const title = batch.product_name || batch.sembako_products?.product_name || 'Bahan Baku / Produk'
+        const unit = batch.unit || batch.sembako_products?.unit || 'Unit'
+        const categoryLabel = batch.category_label || (batch.sembako_products ? 'Produk Jadi' : 'Bahan Baku')
+        const isBahan = batch.item_category === 'bahan_baku' || categoryLabel.includes('Bahan')
+        const isKemasan = batch.item_category === 'kemasan' || categoryLabel.includes('Kemasan')
 
-            <div className="flex justify-between items-center pt-1">
-              <div className="space-y-0.5">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase">Nilai Pembelian</p>
-                <p className="font-black text-base text-foreground tabular-nums leading-none">{formatIDR(batch.total_cost)}</p>
+        return (
+          <motion.div key={batch.id} variants={fadeUp}>
+            <Card className="bg-muted/30 border border-border/60 hover:border-border rounded-2xl p-4.5 space-y-3 shadow-sm transition-all">
+              <div className="flex justify-between items-start gap-2">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">{formatDate(batch.purchase_date)}</p>
+                    <Badge className={cn(
+                      "text-[9px] font-black uppercase px-2 py-0.5 rounded-md border shadow-none",
+                      isBahan ? "bg-amber-500/10 text-amber-600 border-amber-500/20" :
+                      isKemasan ? "bg-purple-500/10 text-purple-600 border-purple-500/20" :
+                      "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                    )}>
+                      {categoryLabel}
+                    </Badge>
+                  </div>
+                  <p className="text-base font-black text-foreground uppercase tracking-tight">{title}</p>
+                </div>
+                <Badge className="bg-muted text-muted-foreground border border-border/60 text-[10px] font-black px-2.5 py-1 rounded-lg shadow-none shrink-0">
+                  {batch.qty_masuk} {unit}
+                </Badge>
               </div>
-              <div className="text-right">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase">Sisa Stok Batch</p>
-                <p className={cn("font-black text-sm tabular-nums leading-none", batch.qty_sisa > 0 ? "text-emerald-500" : "text-muted-foreground")}>
-                  {batch.qty_sisa} {batch.sembako_products?.unit || 'Unit'}
+
+              <div className="bg-card border border-border/40 rounded-xl p-3 flex justify-between items-center">
+                <div className="space-y-0.5">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase">Nilai Pembelian / Nota</p>
+                  <p className="font-black text-base text-foreground tabular-nums leading-none">{formatIDR(batch.total_cost)}</p>
+                  {Number(batch.buy_price) > 0 && (
+                    <p className="text-[10px] font-semibold text-muted-foreground">
+                      @{formatIDR(batch.buy_price)} / {unit}
+                    </p>
+                  )}
+                </div>
+                <div className="text-right space-y-0.5">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase">Sisa Stok</p>
+                  <p className={cn("font-black text-sm tabular-nums leading-none", (batch.qty_sisa > 0 || batch.qty_sisa === '-') ? "text-emerald-500" : "text-muted-foreground")}>
+                    {batch.qty_sisa !== undefined ? `${batch.qty_sisa} ${unit}` : '-'}
+                  </p>
+                </div>
+              </div>
+
+              {batch.notes && (
+                <p className="text-[11px] text-muted-foreground font-medium italic truncate">
+                  Catatan: {batch.notes}
                 </p>
-              </div>
-            </div>
-          </Card>
-        </motion.div>
-      ))}
+              )}
+            </Card>
+          </motion.div>
+        )
+      })}
     </motion.div>
   )
 }
