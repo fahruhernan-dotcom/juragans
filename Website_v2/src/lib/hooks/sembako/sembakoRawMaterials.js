@@ -113,20 +113,6 @@ export const useUpdateSembakoRawMaterial = () => {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async ({ id, ...updates }) => {
-      const currentStock = updates.current_stock !== undefined ? Number(updates.current_stock) : undefined
-      const unitCost = updates.unit_cost !== undefined ? Number(updates.unit_cost) : undefined
-      const totalSpent = updates.total_spent !== undefined ? Number(updates.total_spent) : undefined
-
-      // Prioritize preserving unit_cost: total_spent = currentStock * unitCost
-      if (unitCost !== undefined && unitCost > 0) {
-        updates.unit_cost = unitCost
-        if (currentStock !== undefined && currentStock >= 0) {
-          updates.total_spent = Math.round(unitCost * currentStock)
-        }
-      } else if (totalSpent !== undefined && totalSpent > 0 && currentStock !== undefined && currentStock > 0 && (!unitCost || unitCost === 0)) {
-        updates.unit_cost = Math.round(totalSpent / currentStock)
-      }
-
       const cleanUpdates = sanitizeDBPayload(updates, 'sembako_raw_materials')
       const { error } = await supabase
         .from('sembako_raw_materials')

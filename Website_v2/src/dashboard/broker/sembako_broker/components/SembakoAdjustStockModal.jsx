@@ -58,8 +58,6 @@ export function SembakoAdjustStockModal({ open, onOpenChange, material, onClose 
     const payload = {
       id: material.id,
       current_stock: nNewStock,
-      unit_cost: unitCost, // STRICTLY PRESERVE UNIT COST
-      total_spent: Math.round(unitCost * nNewStock),
     }
 
     if (reason && reason.trim()) {

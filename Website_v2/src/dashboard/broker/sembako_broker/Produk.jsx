@@ -2694,7 +2694,7 @@ export default function Produk() {
                           </div>
                           {Number(raw.total_spent) > 0 && (
                             <div className="flex justify-between text-[11px] pt-1 border-t border-border/40">
-                              <span className="text-muted-foreground">Total Nilai Pembelian:</span>
+                              <span className="text-muted-foreground">Total Nota Pembelian:</span>
                               <span className="font-semibold text-foreground">Rp {fmt(raw.total_spent)}</span>
                             </div>
                           )}
