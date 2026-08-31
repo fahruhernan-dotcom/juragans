@@ -45,6 +45,95 @@ import { calculateBomProductStock } from '@/lib/inventory/bomStockCalculator'
 
 const TEXT_SEC = '#94A3B8'
 
+export function parseProductGrammage(product) {
+  if (!product) return 999999
+  const name = (product.product_name || '').toLowerCase()
+  const sku = (product.sku || '').toLowerCase()
+
+  // 1. Check direct KG notations
+  if (name.includes('2 kg') || name.includes('2kg') || sku.includes('2kg') || sku.includes('2k')) return 2000
+  if (name.includes('1 kg') || name.includes('1kg') || sku.includes('1kg') || sku.includes('1k')) return 1000
+
+  // 2. Check combo / bundling expressions e.g. "2x 250g", "2x250"
+  const comboMatch = name.match(/(\d+)\s*x\s*(\d+)\s*g?/i)
+  if (comboMatch) {
+    const qty = parseInt(comboMatch[1], 10)
+    const g = parseInt(comboMatch[2], 10)
+    return qty * g
+  }
+
+  // e.g. "150g + 250g"
+  const addMatch = name.match(/(\d+)\s*g?\s*\+\s*(\d+)\s*g?/i)
+  if (addMatch) {
+    const g1 = parseInt(addMatch[1], 10)
+    const g2 = parseInt(addMatch[2], 10)
+    return g1 + g2
+  }
+
+  // 3. Regular single gram pattern e.g. 100g, 150g, 200g, 250g, 500g
+  const gramMatch = name.match(/(\d+)\s*(?:g|gr|gram)/i)
+  if (gramMatch) {
+    return parseInt(gramMatch[1], 10)
+  }
+
+  // 4. Fallback check from numbers in name
+  const numMatches = name.match(/\b(\d{2,4})\b/)
+  if (numMatches) {
+    const val = parseInt(numMatches[1], 10)
+    if (val >= 50 && val <= 5000) return val
+  }
+
+  // 5. SKU fallback e.g. JBM-150, JBA-250, JBA-100
+  const skuMatch = sku.match(/(\d+)/)
+  if (skuMatch) {
+    const val = parseInt(skuMatch[1], 10)
+    if (val <= 10) return val * 1000
+    if (val >= 50) return val
+  }
+
+  if ((product.unit || '').toLowerCase() === 'kg') return 1000
+
+  return 999999
+}
+
+export function formatGrammageLabel(product) {
+  const g = parseProductGrammage(product)
+  if (g === 999999) return null
+  if (g >= 1000) {
+    const kg = g / 1000
+    return `${kg} Kg`
+  }
+  return `${g}g`
+}
+
+const CATEGORY_PRIORITY = {
+  'Grade S Murni': 1,
+  'Grade A Crispy': 2,
+  'Paket Bundling & Combo': 3,
+  'Bawang Curah / Bal': 4,
+}
+
+const CATEGORY_META = {
+  'Grade S Murni': {
+    icon: '🧅',
+    label: 'Grade S Murni',
+    desc: '100% Bawang Merah Asli Tanpa Campuran Tepung',
+    badge: 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
+  },
+  'Grade A Crispy': {
+    icon: '🧄',
+    label: 'Grade A Crispy',
+    desc: 'Bawang Goreng Renyah Gurih (~5% Tepung)',
+    badge: 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800'
+  },
+  'Paket Bundling & Combo': {
+    icon: '🎁',
+    label: 'Paket Bundling & Combo',
+    desc: 'Paket Hemat, Combo Rumahan & Reseller',
+    badge: 'bg-purple-50 text-purple-800 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800'
+  }
+}
+
 const CATEGORIES = [
   'Grade S Murni',
   'Grade A Crispy',
@@ -546,6 +635,7 @@ function ProductSheet({ product, onClose, onDelete }) {
   const detectBomSelections = (formObj, materials) => {
     if (!materials || materials.length === 0) return {}
     const nameLower = (formObj.product_name || '').toLowerCase()
+    const isBal = nameLower.includes('bal') || nameLower.includes('curah') || nameLower.includes('mentah')
     
     // Match Bawang
     let matchedBawang = null
@@ -558,27 +648,47 @@ function ProductSheet({ product, onClose, onDelete }) {
       matchedBawang = materials.find(r => ['bawang_mentah', 'bawang_curah', 'mentah', 'bawang'].includes((r.category || '').toLowerCase()) || (r.material_name || '').toLowerCase().includes('bawang'))
     }
 
-    // Match Pouch
+    // Match Pouch - prioritize matching saved cost or size if not bal
     let matchedPouch = null
-    if (nameLower.includes('100')) {
-      matchedPouch = materials.find(r => r.category === 'pouch' && r.material_name.includes('100'))
-    } else if (nameLower.includes('150')) {
-      matchedPouch = materials.find(r => r.category === 'pouch' && (r.material_name.includes('150') || r.material_name.includes('100') || r.material_name.includes('200')))
-    } else if (nameLower.includes('200')) {
-      matchedPouch = materials.find(r => r.category === 'pouch' && r.material_name.includes('200'))
-    } else if (nameLower.includes('250')) {
-      matchedPouch = materials.find(r => r.category === 'pouch' && r.material_name.includes('250'))
+    const hasPouchCost = Number(formObj.pouch_cost) > 0
+    if (hasPouchCost || !isBal) {
+      if (nameLower.includes('100') && !nameLower.includes('1000')) {
+        matchedPouch = materials.find(r => r.category === 'pouch' && r.material_name.includes('100'))
+      } else if (nameLower.includes('150')) {
+        matchedPouch = materials.find(r => r.category === 'pouch' && (r.material_name.includes('150') || r.material_name.includes('100') || r.material_name.includes('200')))
+      } else if (nameLower.includes('200')) {
+        matchedPouch = materials.find(r => r.category === 'pouch' && r.material_name.includes('200'))
+      } else if (nameLower.includes('250')) {
+        matchedPouch = materials.find(r => r.category === 'pouch' && r.material_name.includes('250'))
+      } else if (nameLower.includes('1 kg') || nameLower.includes('1kg') || nameLower.includes('1000')) {
+        matchedPouch = materials.find(r => r.category === 'pouch' && (r.material_name.toLowerCase().includes('1 kg') || r.material_name.toLowerCase().includes('1kg') || r.material_name.includes('1000')))
+      }
+      if (!matchedPouch && hasPouchCost) {
+        matchedPouch = materials.find(r => (r.category === 'pouch' || r.material_name.toLowerCase().includes('pouch')) && Math.round(Number(r.unit_cost)) === Math.round(Number(formObj.pouch_cost)))
+          || materials.find(r => r.category === 'pouch' || r.material_name.toLowerCase().includes('pouch'))
+      }
     }
-    if (!matchedPouch) matchedPouch = materials.find(r => r.category === 'pouch' || r.material_name.toLowerCase().includes('pouch'))
 
     // Match Sticker Front
-    const sFront = materials.find(r => r.category === 'sticker_depan' || r.material_name.toLowerCase().includes('stiker depan') || r.material_name.toLowerCase().includes('label depan'))
+    let sFront = null
+    if (Number(formObj.sticker_front_cost) > 0 || !isBal) {
+      sFront = materials.find(r => r.category === 'sticker_depan' || r.material_name.toLowerCase().includes('stiker depan') || r.material_name.toLowerCase().includes('label depan'))
+    }
 
     // Match Sticker Back
-    const sBack = materials.find(r => r.category === 'sticker_belakang' || r.material_name.toLowerCase().includes('stiker belakang'))
+    let sBack = null
+    if (Number(formObj.sticker_back_cost) > 0 || (!isBal && !nameLower.includes('polos'))) {
+      sBack = materials.find(r => r.category === 'sticker_belakang' || r.material_name.toLowerCase().includes('stiker belakang'))
+    }
 
     // Match Packaging
-    const pPack = materials.find(r => ['polymailer', 'kardus', 'packing'].includes(r.category) || r.material_name.toLowerCase().includes('polymailer') || r.material_name.toLowerCase().includes('plastik'))
+    let pPack = null
+    if (Number(formObj.other_packaging_cost) > 0) {
+      pPack = materials.find(r => (['polymailer', 'kardus', 'packing'].includes(r.category) || r.material_name.toLowerCase().includes('polymailer') || r.material_name.toLowerCase().includes('plastik')) && Math.round(Number(r.unit_cost)) === Math.round(Number(formObj.other_packaging_cost)))
+        || materials.find(r => ['polymailer', 'kardus', 'packing'].includes(r.category) || r.material_name.toLowerCase().includes('polymailer') || r.material_name.toLowerCase().includes('plastik'))
+    } else {
+      pPack = materials.find(r => ['polymailer', 'kardus', 'packing'].includes(r.category) || r.material_name.toLowerCase().includes('polymailer') || r.material_name.toLowerCase().includes('plastik'))
+    }
 
     return {
       bawangId: matchedBawang?.id ? String(matchedBawang.id) : '',
@@ -649,18 +759,24 @@ function ProductSheet({ product, onClose, onDelete }) {
     let rawIngredientCost = 0
     let otherPackCost = 0
 
+    const isBal = nameLower.includes('bal') || nameLower.includes('curah') || nameLower.includes('mentah')
+
     // Match Pouch
     let matchedPouch = null
-    if (nameLower.includes('100')) {
-      matchedPouch = rawMaterials.find(r => r.category === 'pouch' && r.material_name.includes('100'))
-    } else if (nameLower.includes('150')) {
-      matchedPouch = rawMaterials.find(r => r.category === 'pouch' && (r.material_name.includes('150') || r.material_name.includes('100') || r.material_name.includes('200')))
-    } else if (nameLower.includes('200')) {
-      matchedPouch = rawMaterials.find(r => r.category === 'pouch' && r.material_name.includes('200'))
-    } else if (nameLower.includes('250')) {
-      matchedPouch = rawMaterials.find(r => r.category === 'pouch' && r.material_name.includes('250'))
+    if (!isBal) {
+      if (nameLower.includes('100') && !nameLower.includes('1000')) {
+        matchedPouch = rawMaterials.find(r => r.category === 'pouch' && r.material_name.includes('100'))
+      } else if (nameLower.includes('150')) {
+        matchedPouch = rawMaterials.find(r => r.category === 'pouch' && (r.material_name.includes('150') || r.material_name.includes('100') || r.material_name.includes('200')))
+      } else if (nameLower.includes('200')) {
+        matchedPouch = rawMaterials.find(r => r.category === 'pouch' && r.material_name.includes('200'))
+      } else if (nameLower.includes('250')) {
+        matchedPouch = rawMaterials.find(r => r.category === 'pouch' && r.material_name.includes('250'))
+      } else if (nameLower.includes('1 kg') || nameLower.includes('1kg') || nameLower.includes('1000')) {
+        matchedPouch = rawMaterials.find(r => r.category === 'pouch' && (r.material_name.toLowerCase().includes('1 kg') || r.material_name.toLowerCase().includes('1kg') || r.material_name.includes('1000') || r.material_name.includes('1 KG')))
+      }
+      if (!matchedPouch) matchedPouch = rawMaterials.find(r => r.category === 'pouch' || r.material_name.toLowerCase().includes('pouch'))
     }
-    if (!matchedPouch) matchedPouch = rawMaterials.find(r => r.category === 'pouch')
     if (matchedPouch) pouchCost = Math.round(Number(matchedPouch.unit_cost) || 0)
 
     // Match Sticker Front
@@ -668,8 +784,11 @@ function ProductSheet({ product, onClose, onDelete }) {
     if (sFront) stickerFrontCost = Math.round(Number(sFront.unit_cost) || 0)
 
     // Match Sticker Back
-    const sBack = rawMaterials.find(r => r.category === 'sticker_belakang' || r.material_name.toLowerCase().includes('stiker belakang'))
-    if (sBack) stickerBackCost = Math.round(Number(sBack.unit_cost) || 0)
+    let sBack = null
+    if (!isBal) {
+      sBack = rawMaterials.find(r => r.category === 'sticker_belakang' || r.material_name.toLowerCase().includes('stiker belakang'))
+      if (sBack) stickerBackCost = Math.round(Number(sBack.unit_cost) || 0)
+    }
 
     // Match Bawang Curah
     let bCurah = null
@@ -702,11 +821,11 @@ function ProductSheet({ product, onClose, onDelete }) {
 
     setForm(f => ({
       ...f,
-      raw_ingredient_cost: rawIngredientCost || f.raw_ingredient_cost,
-      pouch_cost: pouchCost || f.pouch_cost,
-      sticker_front_cost: stickerFrontCost || f.sticker_front_cost,
-      sticker_back_cost: stickerBackCost || f.sticker_back_cost,
-      other_packaging_cost: otherPackCost || f.other_packaging_cost,
+      raw_ingredient_cost: rawIngredientCost,
+      pouch_cost: pouchCost,
+      sticker_front_cost: stickerFrontCost,
+      sticker_back_cost: stickerBackCost,
+      other_packaging_cost: otherPackCost,
       avg_buy_price: totalHpp > 0 ? totalHpp : f.avg_buy_price
     }))
 
@@ -1438,7 +1557,7 @@ function ProductSheet({ product, onClose, onDelete }) {
                         const val = e.target.value
                         setBomSelections(prev => ({ ...prev, pouchId: val }))
                         const mat = rawMaterials.find(r => String(r.id) === val)
-                        if (mat) updateBomCost('pouch_cost', String(Math.round(Number(mat.unit_cost) || 0)))
+                        updateBomCost('pouch_cost', mat ? String(Math.round(Number(mat.unit_cost) || 0)) : '')
                       }}
                       style={{ ...inputStyle, padding: '6px 8px', fontSize: 11, cursor: 'pointer' }}
                     >
@@ -1486,7 +1605,7 @@ function ProductSheet({ product, onClose, onDelete }) {
                           const val = e.target.value
                           setBomSelections(prev => ({ ...prev, stickerFrontId: val }))
                           const mat = rawMaterials.find(r => String(r.id) === val)
-                          if (mat) updateBomCost('sticker_front_cost', String(Math.round(Number(mat.unit_cost) || 0)))
+                          updateBomCost('sticker_front_cost', mat ? String(Math.round(Number(mat.unit_cost) || 0)) : '')
                         }}
                         style={{ ...inputStyle, padding: '5px 6px', fontSize: 10.5, cursor: 'pointer' }}
                       >
@@ -1532,7 +1651,7 @@ function ProductSheet({ product, onClose, onDelete }) {
                           const val = e.target.value
                           setBomSelections(prev => ({ ...prev, stickerBackId: val }))
                           const mat = rawMaterials.find(r => String(r.id) === val)
-                          if (mat) updateBomCost('sticker_back_cost', String(Math.round(Number(mat.unit_cost) || 0)))
+                          updateBomCost('sticker_back_cost', mat ? String(Math.round(Number(mat.unit_cost) || 0)) : '')
                         }}
                         style={{ ...inputStyle, padding: '5px 6px', fontSize: 10.5, cursor: 'pointer' }}
                       >
@@ -1579,7 +1698,7 @@ function ProductSheet({ product, onClose, onDelete }) {
                         const val = e.target.value
                         setBomSelections(prev => ({ ...prev, packagingId: val }))
                         const mat = rawMaterials.find(r => String(r.id) === val)
-                        if (mat) updateBomCost('other_packaging_cost', String(Math.round(Number(mat.unit_cost) || 0)))
+                        updateBomCost('other_packaging_cost', mat ? String(Math.round(Number(mat.unit_cost) || 0)) : '')
                       }}
                       style={{ ...inputStyle, padding: '6px 8px', fontSize: 11, cursor: 'pointer' }}
                     >
@@ -1893,13 +2012,20 @@ function ProductCard({ product, onEdit, onDelete }) {
       onClick={() => onEdit(product)}
       whileTap={{ scale: 0.98 }}
     >
-      {/* Header: Kategori & SKU */}
+      {/* Header: Kategori, Gramasi & SKU */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, flexWrap: 'wrap' }}>
-        {product.category && (
-          <span style={{ fontSize: 10, fontFamily: 'DM Sans', fontWeight: 700, color: C.accent, background: 'rgba(15,23,42,0.08)', padding: '2px 8px', borderRadius: 20, letterSpacing: '0.03em' }}>
-            {product.category}
-          </span>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {product.category && (
+            <span style={{ fontSize: 10, fontFamily: 'DM Sans', fontWeight: 700, color: C.accent, background: 'rgba(15,23,42,0.08)', padding: '2px 8px', borderRadius: 20, letterSpacing: '0.03em' }}>
+              {product.category}
+            </span>
+          )}
+          {formatGrammageLabel(product) && (
+            <span style={{ fontSize: 9.5, fontFamily: 'DM Sans', fontWeight: 800, color: '#0F172A', background: '#F1F5F9', border: '1px solid #CBD5E1', padding: '1.5px 6px', borderRadius: 6 }}>
+              ⚖️ {formatGrammageLabel(product)}
+            </span>
+          )}
+        </div>
         {product.sku && (
           <span style={{ fontSize: 9.5, fontFamily: 'monospace', fontWeight: 700, color: TEXT_SEC, background: 'rgba(255,255,255,0.06)', padding: '1px 6px', borderRadius: 6 }}>
             {product.sku}
@@ -2079,10 +2205,45 @@ export default function Produk() {
     }
   }, [location.search])
 
+  const [productSortBy, setProductSortBy] = useState('gram_asc') // 'gram_asc' | 'gram_desc' | 'price_asc' | 'price_desc' | 'name_asc'
+
   const categories = useMemo(() => {
     const cats = [...new Set(products.map(p => p.category).filter(Boolean))]
+    cats.sort((a, b) => {
+      const pA = CATEGORY_PRIORITY[a] || 99
+      const pB = CATEGORY_PRIORITY[b] || 99
+      if (pA !== pB) return pA - pB
+      return a.localeCompare(b)
+    })
     return ['Semua', ...cats]
   }, [products])
+
+  const sortProductList = (list) => {
+    return [...list].sort((a, b) => {
+      if (productSortBy === 'gram_asc') {
+        const gA = parseProductGrammage(a)
+        const gB = parseProductGrammage(b)
+        if (gA !== gB) return gA - gB
+        return (Number(a.sell_price) || 0) - (Number(b.sell_price) || 0)
+      }
+      if (productSortBy === 'gram_desc') {
+        const gA = parseProductGrammage(a)
+        const gB = parseProductGrammage(b)
+        if (gA !== gB) return gB - gA
+        return (Number(b.sell_price) || 0) - (Number(a.sell_price) || 0)
+      }
+      if (productSortBy === 'price_asc') {
+        return (Number(a.sell_price) || 0) - (Number(b.sell_price) || 0)
+      }
+      if (productSortBy === 'price_desc') {
+        return (Number(b.sell_price) || 0) - (Number(a.sell_price) || 0)
+      }
+      if (productSortBy === 'name_asc') {
+        return (a.product_name || '').localeCompare(b.product_name || '')
+      }
+      return 0
+    })
+  }
 
   // Partition Bahan Baku vs Kemasan
   const isBahanBakuItem = (r) => {
@@ -2104,7 +2265,7 @@ export default function Produk() {
   const currentRawList = activeSubTab === 'bahan_baku' ? bahanBakuList : kemasanList
 
   const filtered = useMemo(() => {
-    return products.filter(p => {
+    const rawFiltered = products.filter(p => {
       if (!showInactive && !p.is_active) return false
       if (catFilter !== 'Semua' && p.category !== catFilter) return false
       if (search) {
@@ -2115,7 +2276,37 @@ export default function Produk() {
       }
       return true
     })
-  }, [products, search, catFilter, showInactive])
+    return sortProductList(rawFiltered)
+  }, [products, search, catFilter, showInactive, productSortBy])
+
+  // Grouped products for "Semua" categorized view
+  const groupedProducts = useMemo(() => {
+    if (catFilter !== 'Semua' || search) return null
+
+    const groups = {}
+    filtered.forEach(p => {
+      const cat = p.category || 'Lain-lain'
+      if (!groups[cat]) groups[cat] = []
+      groups[cat].push(p)
+    })
+
+    const sortedCatKeys = Object.keys(groups).sort((a, b) => {
+      const pA = CATEGORY_PRIORITY[a] || 99
+      const pB = CATEGORY_PRIORITY[b] || 99
+      if (pA !== pB) return pA - pB
+      return a.localeCompare(b)
+    })
+
+    return sortedCatKeys.map(cat => ({
+      category: cat,
+      items: sortProductList(groups[cat]),
+      meta: CATEGORY_META[cat] || {
+        icon: '📦',
+        desc: '',
+        badge: 'bg-muted text-muted-foreground border-border'
+      }
+    }))
+  }, [filtered, catFilter, search, productSortBy])
 
   const filteredRaw = useMemo(() => {
     return currentRawList.filter(r => {
@@ -2335,8 +2526,8 @@ export default function Produk() {
         {/* ── TAB PRODUK JADI ── */}
         {activeSubTab === 'produk' && (
           <>
-            {/* Toggle non-aktif */}
-            <div className="px-4 sm:px-6 pt-2 pb-2 flex items-center justify-between">
+            {/* Toolbar: Toggle non-aktif & Sort Selector */}
+            <div className="px-4 sm:px-6 pt-3 pb-2 flex flex-wrap items-center justify-between gap-3">
               <button
                 onClick={() => setShowInactive(v => !v)}
                 className="border-0 bg-transparent cursor-pointer text-muted-foreground hover:text-foreground flex items-center gap-2 text-xs font-medium transition-colors"
@@ -2344,9 +2535,25 @@ export default function Produk() {
                 {showInactive ? <ToggleRight size={22} className="text-[#0F172A]" /> : <ToggleLeft size={22} className="text-muted-foreground" />}
                 <span>Tampilkan produk non-aktif</span>
               </button>
+
+              <div className="flex items-center gap-2 ml-auto">
+                <SlidersHorizontal size={13} className="text-muted-foreground" />
+                <span className="text-[11px] font-bold text-muted-foreground">Urutkan:</span>
+                <select
+                  value={productSortBy}
+                  onChange={e => setProductSortBy(e.target.value)}
+                  className="bg-card border border-border/80 rounded-xl px-2.5 py-1.5 text-xs font-bold text-foreground focus:outline-none focus:ring-1 focus:ring-slate-500 cursor-pointer shadow-sm"
+                >
+                  <option value="gram_asc">⚖️ Gramasi: 100g → 2kg (Terkecil)</option>
+                  <option value="gram_desc">⚖️ Gramasi: 2kg → 100g (Terbesar)</option>
+                  <option value="price_asc">💰 Harga Terendah</option>
+                  <option value="price_desc">💰 Harga Tertinggi</option>
+                  <option value="name_asc">🔤 Nama Produk (A-Z)</option>
+                </select>
+              </div>
             </div>
 
-            {/* Product grid */}
+            {/* Product list */}
             <div className="px-4 sm:px-6">
               {filtered.length === 0 ? (
                 <SembakoEmptyState
@@ -2360,8 +2567,44 @@ export default function Produk() {
                   actionLabel="Tambah Produk"
                   onAction={() => setSheet('new')}
                 />
+              ) : groupedProducts ? (
+                <div className="space-y-8 pb-6">
+                  {groupedProducts.map(({ category, items, meta }) => (
+                    <div key={category} className="space-y-3.5">
+                      {/* Category Section Header */}
+                      <div className="flex flex-wrap items-center justify-between gap-2 pt-2 pb-2.5 border-b border-border/70">
+                        <div className="flex items-center gap-2.5">
+                          <span className="text-lg leading-none">{meta.icon || '📦'}</span>
+                          <h3 className="font-sans font-extrabold text-sm sm:text-base text-foreground tracking-tight m-0">
+                            {category}
+                          </h3>
+                          <span className={`text-[10.5px] font-extrabold px-2.5 py-0.5 rounded-full border ${meta.badge}`}>
+                            {items.length} SKU
+                          </span>
+                        </div>
+                        {meta.desc && (
+                          <span className="text-xs text-muted-foreground font-medium hidden sm:inline-block">
+                            {meta.desc}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Grid for this Category */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                        {items.map(product => (
+                          <ProductCard
+                            key={product.id}
+                            product={product}
+                            onEdit={(p) => setSheet(p)}
+                            onDelete={handleDelete}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 pb-6">
                   {filtered.map(product => (
                     <ProductCard
                       key={product.id}
@@ -2943,6 +3186,7 @@ export default function Produk() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
       <ImportCsvModal
         open={importCsvOpen}
         onClose={() => setImportCsvOpen(false)}

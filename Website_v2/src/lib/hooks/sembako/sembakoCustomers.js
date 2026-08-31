@@ -24,10 +24,10 @@ export const useSembakoCustomers = () => {
 
         // Efficiently fetch outstanding remaining_amount for active unpaid sales
         const { data: unpaidSales, error: salesError } = await supabase.from('sembako_sales')
-          .select('customer_id, customer_name, remaining_amount')
+          .select('id, customer_id, customer_name, total_amount, paid_amount, remaining_amount, payment_status, sembako_payments(amount, amount_paid, payment_method, is_deleted)')
           .eq('tenant_id', tenant.id)
           .eq('is_deleted', false)
-          .gt('remaining_amount', 0)
+          .neq('payment_status', 'lunas')
         
         if (salesError) {
           console.warn('[useSembakoCustomers] sales fetch error:', salesError.message)
@@ -36,8 +36,23 @@ export const useSembakoCustomers = () => {
 
         const outstandingMap = (unpaidSales || []).reduce((acc, sale) => {
           const cid = sale.customer_id
-          if (!cid) return acc
-          acc[cid] = (acc[cid] || 0) + (Number(sale.remaining_amount) || 0)
+          if (!cid || sale.payment_status === 'lunas') return acc
+
+          const payments = Array.isArray(sale.sembako_payments) ? sale.sembako_payments.filter(p => !p.is_deleted) : []
+          const paidFromPayments = payments
+            .filter(p => Number(p.amount || p.amount_paid || 0) > 0 && p.payment_method !== 'pengembalian_tunai_retur')
+            .reduce((s, p) => s + (Number(p.amount || p.amount_paid) || 0), 0)
+          const refundFromPayments = payments
+            .filter(p => p.payment_method === 'pengembalian_tunai_retur' || Number(p.amount || p.amount_paid || 0) < 0)
+            .reduce((s, p) => s + Math.abs(Number(p.amount || p.amount_paid || 0)), 0)
+
+          const netPaid = Math.max(Number(sale.paid_amount || 0), Math.max(0, paidFromPayments - refundFromPayments))
+          const totalAmt = Number(sale.total_amount || 0)
+          const realRemaining = Math.max(0, totalAmt - netPaid)
+
+          if (realRemaining > 0) {
+            acc[cid] = (acc[cid] || 0) + realRemaining
+          }
           return acc
         }, {})
 

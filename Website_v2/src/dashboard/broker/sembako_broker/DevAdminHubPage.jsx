@@ -51,6 +51,8 @@ export default function DevAdminHubPage() {
   const [showConfirm1, setShowConfirm1] = useState(false)
   const [showConfirm2, setShowConfirm2] = useState(false)
   const [confirmText, setConfirmText] = useState('')
+  const [showConfirmStockOnly, setShowConfirmStockOnly] = useState(false)
+  const [confirmStockText, setConfirmStockText] = useState('')
   const [isResetting, setIsResetting] = useState(false)
 
   // License hook
@@ -160,6 +162,18 @@ export default function DevAdminHubPage() {
       const { error: errReturns } = await supabase.from('sembako_returns').delete().eq('tenant_id', tenantId)
       if (errReturns) throw errReturns
 
+      try {
+        await supabase.from('sembako_return_items').delete().eq('tenant_id', tenantId)
+      } catch (e) {
+        console.warn('sembako_return_items delete fallback:', e)
+      }
+
+      try {
+        await supabase.from('sembako_inventory_mutations').delete().eq('tenant_id', tenantId)
+      } catch (e) {
+        console.warn('sembako_inventory_mutations delete fallback:', e)
+      }
+
       const { error: errStockOut } = await supabase.from('sembako_stock_out').delete().eq('tenant_id', tenantId)
       if (errStockOut) throw errStockOut
 
@@ -197,6 +211,12 @@ export default function DevAdminHubPage() {
         const { error: errProd } = await supabase.from('sembako_products').delete().eq('tenant_id', tenantId)
         if (errProd) throw errProd
 
+        try {
+          await supabase.from('sembako_raw_materials').delete().eq('tenant_id', tenantId)
+        } catch (e) {
+          console.warn('sembako_raw_materials delete fallback:', e)
+        }
+
         const { error: errCust } = await supabase.from('sembako_customers').delete().eq('tenant_id', tenantId)
         if (errCust) throw errCust
 
@@ -207,10 +227,38 @@ export default function DevAdminHubPage() {
         if (errEmp) throw errEmp
       } else {
         // Reset current_stock and avg_buy_price in sembako_products to 0
-        const { error: errProdReset } = await supabase.from('sembako_products')
-          .update({ current_stock: 0, avg_buy_price: 0 })
-          .eq('tenant_id', tenantId)
-        if (errProdReset) throw errProdReset
+        try {
+          const { data: prodList } = await supabase.from('sembako_products').select('id').eq('tenant_id', tenantId)
+          if (prodList && prodList.length > 0) {
+            const prodIds = prodList.map(p => p.id)
+            await supabase.from('sembako_products')
+              .update({ current_stock: 0, avg_buy_price: 0 })
+              .in('id', prodIds)
+          } else {
+            await supabase.from('sembako_products')
+              .update({ current_stock: 0, avg_buy_price: 0 })
+              .eq('tenant_id', tenantId)
+          }
+        } catch (errProdReset) {
+          console.warn('sembako_products reset fallback:', errProdReset)
+        }
+
+        // Reset current_stock and total_spent in sembako_raw_materials to 0 (preserves master definitions & unit_cost reference)
+        try {
+          const { data: rawList } = await supabase.from('sembako_raw_materials').select('id').eq('tenant_id', tenantId)
+          if (rawList && rawList.length > 0) {
+            const rawIds = rawList.map(r => r.id)
+            await supabase.from('sembako_raw_materials')
+              .update({ current_stock: 0, total_spent: 0 })
+              .in('id', rawIds)
+          } else {
+            await supabase.from('sembako_raw_materials')
+              .update({ current_stock: 0, total_spent: 0 })
+              .eq('tenant_id', tenantId)
+          }
+        } catch (e) {
+          console.warn('sembako_raw_materials stock reset fallback:', e)
+        }
       }
 
       // 4. Clear LocalStorage and React Query Cache
@@ -224,6 +272,16 @@ export default function DevAdminHubPage() {
 
       queryClient.setQueryData(['notifications', tenantId, userId], [])
       queryClient.removeQueries({ queryKey: ['notifications'] })
+      queryClient.invalidateQueries({ queryKey: ['sembako-raw-materials'] })
+      queryClient.invalidateQueries({ queryKey: ['sembako-products'] })
+      queryClient.invalidateQueries({ queryKey: ['sembako-all-batches'] })
+      queryClient.invalidateQueries({ queryKey: ['sembako-suppliers'] })
+      queryClient.invalidateQueries({ queryKey: ['sembako-supplier-invoices'] })
+      queryClient.invalidateQueries({ queryKey: ['sembako-customers'] })
+      queryClient.invalidateQueries({ queryKey: ['sembako-sales'] })
+      queryClient.invalidateQueries({ queryKey: ['sembako-dashboard-stats'] })
+      queryClient.invalidateQueries({ queryKey: ['sembako-audit-logs'] })
+      queryClient.invalidateQueries({ queryKey: ['sembako-inventory-mutations'] })
       queryClient.invalidateQueries()
 
       setSystemLogs([])
@@ -233,6 +291,70 @@ export default function DevAdminHubPage() {
       setConfirmText('')
     } catch (e) {
       toast.error('Gagal melakukan reset database: ' + e.message, { id: toastId })
+    } finally {
+      setIsResetting(false)
+    }
+  }
+
+  const handleResetStocksOnly = async () => {
+    if (confirmStockText !== 'RESET STOK') {
+      toast.error('Konfirmasi kata kunci salah. Ketik RESET STOK.')
+      return
+    }
+    if (!tenant?.id) return
+    setIsResetting(true)
+    const toastId = toast.loading('Sedang mengosongkan seluruh stok gudang ke 0...')
+    try {
+      const tenantId = tenant.id
+
+      // 1. Reset all raw materials
+      try {
+        const { data: rawList } = await supabase.from('sembako_raw_materials').select('id').eq('tenant_id', tenantId).eq('is_deleted', false)
+        if (rawList && rawList.length > 0) {
+          const rawIds = rawList.map(r => r.id)
+          await supabase.from('sembako_raw_materials').update({ current_stock: 0, total_spent: 0 }).in('id', rawIds)
+        } else {
+          await supabase.from('sembako_raw_materials').update({ current_stock: 0, total_spent: 0 }).eq('tenant_id', tenantId)
+        }
+      } catch (e) {
+        console.warn('sembako_raw_materials reset fallback:', e)
+      }
+
+      // 2. Reset all products
+      try {
+        const { data: prodList } = await supabase.from('sembako_products').select('id').eq('tenant_id', tenantId).eq('is_deleted', false)
+        if (prodList && prodList.length > 0) {
+          const prodIds = prodList.map(p => p.id)
+          await supabase.from('sembako_products').update({ current_stock: 0, avg_buy_price: 0 }).in('id', prodIds)
+        } else {
+          await supabase.from('sembako_products').update({ current_stock: 0, avg_buy_price: 0 }).eq('tenant_id', tenantId)
+        }
+      } catch (e) {
+        console.warn('sembako_products reset fallback:', e)
+      }
+
+      // 3. Clear finished batches, restock audit logs & inventory mutations
+      await supabase.from('sembako_stock_batches').delete().eq('tenant_id', tenantId)
+      await supabase.from('sembako_audit_logs').delete().eq('tenant_id', tenantId)
+      try {
+        await supabase.from('sembako_inventory_mutations').delete().eq('tenant_id', tenantId)
+      } catch { /* optional fallback */ }
+
+      queryClient.invalidateQueries({ queryKey: ['sembako-raw-materials'] })
+      queryClient.invalidateQueries({ queryKey: ['sembako-products'] })
+      queryClient.invalidateQueries({ queryKey: ['sembako-all-batches'] })
+      queryClient.invalidateQueries({ queryKey: ['sembako-dashboard-stats'] })
+      queryClient.invalidateQueries({ queryKey: ['sembako-suppliers'] })
+      queryClient.invalidateQueries({ queryKey: ['sembako-supplier-invoices'] })
+      queryClient.invalidateQueries({ queryKey: ['sembako-audit-logs'] })
+      queryClient.invalidateQueries({ queryKey: ['sembako-inventory-mutations'] })
+      queryClient.invalidateQueries()
+
+      toast.success('Seluruh stok bahan baku mentah, kemasan, dan produk jadi berhasil di-reset ke 0!', { id: toastId })
+      setShowConfirmStockOnly(false)
+      setConfirmStockText('')
+    } catch (e) {
+      toast.error('Gagal reset stok: ' + e.message, { id: toastId })
     } finally {
       setIsResetting(false)
     }
@@ -698,6 +820,46 @@ export default function DevAdminHubPage() {
               </div>
             </Card>
 
+            {/* Danger Zone: Reset Seluruh Stok Gudang Saja */}
+            <Card className="bg-amber-500/10 border border-amber-500/30 rounded-[28px] p-6 shadow-sm space-y-4 mt-6">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-2xl bg-amber-500/20 text-amber-600 dark:text-amber-400">
+                  <RefreshCw size={22} />
+                </div>
+                <div>
+                  <h3 className="font-display font-black text-amber-700 dark:text-amber-400 text-lg tracking-tight uppercase leading-none">
+                    Zona Stok: Reset Seluruh Stok Gudang ke 0
+                  </h3>
+                  <p className="text-[11px] text-amber-600/80 dark:text-amber-300/80 font-bold uppercase tracking-wider mt-1">
+                    Khusus Mengosongkan Stok Bahan Baku & Produk (Nota Penjualan & Kontak Tetap Aman)
+                  </p>
+                </div>
+              </div>
+
+              <Separator className="bg-amber-500/20 my-2" />
+
+              <div className="bg-white dark:bg-slate-900/90 p-4 rounded-2xl border border-amber-500/20 space-y-3">
+                <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+                  Gunakan tombol ini jika Anda hanya ingin <strong>mengosongkan seluruh stok fisik gudang menjadi 0 pcs / 0 kg</strong> (Bawang Mentah, Pouch, Stiker, dan Produk Jadi).
+                  <br />
+                  <span className="text-[11px] text-slate-500">
+                    💡 Master produk, harga jual, kontak toko/pelanggan, dan supplier <strong>TIDAK AKAN HILANG</strong>.
+                  </span>
+                </p>
+
+                <Button
+                  onClick={() => {
+                    setConfirmStockText('')
+                    setShowConfirmStockOnly(true)
+                  }}
+                  className="w-full !bg-amber-600 hover:!bg-amber-700 !text-white rounded-2xl h-11 font-black uppercase tracking-wider text-xs shadow-md shadow-amber-600/20 transition-all active:scale-[0.98] cursor-pointer border-none flex items-center justify-center gap-2"
+                >
+                  <RefreshCw size={15} />
+                  Reset Seluruh Stok Gudang ke 0
+                </Button>
+              </div>
+            </Card>
+
           </TabsContent>
 
           {/* TAB 4: RECYCLE BIN DATA RECOVERY */}
@@ -843,6 +1005,81 @@ export default function DevAdminHubPage() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Modal Konfirmasi Reset Stok Only */}
+      <AlertDialog open={showConfirmStockOnly} onOpenChange={(v) => { if (!v && !isResetting) { setShowConfirmStockOnly(false); setConfirmStockText(''); } }}>
+        <AlertDialogContent 
+          className="rounded-[28px] p-6 max-w-md text-left shadow-2xl border"
+          style={{
+            backgroundColor: '#0F172A',
+            borderColor: 'rgba(245,158,11,0.3)',
+            color: '#F8FAFC',
+          }}
+        >
+          <AlertDialogHeader>
+            <AlertDialogTitle 
+              className="font-display font-black tracking-tight uppercase text-lg flex items-center gap-2.5 text-amber-500"
+            >
+              <div className="p-2 rounded-xl bg-amber-500/20 text-amber-500 border border-amber-500/30">
+                <RefreshCw size={20} className="shrink-0" />
+              </div>
+              Reset Semua Stok Gudang ke 0?
+            </AlertDialogTitle>
+            <AlertDialogDescription 
+              className="font-medium mt-3 text-xs leading-relaxed"
+              style={{ color: '#CBD5E1' }}
+            >
+              Tindakan ini akan mengosongkan seluruh stok bahan baku mentah, kemasan/pouch, stiker, dan kapasitas siap kemas produk jadi menjadi <strong>0</strong>.
+              <br /><br />
+              Ketik kata kunci <strong style={{ color: '#FBBF24', fontWeight: 900 }}>"RESET STOK"</strong> di bawah untuk mengonfirmasi:
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="mt-4">
+            <input 
+              type="text"
+              value={confirmStockText}
+              onChange={e => setConfirmStockText(e.target.value)}
+              placeholder="Ketik RESET STOK di sini..."
+              disabled={isResetting}
+              autoFocus
+              className="w-full h-12 px-4 rounded-xl text-sm font-black tracking-wider transition-all outline-none border focus:ring-2 focus:ring-amber-500/30"
+              style={{
+                backgroundColor: '#090D16',
+                color: '#FFFFFF',
+                borderColor: confirmStockText === 'RESET STOK' ? '#22C55E' : 'rgba(255,255,255,0.18)',
+              }}
+            />
+          </div>
+
+          <AlertDialogFooter className="gap-3 mt-6 flex flex-row items-center justify-end">
+            <AlertDialogCancel 
+              disabled={isResetting}
+              className="rounded-xl h-11 px-5 font-bold text-xs cursor-pointer border transition-all"
+              style={{
+                backgroundColor: '#1E293B',
+                borderColor: '#334155',
+                color: '#E2E8F0',
+              }}
+            >
+              Batal
+            </AlertDialogCancel>
+            <button 
+              type="button"
+              disabled={isResetting || confirmStockText !== 'RESET STOK'}
+              onClick={handleResetStocksOnly}
+              className="h-11 px-5 rounded-xl font-black text-xs transition-all flex-1 flex items-center justify-center border-none"
+              style={{
+                backgroundColor: confirmStockText === 'RESET STOK' ? '#D97706' : '#475569',
+                color: '#FFFFFF',
+                cursor: confirmStockText === 'RESET STOK' && !isResetting ? 'pointer' : 'not-allowed',
+                boxShadow: confirmStockText === 'RESET STOK' ? '0 4px 14px rgba(217, 119, 6, 0.4)' : 'none',
+              }}
+            >
+              {isResetting ? 'Mereset Stok...' : 'Konfirmasi Reset Stok'}
+            </button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
     </div>
   )

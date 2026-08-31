@@ -74,46 +74,94 @@ export function matchBawangMaterial(product, rawMaterials = []) {
 export function matchKemasanMaterial(product, rawMaterials = []) {
   if (!rawMaterials || rawMaterials.length === 0) return null
   const name = (product.product_name || '').toLowerCase()
+  const notes = (product.notes || '').toLowerCase()
   const gram = extractProductGrammage(name, product.notes)
 
   const isToples = name.includes('toples') || name.includes('jar')
-  const isBal = name.includes('curah') || name.includes('bal') || name.includes('1 kg') || name.includes('2 kg')
+  const isAlu = name.includes('alumunium') || name.includes('alu') || notes.includes('alumunium') || notes.includes('alu')
 
-  if (isBal) {
-    return rawMaterials.find(r => {
-      const rName = (r.material_name || '').toLowerCase()
-      return rName.includes('kardus') || rName.includes('box') || rName.includes('bal') || rName.includes('plastik')
-    }) || null
-  }
-
+  // 1. If product is Toples / Jar
   if (isToples) {
-    return rawMaterials.find(r => {
+    const toplesMat = rawMaterials.find(r => {
       const rName = (r.material_name || '').toLowerCase()
-      return rName.includes('toples') && (rName.includes(String(gram)) || true)
+      return rName.includes('toples') && (rName.includes(String(gram)) || rName.includes(`${gram}g`))
     }) || rawMaterials.find(r => (r.material_name || '').toLowerCase().includes('toples'))
+    if (toplesMat) return toplesMat
   }
 
-  // Pouch
+  // 2. If product is 1 KG / 1000g (e.g. Murni Bal PE 1 Kg, Grade A Bal PE 1 Kg, Pouch 1 KG)
+  if (gram === 1000 || name.includes('1 kg') || name.includes('1kg') || name.includes('1.000g') || name.includes('1000g')) {
+    const mat1k = rawMaterials.find(r => {
+      const rName = (r.material_name || '').toLowerCase()
+      return (r.category === 'pouch' || r.category === 'kemasan' || rName.includes('pouch') || rName.includes('plastik') || rName.includes('kemasan') || rName.includes('pe')) &&
+        (rName.includes('1 kg') || rName.includes('1kg') || rName.includes('1.000') || rName.includes('1000') || rName.includes('1k')) &&
+        !rName.includes('polymailer')
+    })
+    if (mat1k) return mat1k
+  }
+
+  // 3. If product is 2 KG / 2000g (e.g. Bawang Murni 2 kg Bal HORECA)
+  if (gram === 2000 || name.includes('2 kg') || name.includes('2kg') || name.includes('2000g')) {
+    const mat2k = rawMaterials.find(r => {
+      const rName = (r.material_name || '').toLowerCase()
+      return (rName.includes('2 kg') || rName.includes('2kg') || rName.includes('2000') || rName.includes('horeca')) &&
+        !rName.includes('polymailer')
+    })
+    if (mat2k) return mat2k
+  }
+
+  // 4. If Alumunium Foil pouch
+  if (isAlu) {
+    const aluMat = rawMaterials.find(r => {
+      const rName = (r.material_name || '').toLowerCase()
+      return (rName.includes('alumunium') || rName.includes('alu')) && rName.includes(String(gram))
+    }) || rawMaterials.find(r => (r.material_name || '').toLowerCase().includes('alumunium') || (r.material_name || '').toLowerCase().includes('alu'))
+    if (aluMat) return aluMat
+  }
+
+  // 5. Standard Pouch / Standing Pouch
   const pouchList = rawMaterials.filter(r => {
     const rCat = (r.category || '').toLowerCase()
     const rName = (r.material_name || '').toLowerCase()
-    return rCat === 'pouch' || rName.includes('pouch')
+    return (rCat === 'pouch' || rCat === 'kemasan' || rName.includes('pouch')) && !rName.includes('polymailer')
   })
 
   if (pouchList.length > 0) {
     if (gram === 250) {
-      const p250 = pouchList.find(r => r.material_name.includes('250'))
+      const p250 = pouchList.find(r => r.material_name.includes('250') && !r.material_name.toLowerCase().includes('alu'))
+        || pouchList.find(r => r.material_name.includes('250'))
       if (p250) return p250
     }
-    if (gram === 200 || gram === 150) {
-      const p200 = pouchList.find(r => r.material_name.includes('200') || r.material_name.includes('150'))
+    if (gram === 200) {
+      const p200 = pouchList.find(r => r.material_name.includes('200') && !r.material_name.toLowerCase().includes('alu'))
+        || pouchList.find(r => r.material_name.includes('200'))
       if (p200) return p200
     }
+    if (gram === 150) {
+      const p150 = pouchList.find(r => r.material_name.includes('150'))
+        || pouchList.find(r => r.material_name.includes('200') && !r.material_name.toLowerCase().includes('alu'))
+        || pouchList.find(r => r.material_name.includes('100'))
+      if (p150) return p150
+    }
     if (gram === 100) {
-      const p100 = pouchList.find(r => r.material_name.includes('100'))
+      const p100 = pouchList.find(r => r.material_name.includes('100') && !r.material_name.toLowerCase().includes('alu'))
+        || pouchList.find(r => r.material_name.includes('100'))
       if (p100) return p100
     }
+    if (gram === 1000) {
+      const p1k = pouchList.find(r => r.material_name.toLowerCase().includes('1 kg') || r.material_name.toLowerCase().includes('1kg') || r.material_name.includes('1000'))
+      if (p1k) return p1k
+    }
     return pouchList[0]
+  }
+
+  // 6. Curah / Bal fallback
+  const isBal = name.includes('curah') || name.includes('bal')
+  if (isBal) {
+    return rawMaterials.find(r => {
+      const rName = (r.material_name || '').toLowerCase()
+      return (rName.includes('kardus') || rName.includes('box') || rName.includes('bal') || rName.includes('plastik')) && !rName.includes('polymailer')
+    }) || null
   }
 
   return null
@@ -381,13 +429,40 @@ export function calculateBomProductStock(product, rawMaterials = [], customKemas
  * @param {object|number|null} customKemasan - Override kemasan jika menggunakan pouch khusus
  * @returns {number} HPP per unit (dalam Rupiah)
  */
-export function calculateBomProductHpp(product, rawMaterials = [], customKemasan = null) {
+/**
+ * Mencocokkan Plastik Polymailer / Packing Luar
+ */
+export function matchOtherPackagingMaterial(product, rawMaterials = []) {
+  if (!rawMaterials || rawMaterials.length === 0) return null
+  const name = (product?.product_name || '').toLowerCase()
+  if (name.includes('curah') || name.includes('bal')) return null
+
+  return rawMaterials.find(r => {
+    const rCat = (r.category || '').toLowerCase()
+    const rName = (r.material_name || '').toLowerCase()
+    return rCat === 'packing' || rName.includes('polymailer') || rName.includes('plastik packing') || (rCat === 'packaging' && rName.includes('polymailer'))
+  }) || null
+}
+
+/**
+ * Menghitung HPP standar produk berdasarkan BOM bahan baku saat ini
+ * @param {object} product 
+ * @param {Array} rawMaterials 
+ * @param {object|number|null} customKemasan - Override kemasan jika menggunakan pouch khusus
+ * @param {object} options - { noFrontSticker, noBackSticker, noStickers, noPolymailer, noOtherPackaging }
+ * @returns {number} HPP per unit (dalam Rupiah)
+ */
+export function calculateBomProductHpp(product, rawMaterials = [], customKemasan = null, options = {}) {
   if (!product || !rawMaterials || rawMaterials.length === 0) {
     return Number(product?.avg_buy_price) || 0
   }
   const name = product.product_name || ''
   const nameLower = name.toLowerCase()
   const isBundling = product.category === 'Paket Bundling & Combo' || nameLower.includes('paket') || nameLower.includes('bundling')
+
+  const noFront = Boolean(options?.noFrontSticker || options?.noStickers)
+  const noBack = Boolean(options?.noBackSticker || options?.noStickers)
+  const noPolymailer = Boolean(options?.noPolymailer || options?.noOtherPackaging || options?.noOtherPkg)
 
   if (isBundling) {
     let multiplier = 1
@@ -410,40 +485,47 @@ export function calculateBomProductHpp(product, rawMaterials = [], customKemasan
     if (customKemasan) {
       kemasanMat = typeof customKemasan === 'object' ? customKemasan : { unit_cost: Number(customKemasan) || 0 }
     }
-    const sFrontMat = matchStickerFrontMaterial(product, rawMaterials)
-    const sBackMat = matchStickerBackMaterial(product, rawMaterials)
+    const sFrontMat = noFront ? null : matchStickerFrontMaterial(product, rawMaterials)
+    const sBackMat = noBack ? null : matchStickerBackMaterial(product, rawMaterials)
+    const otherMat = noPolymailer ? null : matchOtherPackagingMaterial(product, rawMaterials)
+
+    const getMatCost = (mat) => Number(mat?.active_fifo_cost ?? mat?.unit_cost) || 0
 
     let totalCost = 0
     if (bawangMat) {
       const isKg = (bawangMat.unit || '').toLowerCase() === 'kg'
-      const costPerGram = isKg ? (Number(bawangMat.unit_cost) || 0) / 1000 : (Number(bawangMat.unit_cost) || 0)
+      const costPerGram = isKg ? getMatCost(bawangMat) / 1000 : getMatCost(bawangMat)
       totalCost += gramPerPack * costPerGram
     }
-    if (kemasanMat) totalCost += multiplier * (Number(kemasanMat.unit_cost) || 0)
-    if (sFrontMat) totalCost += multiplier * (Number(sFrontMat.unit_cost) || 0)
-    if (sBackMat) totalCost += multiplier * (Number(sBackMat.unit_cost) || 0)
+    if (kemasanMat) totalCost += multiplier * getMatCost(kemasanMat)
+    if (sFrontMat) totalCost += multiplier * getMatCost(sFrontMat)
+    if (sBackMat) totalCost += multiplier * getMatCost(sBackMat)
+    if (otherMat) totalCost += multiplier * getMatCost(otherMat)
 
     return totalCost > 0 ? Math.round(totalCost) : (Number(product.avg_buy_price) || 0)
   }
 
+  const getMatCost = (mat) => Number(mat?.active_fifo_cost ?? mat?.unit_cost) || 0
   const gram = extractProductGrammage(name, product.notes)
   const bawangMat = matchBawangMaterial(product, rawMaterials)
   let kemasanMat = matchKemasanMaterial(product, rawMaterials)
   if (customKemasan) {
     kemasanMat = typeof customKemasan === 'object' ? customKemasan : { unit_cost: Number(customKemasan) || 0 }
   }
-  const sFrontMat = matchStickerFrontMaterial(product, rawMaterials)
-  const sBackMat = matchStickerBackMaterial(product, rawMaterials)
+  const sFrontMat = noFront ? null : matchStickerFrontMaterial(product, rawMaterials)
+  const sBackMat = noBack ? null : matchStickerBackMaterial(product, rawMaterials)
+  const otherMat = noPolymailer ? null : matchOtherPackagingMaterial(product, rawMaterials)
 
   let totalCost = 0
   if (bawangMat) {
     const isKg = (bawangMat.unit || '').toLowerCase() === 'kg'
-    const costPerGram = isKg ? (Number(bawangMat.unit_cost) || 0) / 1000 : (Number(bawangMat.unit_cost) || 0)
+    const costPerGram = isKg ? getMatCost(bawangMat) / 1000 : getMatCost(bawangMat)
     totalCost += gram * costPerGram
   }
-  if (kemasanMat) totalCost += Number(kemasanMat.unit_cost) || 0
-  if (sFrontMat) totalCost += Number(sFrontMat.unit_cost) || 0
-  if (sBackMat) totalCost += Number(sBackMat.unit_cost) || 0
+  if (kemasanMat) totalCost += getMatCost(kemasanMat)
+  if (sFrontMat) totalCost += getMatCost(sFrontMat)
+  if (sBackMat) totalCost += getMatCost(sBackMat)
+  if (otherMat) totalCost += getMatCost(otherMat)
 
   return totalCost > 0 ? Math.round(totalCost) : (Number(product.avg_buy_price) || 0)
 }

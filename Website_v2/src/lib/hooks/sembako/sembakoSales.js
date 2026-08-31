@@ -8,7 +8,7 @@ import { logError } from '@/lib/logger/errorLogger'
 import { formatIDR } from '@/lib/format'
 import { STALE_5M, sanitizeDBPayload, getTenantId } from './sembakoCommon'
 import { recordAuditLog } from '@/lib/hooks/useSembakoAudit'
-import { recordInventoryMutation } from '@/lib/hooks/sembako/sembakoMutations'
+import { recordInventoryMutation, deductRawMaterialFifo } from '@/lib/hooks/sembako/sembakoMutations'
 import {
   extractProductGrammage,
   matchBawangMaterial,
@@ -326,26 +326,24 @@ async function deductRawMaterialsAndPackaging({ tenant_id, items, packing_detail
         .update({ current_stock: newStock })
         .eq('id', matId)
 
-      // 3A. Persistent inventory ledger mutation in Supabase
-      recordInventoryMutation({
-        tenant_id,
-        material_id: matId,
-        material_name: entry.material.material_name,
-        material_category: entry.material.category,
-        mutation_type: 'OUT',
-        action_type: 'SALE',
-        quantity: entry.deductQty,
-        unit: entry.material.unit || 'pcs',
-        unit_cost: Number(entry.material.unit_cost) || 0,
-        total_cost: entry.deductQty * (Number(entry.material.unit_cost) || 0),
-        prev_stock: currentStock,
-        new_stock: newStock,
-        ref_type: 'sale',
-        ref_number: invoice_number || 'Sale',
-        party_name: 'Penjualan',
-        notes: `Pemakaian bahan untuk penjualan #${invoice_number || 'Sale'} (${entry.reason})`,
-        created_by: 'Kasir / Sistem',
-      }).catch(() => {})
+      // 3A. FIFO Lot Consumption & OUT Ledger Mutation in Supabase
+      try {
+        await deductRawMaterialFifo({
+          tenant_id,
+          material_id: matId,
+          material_name: entry.material.material_name,
+          material_category: entry.material.category,
+          qtyToDeduct: entry.deductQty,
+          unit: entry.material.unit || 'pcs',
+          fallbackUnitCost: Number(entry.material.unit_cost) || 0,
+          ref_type: 'SALE',
+          ref_number: invoice_number || 'Sale',
+          party_name: 'Penjualan',
+          notes: `Pemakaian FIFO untuk penjualan #${invoice_number || 'Sale'} (${entry.reason})`
+        })
+      } catch (fifoErr) {
+        console.warn('[deductRawMaterialsAndPackaging] FIFO deduct warning:', fifoErr)
+      }
 
       // 3B. Audit log record
       try {

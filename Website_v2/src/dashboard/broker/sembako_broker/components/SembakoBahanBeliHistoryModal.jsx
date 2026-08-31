@@ -572,9 +572,9 @@ export function SembakoBahanBeliHistoryModal({ open, onOpenChange, material, onC
               </p>
             </div>
 
-            {/* Rata-rata HPP Beli */}
+            {/* HPP Beli Satuan (FIFO) */}
             <div className="p-3 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10">
-              <p className="text-[10px] font-bold uppercase text-slate-500 tracking-wider">HPP Beli Satuan</p>
+              <p className="text-[10px] font-bold uppercase text-slate-500 tracking-wider">HPP Beli (FIFO)</p>
               <p className="text-base font-black text-slate-900 dark:text-white mt-0.5">
                 {formatIDR(material?.unit_cost || 0)}
               </p>

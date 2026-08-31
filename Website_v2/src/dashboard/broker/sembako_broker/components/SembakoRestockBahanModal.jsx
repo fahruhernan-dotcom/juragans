@@ -566,13 +566,18 @@ export function SembakoRestockBahanModal({ open, onOpenChange, material, onClose
           {/* Live Preview Card */}
           {nAddQty > 0 && (
             <div className="p-3.5 rounded-2xl bg-amber-500/[0.08] border border-amber-500/25 space-y-2 text-xs">
-              <div className="flex items-center gap-1.5 text-amber-800 dark:text-amber-300 font-bold text-[11px]">
-                <Calculator size={13} />
-                <span>Simulasi Perubahan Stok & HPP:</span>
+              <div className="flex items-center justify-between text-amber-800 dark:text-amber-300 font-bold text-[11px]">
+                <div className="flex items-center gap-1.5">
+                  <Calculator size={13} />
+                  <span>Simulasi Restok & Lot Batch (FIFO):</span>
+                </div>
+                <span className="bg-amber-500/20 text-amber-900 dark:text-amber-200 text-[9.5px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
+                  Metode FIFO
+                </span>
               </div>
               <div className="grid grid-cols-2 gap-2 text-[11px] pt-1">
                 <div className="p-2.5 rounded-xl bg-white dark:bg-white/5 border border-amber-500/20">
-                  <p className="text-muted-foreground text-[10px]">Stok Total Nanti:</p>
+                  <p className="text-muted-foreground text-[10px]">Stok Fisik Total:</p>
                   <div className="flex items-center gap-1.5 font-black text-slate-900 dark:text-white mt-0.5">
                     <span>{nPrevStock}</span>
                     <ArrowRight size={12} className="text-amber-600" />
@@ -580,14 +585,21 @@ export function SembakoRestockBahanModal({ open, onOpenChange, material, onClose
                   </div>
                 </div>
                 <div className="p-2.5 rounded-xl bg-white dark:bg-white/5 border border-amber-500/20">
-                  <p className="text-muted-foreground text-[10px]">HPP Rata-rata Baru:</p>
+                  <p className="text-muted-foreground text-[10px]">Harga Lot Masuk Ini:</p>
                   <div className="flex items-center gap-1.5 font-black text-slate-900 dark:text-white mt-0.5">
-                    <span>{formatIDR(nPrevUnitCost)}</span>
-                    <ArrowRight size={12} className="text-amber-600" />
-                    <span className="text-amber-600 dark:text-amber-400 font-extrabold">{formatIDR(newUnitCost)}</span>
+                    <span className="text-amber-600 dark:text-amber-400 font-extrabold">{formatIDR(nBuyPrice)}</span>
+                    <span className="text-[10px] text-muted-foreground font-normal">/{unitLabel}</span>
                   </div>
                 </div>
               </div>
+              {nPrevStock > 0 && (
+                <div className="bg-amber-500/10 border border-amber-500/20 p-2 rounded-xl text-[10px] text-amber-800 dark:text-amber-300 flex items-start gap-1.5">
+                  <span className="shrink-0 font-bold">⚡ Alur FIFO:</span>
+                  <span>
+                    Stok lama <strong>{nPrevStock} {unitLabel} @ {formatIDR(nPrevUnitCost)}</strong> akan dipotong lebih dulu saat pengemasan/penjualan sebelum memakai lot baru ini (@ {formatIDR(nBuyPrice)}).
+                  </span>
+                </div>
+              )}
             </div>
           )}
 

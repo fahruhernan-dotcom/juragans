@@ -29,11 +29,12 @@ export function cleanCustomerNotes(notes) {
 export function SembakoInvoicePaper({ data, mode = 'invoice' }) {
   if (!data) return null
 
+  const isPurchase = mode === 'purchase' || Boolean(data.isPurchase)
   const isDelivery = mode === 'delivery'
   const companyName = data.tenant?.business_name || 'Gudang Juragans'
   const companyPhone = data.tenant?.phone || '-'
-  const customerName = data.customerName || data.customer_name || 'Pelanggan Umum'
-  const customerType = data.customerType || data.customer_type || 'perseorangan'
+  const customerName = data.customerName || data.customer_name || (isPurchase ? 'Supplier / Vendor Mitra' : 'Pelanggan Umum')
+  const customerType = data.customerType || data.customer_type || (isPurchase ? 'Vendor Supplier' : 'perseorangan')
   const customerPhone = data.customerPhone || data.customer_phone || '-'
   const customerAddress = data.customerAddress || data.customer_address || ''
 
@@ -105,7 +106,7 @@ export function SembakoInvoicePaper({ data, mode = 'invoice' }) {
             className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-black tracking-wider uppercase mb-1 shadow-sm"
             style={{ backgroundColor: '#0F172A', color: '#FFFFFF' }}
           >
-            <span style={{ color: '#FFFFFF' }}>{isDelivery ? 'SURAT JALAN' : 'INVOICE RESMI'}</span>
+            <span style={{ color: '#FFFFFF' }}>{isPurchase ? 'BUKTI RESTOK & PEMBELIAN' : (isDelivery ? 'SURAT JALAN' : 'INVOICE RESMI')}</span>
           </div>
           <p className="text-xs font-mono font-bold text-slate-900 flex sm:justify-end items-center gap-1">
             <span className="text-slate-500 font-normal">No:</span> {invoiceNo}
@@ -128,7 +129,9 @@ export function SembakoInvoicePaper({ data, mode = 'invoice' }) {
             <div className="flex items-center justify-between px-3.5 py-2 rounded-xl bg-emerald-50/90 border border-emerald-200 text-emerald-800">
               <div className="flex items-center gap-2">
                 <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
-                <span className="text-xs font-bold tracking-wide uppercase">FAKTUR LUNAS (PAID)</span>
+                <span className="text-xs font-bold tracking-wide uppercase">
+                  {isPurchase ? 'RESTOK LUNAS (PAID)' : 'FAKTUR LUNAS (PAID)'}
+                </span>
               </div>
               <span className="text-[11px] font-semibold text-emerald-700">Pembayaran telah lunas</span>
             </div>
@@ -144,9 +147,13 @@ export function SembakoInvoicePaper({ data, mode = 'invoice' }) {
             <div className="flex items-center justify-between px-3.5 py-2 rounded-xl bg-amber-50/90 border border-amber-200 text-amber-900">
               <div className="flex items-center gap-2">
                 <AlertCircle size={16} className="text-amber-600 shrink-0" />
-                <span className="text-xs font-bold tracking-wide uppercase">BELUM LUNAS (UNPAID)</span>
+                <span className="text-xs font-bold tracking-wide uppercase">
+                  {isPurchase ? 'HUTANG PEMBELIAN (UNPAID)' : 'BELUM LUNAS (UNPAID)'}
+                </span>
               </div>
-              <span className="text-[11px] font-semibold text-amber-800">Menunggu Pelunasan</span>
+              <span className="text-[11px] font-semibold text-amber-800">
+                {isPurchase ? 'Hutang Belum Terbayar' : 'Menunggu Pelunasan'}
+              </span>
             </div>
           )}
         </div>
@@ -154,22 +161,32 @@ export function SembakoInvoicePaper({ data, mode = 'invoice' }) {
 
       {/* ── Parties Info Card (Seller & Buyer) ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-5">
-        {/* Seller Info */}
+        {/* Left Party Card */}
         <div className="bg-slate-50/90 rounded-xl p-3.5 border border-slate-200/80 space-y-1">
           <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-            <Building2 size={12} className="text-slate-400" /> Diterbitkan Oleh (Seller)
+            <Building2 size={12} className="text-slate-400" /> 
+            {isPurchase ? 'Vendor Supplier (Seller)' : 'Diterbitkan Oleh (Seller)'}
           </div>
-          <p className="text-sm font-black text-slate-900 leading-snug">{companyName}</p>
-          <p className="text-xs text-slate-600 flex items-center gap-1">
-            <Phone size={11} className="text-slate-400" /> {companyPhone}
+          <p className="text-sm font-black text-slate-900 leading-snug">
+            {isPurchase ? customerName : companyName}
           </p>
+          <p className="text-xs text-slate-600 flex items-center gap-1">
+            <Phone size={11} className="text-slate-400" /> 
+            {isPurchase ? (customerPhone || '-') : companyPhone}
+          </p>
+          {isPurchase && customerAddress && (
+            <p className="text-xs text-slate-600 flex items-center gap-1">
+              <MapPin size={11} className="text-slate-400" /> {customerAddress}
+            </p>
+          )}
         </div>
 
-        {/* Buyer Info */}
+        {/* Right Party Card */}
         <div className="bg-slate-50/90 rounded-xl p-3.5 border border-slate-200/80 space-y-1">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-              <User size={12} className="text-slate-400" /> Ditujukan Kepada (Buyer)
+              <User size={12} className="text-slate-400" /> 
+              {isPurchase ? 'Penerima / Gudang (Buyer)' : 'Ditujukan Kepada (Buyer)'}
             </div>
             {customerType && (
               <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-indigo-100 text-indigo-800">
@@ -177,12 +194,16 @@ export function SembakoInvoicePaper({ data, mode = 'invoice' }) {
               </span>
             )}
           </div>
-          <p className="text-sm font-black text-slate-900 leading-snug">{customerName}</p>
+          <p className="text-sm font-black text-slate-900 leading-snug">
+            {isPurchase ? companyName : customerName}
+          </p>
           <div className="flex flex-wrap gap-x-3 text-xs text-slate-600">
-            {customerPhone && customerPhone !== '-' && (
-              <span className="flex items-center gap-1"><Phone size={11} className="text-slate-400" /> {customerPhone}</span>
+            {(!isPurchase ? customerPhone : companyPhone) && (
+              <span className="flex items-center gap-1">
+                <Phone size={11} className="text-slate-400" /> {!isPurchase ? customerPhone : companyPhone}
+              </span>
             )}
-            {customerAddress && (
+            {!isPurchase && customerAddress && (
               <span className="flex items-center gap-1"><MapPin size={11} className="text-slate-400" /> {customerAddress}</span>
             )}
           </div>

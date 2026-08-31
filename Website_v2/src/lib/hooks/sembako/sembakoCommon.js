@@ -63,7 +63,7 @@ export const ALLOWED_COLUMNS = {
   ],
   sembako_inventory_mutations: [
     'tenant_id', 'material_id', 'material_name', 'material_category',
-    'mutation_type', 'action_type', 'quantity', 'unit', 'unit_cost',
+    'mutation_type', 'action_type', 'quantity', 'qty_sisa', 'unit', 'unit_cost',
     'total_cost', 'prev_stock', 'new_stock', 'ref_type', 'ref_id',
     'ref_number', 'party_name', 'notes', 'created_by', 'created_at'
   ]

@@ -54,13 +54,16 @@ export default function InvoicePreviewModal({ type = 'sembako_sale', data, isOpe
   const paymentStatus = inv?.payment_status || data.payment_status || (remainingAmount === 0 ? 'lunas' : paidAmount > 0 ? 'sebagian' : 'belum_lunas')
   const payments = inv?.sembako_payments || data.payments || data.sembako_payments || []
 
+  const isPurchase = type === 'sembako_purchase' || type === 'sembako_restock' || Boolean(data.isPurchase)
+  const isDelivery = type === 'sembako_delivery'
+
   const paperData = {
     tenant: data.tenant || tenant || { business_name: 'Juragans', phone: '-' },
     invoice_number: invNo,
     transaction_date: txnDate,
     due_date: dueDate,
-    customer_name: cust?.customer_name || inv?.customer_name || data.customerName || 'Customer',
-    customer_type: cust?.customer_type || 'perseorangan',
+    customer_name: cust?.customer_name || inv?.customer_name || data.customerName || (isPurchase ? 'Vendor Supplier' : 'Customer'),
+    customer_type: cust?.customer_type || (isPurchase ? 'Supplier / Vendor Mitra' : 'perseorangan'),
     customer_phone: cust?.phone || data.customerPhone || '-',
     customer_address: cust?.address || data.customerAddress || '',
     total_amount: totalAmount,
@@ -74,6 +77,7 @@ export default function InvoicePreviewModal({ type = 'sembako_sale', data, isOpe
     sembako_payments: payments,
     notes: inv?.notes || data.notes || '',
     sembako_deliveries: inv?.sembako_deliveries || data.sembako_deliveries || [],
+    isPurchase,
   }
 
   const pdfDoc = (
@@ -205,7 +209,7 @@ export default function InvoicePreviewModal({ type = 'sembako_sale', data, isOpe
             {viewFormat === 'thermal' ? (
               <SembakoThermalReceipt data={paperData} />
             ) : (
-              <SembakoInvoicePaper data={paperData} mode="invoice" />
+              <SembakoInvoicePaper data={paperData} mode={isPurchase ? 'purchase' : (isDelivery ? 'delivery' : 'invoice')} />
             )}
           </div>
         </div>

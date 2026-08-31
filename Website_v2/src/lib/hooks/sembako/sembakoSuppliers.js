@@ -23,15 +23,22 @@ export const useSembakoSuppliers = () => {
 
         // Fetch supplier batch total costs
         const { data: batches } = await supabase.from('sembako_stock_batches')
-          .select('supplier_id, total_cost, qty_masuk, buy_price')
+          .select('supplier_id, total_cost, qty_masuk, buy_price, purchase_date')
           .eq('tenant_id', tenant.id)
           .eq('is_deleted', false)
 
         // Fetch raw materials (Bahan Baku & Kemasan)
         const { data: rawMaterials } = await supabase.from('sembako_raw_materials')
-          .select('id, supplier_name, total_spent, current_stock, unit_cost')
+          .select('id, material_name, supplier_name, total_spent, current_stock, unit_cost, updated_at, created_at')
           .eq('tenant_id', tenant.id)
           .eq('is_deleted', false)
+
+        // Fetch restock audit logs
+        const { data: auditLogs } = await supabase.from('sembako_audit_logs')
+          .select('id, product_name, action_type, notes, created_at, timestamp')
+          .eq('tenant_id', tenant.id)
+          .eq('action_type', 'RESTOCK_BAHAN')
+          .order('created_at', { ascending: false })
 
         // Fetch supplier payments
         const { data: payments } = await supabase.from('sembako_supplier_payments')
@@ -55,26 +62,67 @@ export const useSembakoSuppliers = () => {
         return (suppliers || []).map(s => {
           const sName = (s.supplier_name || '').toLowerCase().trim()
 
-          // Cost from SKU product stock batches
+          // 1. Cost from SKU product stock batches
           const batchCost = batchCostMap[s.id] || 0
 
-          // Cost from raw materials & packaging
-          const rawMaterialCost = (rawMaterials || []).reduce((sum, r) => {
+          // 2. Cost from Restock Audit Logs for this supplier
+          const relevantLogs = (auditLogs || []).filter(l => {
+            try {
+              if (l.notes && l.notes.startsWith('{')) {
+                const meta = JSON.parse(l.notes)
+                return (meta.supplier_name || '').toLowerCase().trim() === sName
+              }
+            } catch { /* ignore */ }
+            return false
+          })
+
+          const loggedSpentByMat = {}
+          let restockSpentTotal = 0
+          const logDates = []
+
+          relevantLogs.forEach(l => {
+            let meta = {}
+            try { if (l.notes.startsWith('{')) meta = JSON.parse(l.notes) } catch { /* ignore */ }
+            const spent = meta.total_spent || (Number(meta.qty_added || 0) * Number(meta.unit_cost || 0))
+            const matKey = (l.product_name || '').toLowerCase().trim()
+            loggedSpentByMat[matKey] = (loggedSpentByMat[matKey] || 0) + spent
+            restockSpentTotal += spent
+            if (l.created_at || l.timestamp) logDates.push(l.created_at || l.timestamp)
+          })
+
+          // 3. Cost from raw materials baseline (unlogged initial stock)
+          const unloggedRawMaterialCost = (rawMaterials || []).reduce((sum, r) => {
             const rSuppName = (r.supplier_name || '').toLowerCase().trim()
             if (rSuppName && rSuppName === sName) {
-              const spent = Number(r.total_spent) > 0 ? Number(r.total_spent) : (Number(r.current_stock || 0) * Number(r.unit_cost || 0))
-              return sum + spent
+              const totalSpentOnMat = Number(r.total_spent) > 0 ? Number(r.total_spent) : (Number(r.current_stock || 0) * Number(r.unit_cost || 0))
+              const matKey = (r.material_name || '').toLowerCase().trim()
+              const loggedSpent = loggedSpentByMat[matKey] || 0
+              const unloggedSpent = Math.max(0, totalSpentOnMat - loggedSpent)
+              return sum + unloggedSpent
             }
             return sum
           }, 0)
 
-          const totalCost = batchCost + rawMaterialCost
+          const batchDates = (batches || [])
+            .filter(b => b.supplier_id === s.id && b.purchase_date)
+            .map(b => b.purchase_date)
+
+          const rawDates = (rawMaterials || [])
+            .filter(r => (r.supplier_name || '').toLowerCase().trim() === sName)
+            .map(r => r.updated_at || r.created_at)
+            .filter(Boolean)
+
+          const allDates = [...batchDates, ...logDates, ...rawDates].sort((a, b) => new Date(b) - new Date(a))
+          const lastPurchaseDate = allDates[0] || null
+
+          const totalCost = batchCost + restockSpentTotal + unloggedRawMaterialCost
           const totalPaid = paymentMap[s.id] || 0
           return {
             ...s,
             total_purchase_value: totalCost,
             total_paid_value: totalPaid,
-            total_outstanding: Math.max(0, totalCost - totalPaid)
+            total_outstanding: Math.max(0, totalCost - totalPaid),
+            last_purchase_date: lastPurchaseDate
           }
         })
       } catch (e) { console.warn('[useSembakoSuppliers]', e); return [] }
@@ -195,8 +243,9 @@ export const useSembakoSupplierInvoices = (supplierId) => {
           sembako_products: b.sembako_products
         }))
 
-        // 3. Fetch raw materials & packaging
+        // 3. Fetch raw materials & restock audit logs without double counting
         let mappedRawMaterials = []
+        let mappedRestockLogs = []
         if (supplierName) {
           const { data: rawMaterials } = await supabase.from('sembako_raw_materials')
             .select('*')
@@ -204,61 +253,76 @@ export const useSembakoSupplierInvoices = (supplierId) => {
             .eq('is_deleted', false)
             .ilike('supplier_name', supplier?.supplier_name)
 
-          mappedRawMaterials = (rawMaterials || []).map(r => {
-            const isBahan = ['bawang_mentah', 'bawang_curah', 'bawang_putih', 'minyak_goreng', 'tepung_bumbu', 'bahan_baku', 'bahan_lain'].includes(r.category)
-            const spent = Number(r.total_spent) > 0 ? Number(r.total_spent) : (Number(r.current_stock || 0) * Number(r.unit_cost || 0))
-            return {
-              id: r.id,
-              purchase_date: r.updated_at || r.created_at,
-              product_name: r.material_name,
-              item_category: isBahan ? 'bahan_baku' : 'kemasan',
-              category_label: isBahan ? 'Bahan Baku Mentah' : 'Kemasan & Packaging',
-              qty_masuk: r.current_stock,
-              unit: r.unit || 'pcs',
-              buy_price: r.unit_cost || 0,
-              total_cost: spent,
-              qty_sisa: r.current_stock,
-              notes: r.notes || `Pembelian ${isBahan ? 'Bahan Baku' : 'Kemasan'} dari ${supplier?.supplier_name}`
-            }
-          })
-        }
-
-        // 4. Fetch restock audit logs
-        let mappedRestockLogs = []
-        if (supplierName) {
           const { data: auditLogs } = await supabase.from('sembako_audit_logs')
             .select('*')
             .eq('tenant_id', tenant.id)
             .eq('action_type', 'RESTOCK_BAHAN')
             .order('created_at', { ascending: false })
 
-          mappedRestockLogs = (auditLogs || [])
-            .filter(l => {
-              try {
-                if (l.notes && l.notes.startsWith('{')) {
-                  const meta = JSON.parse(l.notes)
-                  return (meta.supplier_name || '').toLowerCase().trim() === supplierName
-                }
-              } catch { /* ignore */ }
-              return false
-            })
-            .map(l => {
-              let meta = {}
-              try { if (l.notes.startsWith('{')) meta = JSON.parse(l.notes) } catch { /* ignore */ }
-              return {
-                id: l.id,
-                purchase_date: l.created_at || l.timestamp,
-                product_name: l.product_name,
-                item_category: 'restok_bahan',
-                category_label: 'Restok Cepat',
-                qty_masuk: meta.qty_added || 0,
-                unit: meta.unit || 'pcs',
-                buy_price: meta.unit_cost || 0,
-                total_cost: meta.total_spent || (Number(meta.qty_added || 0) * Number(meta.unit_cost || 0)),
-                qty_sisa: meta.new_stock ?? '-',
-                notes: meta.notes || `Restok oleh ${l.user_name || 'Admin'}`
+          const relevantLogs = (auditLogs || []).filter(l => {
+            try {
+              if (l.notes && l.notes.startsWith('{')) {
+                const meta = JSON.parse(l.notes)
+                return (meta.supplier_name || '').toLowerCase().trim() === supplierName
               }
-            })
+            } catch { /* ignore */ }
+            return false
+          })
+
+          // Track total spent logged in audit logs per material name
+          const loggedSpentByMat = {}
+          const loggedQtyByMat = {}
+
+          mappedRestockLogs = relevantLogs.map(l => {
+            let meta = {}
+            try { if (l.notes.startsWith('{')) meta = JSON.parse(l.notes) } catch { /* ignore */ }
+            const spent = meta.total_spent || (Number(meta.qty_added || 0) * Number(meta.unit_cost || 0))
+            const matKey = (l.product_name || '').toLowerCase().trim()
+            loggedSpentByMat[matKey] = (loggedSpentByMat[matKey] || 0) + spent
+            loggedQtyByMat[matKey] = (loggedQtyByMat[matKey] || 0) + (Number(meta.qty_added) || 0)
+
+            return {
+              id: l.id,
+              purchase_date: l.created_at || l.timestamp,
+              product_name: l.product_name,
+              item_category: 'restok_bahan',
+              category_label: 'Restok Cepat',
+              qty_masuk: meta.qty_added || 0,
+              unit: meta.unit || 'pcs',
+              buy_price: meta.unit_cost || 0,
+              total_cost: spent,
+              qty_sisa: meta.new_stock ?? '-',
+              notes: meta.notes || `Restok oleh ${l.user_name || 'Admin'}`
+            }
+          })
+
+          mappedRawMaterials = (rawMaterials || []).flatMap(r => {
+            const isBahan = ['bawang_mentah', 'bawang_curah', 'bawang_putih', 'minyak_goreng', 'tepung_bumbu', 'bahan_baku', 'bahan_lain'].includes(r.category)
+            const totalSpentOnMat = Number(r.total_spent) > 0 ? Number(r.total_spent) : (Number(r.current_stock || 0) * Number(r.unit_cost || 0))
+            const matKey = (r.material_name || '').toLowerCase().trim()
+            const loggedSpent = loggedSpentByMat[matKey] || 0
+            const unloggedSpent = Math.max(0, totalSpentOnMat - loggedSpent)
+
+            if (unloggedSpent <= 0 && loggedSpent > 0) {
+              // Entire cost already represented by restock audit logs
+              return []
+            }
+
+            const unloggedQty = Math.max(0, (Number(r.current_stock) || 0) - (loggedQtyByMat[matKey] || 0))
+            return [{
+              id: r.id,
+              purchase_date: r.created_at || r.updated_at,
+              product_name: r.material_name,
+              item_category: isBahan ? 'bahan_baku' : 'kemasan',
+              category_label: isBahan ? 'Bahan Baku Mentah' : 'Kemasan & Packaging',
+              qty_masuk: unloggedQty > 0 ? unloggedQty : (r.unit_cost > 0 ? Math.round(unloggedSpent / r.unit_cost) : (r.current_stock || 0)),
+              unit: r.unit || 'pcs',
+              buy_price: r.unit_cost || 0,
+              total_cost: unloggedSpent,
+              qty_sisa: r.current_stock,
+              notes: loggedSpent > 0 ? `Stok Terdaftar Awal (${supplier?.supplier_name})` : (r.notes || `Pembelian ${isBahan ? 'Bahan Baku' : 'Kemasan'} dari ${supplier?.supplier_name}`)
+            }]
+          })
         }
 
         // Combine and sort chronologically descending
@@ -324,6 +388,7 @@ export const useRecordSembakoSupplierPayment = () => {
     onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ['sembako-supplier-payments', vars.supplier_id] })
       queryClient.invalidateQueries({ queryKey: ['sembako-supplier-invoices', vars.supplier_id] })
+      queryClient.invalidateQueries({ queryKey: ['sembako-all-supplier-payments'] })
       queryClient.invalidateQueries({ queryKey: ['sembako-suppliers'] })
       queryClient.invalidateQueries({ queryKey: ['sembako-dashboard-stats'] })
       toast.success('Pembayaran ke supplier dicatat')
@@ -331,3 +396,35 @@ export const useRecordSembakoSupplierPayment = () => {
     onError: (err) => toast.error(normalizeSupabaseError(err).message),
   })
 }
+
+export const useDeleteSembakoSupplierPayment = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, supplier_id }) => {
+      const { error } = await supabase
+        .from('sembako_supplier_payments')
+        .delete()
+        .eq('id', id)
+      if (error) {
+        logSupabaseError(error, { table: 'sembako_supplier_payments', operation: 'delete', component: 'useSembakoData', actionName: 'sembako.supplier_payment.delete' })
+        throw error
+      }
+      return { id, supplier_id }
+    },
+    onSuccess: (_, vars) => {
+      if (vars?.supplier_id) {
+        queryClient.invalidateQueries({ queryKey: ['sembako-supplier-payments', vars.supplier_id] })
+        queryClient.invalidateQueries({ queryKey: ['sembako-supplier-invoices', vars.supplier_id] })
+      } else {
+        queryClient.invalidateQueries({ queryKey: ['sembako-supplier-payments'] })
+        queryClient.invalidateQueries({ queryKey: ['sembako-supplier-invoices'] })
+      }
+      queryClient.invalidateQueries({ queryKey: ['sembako-all-supplier-payments'] })
+      queryClient.invalidateQueries({ queryKey: ['sembako-suppliers'] })
+      queryClient.invalidateQueries({ queryKey: ['sembako-dashboard-stats'] })
+      toast.success('Riwayat pembayaran berhasil dihapus')
+    },
+    onError: (err) => toast.error(normalizeSupabaseError(err).message),
+  })
+}
+

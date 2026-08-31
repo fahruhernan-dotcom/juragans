@@ -175,8 +175,11 @@ export default function SembakoTokoSupplier() {
   }, [allBatches])
 
   const totalPiutang = useMemo(
-    () => customers.reduce((sum, c) => sum + (c.total_outstanding || 0), 0),
-    [customers]
+    () => customers.reduce((sum, c) => {
+      const statsOut = customerStats[c.id]?.calculatedOutstanding
+      return sum + (statsOut !== undefined ? statsOut : (c.total_outstanding || 0))
+    }, 0),
+    [customers, customerStats]
   )
 
   const totalBelanjaSupplier = useMemo(
@@ -190,8 +193,12 @@ export default function SembakoTokoSupplier() {
   )
 
   const customersWithDebt = useMemo(
-    () => customers.filter((customer) => (customer.total_outstanding || 0) > 0).length,
-    [customers]
+    () => customers.filter((customer) => {
+      const statsOut = customerStats[customer.id]?.calculatedOutstanding
+      const out = statsOut !== undefined ? statsOut : (customer.total_outstanding || 0)
+      return out > 0
+    }).length,
+    [customers, customerStats]
   )
 
   const activeSuppliers = useMemo(
@@ -674,10 +681,15 @@ function SupplierActions({ compact = false, open: controlledOpen, onOpenChange: 
 function TokoList({ customers, customerStats, search, selectedArea, onlyHutang }) {
   const navigate = useNavigate()
 
+  const getCustOutstanding = (c) => {
+    const statsOut = customerStats[c.id]?.calculatedOutstanding
+    return statsOut !== undefined ? statsOut : (c.total_outstanding || 0)
+  }
+
   const filtered = useMemo(() => {
     return customers
       .filter((customer) => {
-        const outstanding = customer.total_outstanding || 0
+        const outstanding = getCustOutstanding(customer)
         const haystack = [customer.customer_name, customer.area, customer.phone]
           .filter(Boolean)
           .join(' ')
@@ -690,11 +702,11 @@ function TokoList({ customers, customerStats, search, selectedArea, onlyHutang }
         return matchesSearch && matchesArea && matchesDebt
       })
       .sort((left, right) => {
-        const leftOutstanding = left.total_outstanding || 0
-        const rightOutstanding = right.total_outstanding || 0
+        const leftOutstanding = getCustOutstanding(left)
+        const rightOutstanding = getCustOutstanding(right)
         return rightOutstanding - leftOutstanding
       })
-  }, [customers, onlyHutang, search, selectedArea])
+  }, [customers, customerStats, onlyHutang, search, selectedArea])
 
   if (!filtered.length) {
     return (
@@ -710,7 +722,7 @@ function TokoList({ customers, customerStats, search, selectedArea, onlyHutang }
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
       {filtered.map((customer) => {
         const stats = customerStats[customer.id] || {}
-        const outstanding = customer.total_outstanding || 0
+        const outstanding = getCustOutstanding(customer)
         const invoiceCount = stats.invoiceCount || 0
         const lastTxDate = stats.lastTransactionDate
           ? new Date(stats.lastTransactionDate).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: '2-digit' })
@@ -874,8 +886,9 @@ function SupplierList({ suppliers, supplierStats, search, onAddSupplier }) {
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
       {filtered.map((supplier) => {
         const stats = supplierStats[supplier.id] || {}
-        const lastDate = stats.lastPurchaseDate
-          ? new Date(stats.lastPurchaseDate).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: '2-digit' })
+        const rawDate = supplier.last_purchase_date || stats.lastPurchaseDate
+        const lastDate = rawDate
+          ? new Date(rawDate).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: '2-digit' })
           : null
 
         return (

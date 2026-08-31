@@ -481,9 +481,9 @@ export function calculateSaleFinancials(sale, returnsList = [], products = []) {
   const remainingAmount = isOverpaid ? 0 : Math.max(0, grandTotal - paidAmount)
 
   const totalExpenses = otherCost
-  const grossProfit = Math.max(0, (itemsSubtotal - totalReturnAmount) - effectiveCogs)
-  const profit = Math.max(0, grossProfit - totalExpenses)
-  const netMarginPct = grandTotal > 0 ? Math.round((profit / grandTotal) * 100) : 0
+  const grossProfit = (itemsSubtotal - totalReturnAmount) - effectiveCogs
+  const profit = grossProfit - totalExpenses
+  const netMarginPct = grandTotal > 0 ? Number(((profit / grandTotal) * 100).toFixed(1)) : 0
 
 
 

@@ -26,7 +26,7 @@ import {
   formatFriendlyErrorMessage,
 } from './sembakoSaleUtils'
 import { SembakoSuccessCard } from './SembakoSuccessCard'
-import { calculateBomProductHpp, matchKemasanMaterial } from '@/lib/inventory/bomStockCalculator'
+import { calculateBomProductHpp, matchKemasanMaterial, matchStickerFrontMaterial, matchStickerBackMaterial, matchOtherPackagingMaterial } from '@/lib/inventory/bomStockCalculator'
 
 const PRESET_OTHER_COST_CATEGORIES = [
   { id: 'bensin', label: 'BBM / Bensin', Icon: Fuel, color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
@@ -334,6 +334,16 @@ function ProductItemRow({
   const isBelowHpp = baseCogsPerBase > 0 && pricePerBase > 0 && pricePerBase < baseCogsPerBase
   const marginPerUnit = pricePerBase > 0 && baseCogsPerBase > 0 ? pricePerBase - baseCogsPerBase : null
 
+  const sFrontMat = prod ? matchStickerFrontMaterial(prod, rawMaterialsList) : null
+  const sBackMat = prod ? matchStickerBackMaterial(prod, rawMaterialsList) : null
+  const otherMat = prod ? matchOtherPackagingMaterial(prod, rawMaterialsList) : null
+  const sFrontCost = Number(sFrontMat?.unit_cost || prod?.sticker_front_cost || 0)
+  const sBackCost = Number(sBackMat?.unit_cost || prod?.sticker_back_cost || 0)
+  const otherPkgCost = Number(otherMat?.unit_cost || prod?.other_packaging_cost || 0)
+  const deltaStickers = (item.noFrontSticker ? -sFrontCost : 0) + (item.noBackSticker ? -sBackCost : 0)
+  const deltaPolymailer = item.noPolymailer ? -otherPkgCost : 0
+  const deltaAllSavings = deltaStickers + deltaPolymailer
+
   // Calculate local FIFO breakdown for UI suggestion
   const prodBatches = useMemo(() => {
     if (!item.product_id || !allBatches.length) return []
@@ -357,7 +367,7 @@ function ProductItemRow({
         if (foundMat) customCost = Number(foundMat.unit_cost) || 0
       }
     }
-    const deltaPackaging = item.useCustomPackaging ? (customCost - stdKemasanCost) : 0
+    const deltaPackaging = (item.useCustomPackaging ? (customCost - stdKemasanCost) : 0) + deltaStickers + deltaPolymailer
 
     let remaining = qty
     const breakdown = []
@@ -375,7 +385,7 @@ function ProductItemRow({
     }
     
     if (remaining > 0) {
-      const fallbackCost = prod ? (calculateBomProductHpp(prod, rawMaterialsList, item.useCustomPackaging ? { unit_cost: customCost } : null) || ((prod.avg_buy_price || 0) + deltaPackaging)) : 0
+      const fallbackCost = prod ? (calculateBomProductHpp(prod, rawMaterialsList, item.useCustomPackaging ? { unit_cost: customCost } : null, { noFrontSticker: item.noFrontSticker, noBackSticker: item.noBackSticker, noPolymailer: item.noPolymailer }) || ((prod.avg_buy_price || 0) + deltaPackaging)) : 0
       breakdown.push({
         batch_code: 'Fallback (Stok Kurang)',
         qty: remaining,
@@ -385,7 +395,7 @@ function ProductItemRow({
     }
     
     return breakdown
-  }, [item.quantity, item.useCustomPackaging, item.customPackagingCost, item.customPackagingId, prodBatches, prod, factor, rawMaterialsList])
+  }, [item.quantity, item.useCustomPackaging, item.customPackagingCost, item.customPackagingId, item.noFrontSticker, item.noBackSticker, item.noPolymailer, deltaStickers, deltaPolymailer, prodBatches, prod, factor, rawMaterialsList])
 
   return (
     <div
@@ -702,38 +712,49 @@ function ProductItemRow({
             </div>
           )}
 
-          {/* Expandable Custom Packaging / Pouch Accordion */}
+          {/* Expandable Custom Packaging / Pouch, Sticker & Polymailer Accordion */}
           <div className="pt-2 border-t border-[#E2E8F0] mt-1">
             <button
               type="button"
               onClick={() => setIsPackagingExpanded(!isPackagingExpanded)}
               className={`w-full flex items-center justify-between py-1.5 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                item.useCustomPackaging
+                item.useCustomPackaging || item.noFrontSticker || item.noBackSticker || item.noPolymailer
                   ? 'bg-amber-500/10 border-amber-500/30 text-amber-900'
                   : 'bg-[#F8FAFC] border-[#E2E8F0] text-slate-600 hover:bg-slate-100/70'
               }`}
             >
               <div className="flex items-center gap-2 min-w-0">
-                <Package size={14} className={item.useCustomPackaging ? 'text-amber-600' : 'text-slate-400'} />
+                <Package size={14} className={item.useCustomPackaging || item.noFrontSticker || item.noBackSticker || item.noPolymailer ? 'text-amber-600' : 'text-slate-400'} />
                 <span className="truncate">
-                  Kemasan: <strong className={item.useCustomPackaging ? 'text-amber-700' : 'text-slate-700'}>
+                  Kemasan: <strong className={item.useCustomPackaging || item.noFrontSticker || item.noBackSticker || item.noPolymailer ? 'text-amber-700' : 'text-slate-700'}>
                     {item.useCustomPackaging ? (item.customPackagingName || 'Kemasan / Pouch Khusus') : 'Plastik Pouch (Standar)'}
+                    {item.noFrontSticker && item.noBackSticker && item.noPolymailer
+                      ? ' · ⚡ Polosan Total (Pouch Saja)'
+                      : item.noFrontSticker && item.noBackSticker
+                      ? ' · 🚫 Polos (Tanpa Stiker)'
+                      : item.noFrontSticker
+                      ? ' · ❌ Tanpa Stiker Depan'
+                      : item.noBackSticker
+                      ? ' · ❌ Tanpa Stiker Belakang'
+                      : item.noPolymailer
+                      ? ' · ❌ Tanpa Polymailer'
+                      : ''}
                   </strong>
                 </span>
               </div>
               <div className="flex items-center gap-1 shrink-0 text-[10px] text-amber-700 font-bold">
-                <span>{item.useCustomPackaging ? '✏️ Ganti Pouch' : '+ Detail Pouch'}</span>
+                <span>{item.useCustomPackaging || item.noFrontSticker || item.noBackSticker || item.noPolymailer ? '✏️ Ubah Kemasan/Stiker' : '+ Detail Pouch & Stiker'}</span>
                 <ChevronDown size={13} style={{ transform: isPackagingExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
               </div>
             </button>
 
             {isPackagingExpanded && (
-              <div className="mt-2 p-3 rounded-xl bg-amber-50/70 border border-amber-200/80 space-y-2.5 animate-in fade-in duration-150">
+              <div className="mt-2 p-3 rounded-xl bg-amber-50/70 border border-amber-200/80 space-y-3 animate-in fade-in duration-150">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-black uppercase tracking-wider text-amber-900 flex items-center gap-1">
                     <span>🛍️</span> Kustomisasi Kemasan & Pouch Produk:
                   </span>
-                  {item.useCustomPackaging && (
+                  {(item.useCustomPackaging || item.noFrontSticker || item.noBackSticker || item.noPolymailer) && (
                     <button
                       type="button"
                       onClick={() => {
@@ -742,12 +763,15 @@ function ProductItemRow({
                           customPackagingId: '',
                           customPackagingName: '',
                           customPackagingCost: 0,
-                          customPackagingNote: ''
+                          customPackagingNote: '',
+                          noFrontSticker: false,
+                          noBackSticker: false,
+                          noPolymailer: false
                         })
                       }}
                       className="text-[9.5px] font-bold text-rose-600 hover:underline cursor-pointer"
                     >
-                      Reset ke Standar (Plastik Pouch)
+                      Reset ke Standar Lengkap
                     </button>
                   )}
                 </div>
@@ -831,6 +855,143 @@ function ProductItemRow({
                   </div>
                 </div>
 
+                {/* Kustomisasi Stiker & Plastik Packing / Polymailer */}
+                <div className="pt-2 border-t border-amber-200/80 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-amber-900 flex items-center gap-1">
+                      <span>🏷️</span> Opsi Stiker & Plastik Packing:
+                    </span>
+                    {(item.noFrontSticker || item.noBackSticker || item.noPolymailer) && (
+                      <span className="text-[10px] font-black text-emerald-800 bg-emerald-100/90 border border-emerald-300 px-2 py-0.5 rounded-full">
+                        💰 Hemat HPP: -{formatIDR(Math.abs(deltaAllSavings))}/pcs
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {/* Checkbox Stiker Depan */}
+                    <label className={`flex items-center gap-2.5 p-2.5 rounded-xl border transition-all cursor-pointer select-none ${
+                      !item.noFrontSticker
+                        ? 'bg-white border-amber-300 text-slate-800 shadow-xs'
+                        : 'bg-amber-100/40 border-amber-200/80 text-slate-400'
+                    }`}>
+                      <input
+                        type="checkbox"
+                        checked={!item.noFrontSticker}
+                        onChange={(e) => {
+                          onChangeItem(idx, { noFrontSticker: !e.target.checked })
+                        }}
+                        className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-amber-300 cursor-pointer"
+                      />
+                      <div className="flex flex-col min-w-0">
+                        <span className={`text-xs font-bold leading-tight flex items-center gap-1 ${item.noFrontSticker ? 'line-through text-slate-400' : 'text-slate-800'}`}>
+                          <span>🏷️ Stiker Depan</span>
+                          {!item.noFrontSticker && sFrontCost > 0 && (
+                            <span className="text-[10px] text-amber-700 font-mono">({formatIDR(sFrontCost)})</span>
+                          )}
+                        </span>
+                        <span className="text-[9.5px] text-muted-foreground">
+                          {!item.noFrontSticker ? 'Ditempel' : '❌ Tanpa Depan'}
+                        </span>
+                      </div>
+                    </label>
+
+                    {/* Checkbox Stiker Belakang */}
+                    <label className={`flex items-center gap-2.5 p-2.5 rounded-xl border transition-all cursor-pointer select-none ${
+                      !item.noBackSticker
+                        ? 'bg-white border-amber-300 text-slate-800 shadow-xs'
+                        : 'bg-amber-100/40 border-amber-200/80 text-slate-400'
+                    }`}>
+                      <input
+                        type="checkbox"
+                        checked={!item.noBackSticker}
+                        onChange={(e) => {
+                          onChangeItem(idx, { noBackSticker: !e.target.checked })
+                        }}
+                        className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-amber-300 cursor-pointer"
+                      />
+                      <div className="flex flex-col min-w-0">
+                        <span className={`text-xs font-bold leading-tight flex items-center gap-1 ${item.noBackSticker ? 'line-through text-slate-400' : 'text-slate-800'}`}>
+                          <span>🏷️ Stiker Belakang</span>
+                          {!item.noBackSticker && sBackCost > 0 && (
+                            <span className="text-[10px] text-amber-700 font-mono">({formatIDR(sBackCost)})</span>
+                          )}
+                        </span>
+                        <span className="text-[9.5px] text-muted-foreground">
+                          {!item.noBackSticker ? 'Ditempel' : '❌ Tanpa Belakang'}
+                        </span>
+                      </div>
+                    </label>
+
+                    {/* Checkbox Plastik Polymailer */}
+                    <label className={`flex items-center gap-2.5 p-2.5 rounded-xl border transition-all cursor-pointer select-none ${
+                      !item.noPolymailer
+                        ? 'bg-white border-amber-300 text-slate-800 shadow-xs'
+                        : 'bg-amber-100/40 border-amber-200/80 text-slate-400'
+                    }`}>
+                      <input
+                        type="checkbox"
+                        checked={!item.noPolymailer}
+                        onChange={(e) => {
+                          onChangeItem(idx, { noPolymailer: !e.target.checked })
+                        }}
+                        className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-amber-300 cursor-pointer"
+                      />
+                      <div className="flex flex-col min-w-0">
+                        <span className={`text-xs font-bold leading-tight flex items-center gap-1 ${item.noPolymailer ? 'line-through text-slate-400' : 'text-slate-800'}`}>
+                          <span>📦 Plastik Polymailer</span>
+                          {!item.noPolymailer && otherPkgCost > 0 && (
+                            <span className="text-[10px] text-amber-700 font-mono">({formatIDR(otherPkgCost)})</span>
+                          )}
+                        </span>
+                        <span className="text-[9.5px] text-muted-foreground">
+                          {!item.noPolymailer ? 'Plastik packing' : '❌ Tanpa Poly'}
+                        </span>
+                      </div>
+                    </label>
+                  </div>
+
+                  {/* Tombol Cepat Pilihan Polos */}
+                  <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const isCurrentlyNoStickers = Boolean(item.noFrontSticker && item.noBackSticker)
+                        onChangeItem(idx, {
+                          noFrontSticker: !isCurrentlyNoStickers,
+                          noBackSticker: !isCurrentlyNoStickers
+                        })
+                      }}
+                      className={`text-[10px] font-extrabold px-3 py-1.5 rounded-lg border transition-all cursor-pointer flex items-center gap-1.5 ${
+                        item.noFrontSticker && item.noBackSticker && !item.noPolymailer
+                          ? 'bg-amber-700 text-white border-amber-700 shadow-xs'
+                          : 'bg-white hover:bg-amber-100/70 text-amber-900 border-amber-300'
+                      }`}
+                    >
+                      <span>{item.noFrontSticker && item.noBackSticker && !item.noPolymailer ? '✓ Mode: Tanpa Stiker' : '🚫 Set: Tanpa Stiker Saja'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const isAllPlain = Boolean(item.noFrontSticker && item.noBackSticker && item.noPolymailer)
+                        onChangeItem(idx, {
+                          noFrontSticker: !isAllPlain,
+                          noBackSticker: !isAllPlain,
+                          noPolymailer: !isAllPlain
+                        })
+                      }}
+                      className={`text-[10px] font-extrabold px-3 py-1.5 rounded-lg border transition-all cursor-pointer flex items-center gap-1.5 ${
+                        item.noFrontSticker && item.noBackSticker && item.noPolymailer
+                          ? 'bg-amber-800 text-white border-amber-800 shadow-xs'
+                          : 'bg-amber-100/80 hover:bg-amber-200 text-amber-950 border-amber-400'
+                      }`}
+                    >
+                      <span>{item.noFrontSticker && item.noBackSticker && item.noPolymailer ? '✓ Polosan Total (Pouch Saja)' : '⚡ Set: Polosan Total (Pouch Saja)'}</span>
+                    </button>
+                  </div>
+                </div>
+
                 {/* Catatan Kemasan */}
                 <div>
                   <label className="text-[9.5px] font-bold text-slate-600 block mb-1">
@@ -845,14 +1006,17 @@ function ProductItemRow({
                   />
                 </div>
 
-                {item.useCustomPackaging && (
+                {(item.useCustomPackaging || item.noFrontSticker || item.noBackSticker || item.noPolymailer) && (
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-300/50 text-[11px]">
                     <div className="flex flex-col gap-0.5 text-amber-900 font-bold">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <span>⚡</span>
                         <span>HPP Terupdate: <strong className="font-mono text-amber-950 font-black">{formatIDR(baseCogsPerBase)} / {baseUnit}</strong></span>
                         {Number(item.customPackagingCost) > 0 && (
                           <span className="text-amber-800/80 font-semibold">(Biaya Kemasan: {formatIDR(item.customPackagingCost)}/pcs)</span>
+                        )}
+                        {deltaAllSavings !== 0 && (
+                          <span className="text-emerald-800 font-semibold">(Potongan HPP: {formatIDR(Math.abs(deltaAllSavings))}/pcs)</span>
                         )}
                       </div>
                       {customPouchStock !== null && (
@@ -1322,6 +1486,11 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
           }
         }
 
+        const itNotesStr = ((it.notes || '') + ' ' + (editSale.notes || '')).toLowerCase()
+        const noFrontSticker = Boolean(it.no_front_sticker || itNotesStr.includes('tanpa stiker') || itNotesStr.includes('tanpa stiker depan') || itNotesStr.includes('polos') || itNotesStr.includes('polosan'))
+        const noBackSticker = Boolean(it.no_back_sticker || itNotesStr.includes('tanpa stiker') || itNotesStr.includes('tanpa stiker belakang') || itNotesStr.includes('polos') || itNotesStr.includes('polosan'))
+        const noPolymailer = Boolean(it.no_polymailer || itNotesStr.includes('tanpa polymailer') || itNotesStr.includes('tanpa poly') || itNotesStr.includes('polosan:'))
+
         return {
           product_id: it.product_id,
           product_name: cleanName,
@@ -1336,13 +1505,16 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
           customPackagingName,
           customPackagingCost,
           customPackagingNote,
+          noFrontSticker,
+          noBackSticker,
+          noPolymailer,
         }
       }))
       // Data lengkap — buka di step 1 (barang) supaya langsung bisa review/edit/tambah
       setStep(1)
     } else {
       // Items kosong (data lama) — buka di step 1 juga, customer sudah prefill, tinggal isi barang
-      setItems([{ product_id: '', product_name: '', unit: '', selectedUnit: '', priceMode: 'per_base', quantity: 0, price_per_unit: 0, cogs_per_unit: 0, useCustomPackaging: false, customPackagingId: '', customPackagingName: '', customPackagingCost: 0, customPackagingNote: '' }])
+      setItems([{ product_id: '', product_name: '', unit: '', selectedUnit: '', priceMode: 'per_base', quantity: 0, price_per_unit: 0, cogs_per_unit: 0, useCustomPackaging: false, customPackagingId: '', customPackagingName: '', customPackagingCost: 0, customPackagingNote: '', noFrontSticker: false, noBackSticker: false, noPolymailer: false }])
       setStep(1)
     }
   }, [open, editSale, rawMaterialsList])
@@ -1492,14 +1664,23 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
           }
         }
 
+        const sFrontMat = matchStickerFrontMaterial(p, rawMaterialsList)
+        const sBackMat = matchStickerBackMaterial(p, rawMaterialsList)
+        const otherMat = matchOtherPackagingMaterial(p, rawMaterialsList)
+        const sFrontCost = Number(sFrontMat?.unit_cost || p?.sticker_front_cost || 0)
+        const sBackCost = Number(sBackMat?.unit_cost || p?.sticker_back_cost || 0)
+        const otherPkgCost = Number(otherMat?.unit_cost || p?.other_packaging_cost || 0)
+        const deltaStickers = (current.noFrontSticker ? -sFrontCost : 0) + (current.noBackSticker ? -sBackCost : 0)
+        const deltaPolymailer = current.noPolymailer ? -otherPkgCost : 0
+
         const stdKemasan = matchKemasanMaterial(p, rawMaterialsList)
         const stdKemasanCost = Number(stdKemasan?.unit_cost) || 0
         const newKemasanCost = customKemasan ? (Number(customKemasan.unit_cost) || 0) : stdKemasanCost
-        const deltaPackaging = current.useCustomPackaging ? (newKemasanCost - stdKemasanCost) : 0
+        const deltaPackaging = (current.useCustomPackaging ? (newKemasanCost - stdKemasanCost) : 0) + deltaStickers + deltaPolymailer
 
         const factor = getFactor(current.selectedUnit || p.unit || 'pcs', p)
         const qtyInBase = (Number(current.quantity) || 0) * factor
-        const bomCost = calculateBomProductHpp(p, rawMaterialsList, customKemasan)
+        const bomCost = calculateBomProductHpp(p, rawMaterialsList, customKemasan, { noFrontSticker: current.noFrontSticker, noBackSticker: current.noBackSticker, noPolymailer: current.noPolymailer })
 
         const prodBatches = allBatches
           .filter(b => b.product_id === pId && !b.is_deleted && (b.qty_sisa || 0) > 0)
@@ -1554,8 +1735,19 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
         const customPackagingTag = i.useCustomPackaging && (i.customPackagingName || i.customPackagingNote)
           ? `[Kemasan: ${i.customPackagingName || 'Khusus'}${i.customPackagingNote ? ` - ${i.customPackagingNote}` : ''}]`
           : ''
+        let stickerTag = ''
+        if (i.noFrontSticker && i.noBackSticker && i.noPolymailer) {
+          stickerTag = '[Polosan: Tanpa Stiker & Tanpa Polymailer]'
+        } else if (i.noFrontSticker && i.noBackSticker) {
+          stickerTag = '[Tanpa Stiker / Polos]'
+        } else if (i.noFrontSticker) {
+          stickerTag = '[Tanpa Stiker Depan]'
+        } else if (i.noBackSticker) {
+          stickerTag = '[Tanpa Stiker Belakang]'
+        }
+        const polyTag = i.noPolymailer && !stickerTag.includes('Polymailer') ? '[Tanpa Polymailer]' : ''
         const baseNotes = prod?.notes || i.notes || ''
-        const itemFinalNotes = [baseNotes, customPackagingTag].filter(Boolean).join(' ')
+        const itemFinalNotes = [baseNotes, customPackagingTag, stickerTag, polyTag].filter(Boolean).join(' ')
 
         return {
           ...i,
@@ -1570,6 +1762,9 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
           custom_packaging_id: i.customPackagingId || null,
           custom_packaging_name: i.customPackagingName || null,
           custom_packaging_note: i.customPackagingNote || null,
+          no_front_sticker: Boolean(i.noFrontSticker),
+          no_back_sticker: Boolean(i.noBackSticker),
+          no_polymailer: Boolean(i.noPolymailer),
         }
       })
     if (!validItems.length) { toast.error('Tambahkan minimal 1 produk'); return }
