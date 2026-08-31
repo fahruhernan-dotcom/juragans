@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/dialog'
 import { useUpdateSembakoRawMaterial } from '@/lib/hooks/useSembakoData'
 import { recordAuditLog } from '@/lib/hooks/useSembakoAudit'
+import { recordInventoryMutation } from '@/lib/hooks/sembako/sembakoMutations'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { formatIDR } from '@/lib/format'
 import { SlidersHorizontal, ArrowRight, ShieldCheck, CheckCircle2, AlertCircle, Package } from 'lucide-react'
@@ -27,7 +28,7 @@ export function SembakoAdjustStockModal({ open, onOpenChange, material, onClose 
 
   useEffect(() => {
     if (material && open) {
-      setNewStock(String(material.current_stock ?? ''))
+      setNewStock(material.current_stock !== undefined && material.current_stock !== null ? String(material.current_stock) : '0')
       setReason('')
     }
   }, [material, open])
@@ -38,8 +39,10 @@ export function SembakoAdjustStockModal({ open, onOpenChange, material, onClose 
   }
 
   const nNewStock = parseFloat(newStock)
-  const isValid = !isNaN(nNewStock) && nNewStock >= 0
-  const diff = isValid ? nNewStock - currentStock : 0
+  const isInvalid = isNaN(nNewStock) || nNewStock < 0
+  const diff = !isInvalid ? (nNewStock - currentStock) : 0
+  const isSame = diff === 0
+  const isValid = !isInvalid
 
   const handleQuickAdjust = (delta) => {
     const base = isValid ? nNewStock : currentStock
@@ -49,19 +52,15 @@ export function SembakoAdjustStockModal({ open, onOpenChange, material, onClose 
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!material?.id) return
-    if (!isValid) {
-      toast.error('Masukkan jumlah stok fisik yang valid (minimal 0)')
-      return
-    }
+    if (isInvalid || isSame) return
 
     const payload = {
       id: material.id,
       current_stock: nNewStock,
     }
 
-    if (reason && reason.trim()) {
-      const stamp = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'short' })
+    if (reason.trim()) {
+      const stamp = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })
       const noteEntry = `[Opname ${stamp}: ${diff >= 0 ? '+' : ''}${diff} ${unit} - ${reason.trim()}]`
       payload.notes = material.notes ? `${material.notes} | ${noteEntry}` : noteEntry
     }
@@ -69,22 +68,40 @@ export function SembakoAdjustStockModal({ open, onOpenChange, material, onClose 
     try {
       await updateMutation.mutateAsync(payload)
 
-      // Record non-blocking audit log
+      // 1. Record persistent inventory mutation in database
+      recordInventoryMutation({
+        material_id: material.id,
+        material_name: material.material_name,
+        material_category: material.category,
+        mutation_type: 'ADJUST',
+        action_type: 'OPNAME',
+        quantity: diff,
+        unit,
+        unit_cost: unitCost,
+        total_cost: Math.abs(diff) * unitCost,
+        prev_stock: currentStock,
+        new_stock: nNewStock,
+        ref_type: 'opname',
+        notes: reason.trim() || 'Penyesuaian stok opname fisik',
+        created_by: profile?.full_name || profile?.email || 'Admin',
+      }).catch(() => {})
+
+      // 2. Record audit log
       try {
         recordAuditLog({
-          action: 'update',
-          entityType: 'raw_material_adjust',
-          entityId: material.id,
-          entityName: material.material_name,
-          details: {
-            previous_stock: currentStock,
+          action_type: 'ADJUST_BAHAN',
+          product_name: material.material_name,
+          old_value: `${currentStock} ${unit}`,
+          new_value: `${nNewStock} ${unit} (${diff >= 0 ? '+' : ''}${diff} ${unit})`,
+          notes: JSON.stringify({
+            prev_stock: currentStock,
             new_stock: nNewStock,
-            diff,
+            delta_qty: diff,
             unit,
             unit_cost: unitCost,
             reason: reason.trim() || 'Penyesuaian stok opname fisik'
-          },
-          actorEmail: profile?.email || 'unknown'
+          }),
+          profile
         })
       } catch { /* ignore audit failure */ }
 
@@ -106,8 +123,8 @@ export function SembakoAdjustStockModal({ open, onOpenChange, material, onClose 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md w-full bg-white text-slate-900 border border-slate-200 rounded-3xl p-0 overflow-hidden shadow-2xl">
-        <DialogHeader className="p-5 border-b border-slate-100 bg-slate-50/80">
+      <DialogContent className="max-w-md w-full bg-white text-slate-900 border border-slate-200 rounded-3xl p-0 overflow-hidden shadow-2xl max-h-[92vh] flex flex-col">
+        <DialogHeader className="p-5 border-b border-slate-100 bg-slate-50/80 shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold border border-amber-200 shrink-0">
               <SlidersHorizontal size={20} />
@@ -123,7 +140,7 @@ export function SembakoAdjustStockModal({ open, onOpenChange, material, onClose 
           </div>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-4 text-xs">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
           {/* Target Material Card */}
           <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
             <div className="flex items-center justify-between">
@@ -253,7 +270,7 @@ export function SembakoAdjustStockModal({ open, onOpenChange, material, onClose 
             </div>
           </div>
 
-          <DialogFooter className="pt-3 gap-2 sm:gap-0">
+          <DialogFooter className="pt-3 pb-1 border-t border-slate-100 flex items-center justify-end gap-2 shrink-0 bg-white/95 backdrop-blur-sm sticky bottom-0 z-10 -mx-5 -mb-5 px-5 py-3">
             <button
               type="button"
               onClick={handleClose}

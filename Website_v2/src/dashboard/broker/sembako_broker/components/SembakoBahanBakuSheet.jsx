@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import {
   Sheet,
   SheetContent,
@@ -9,10 +9,12 @@ import {
 import {
   useCreateSembakoRawMaterial,
   useUpdateSembakoRawMaterial,
-  useSembakoSuppliers
+  useSembakoSuppliers,
+  useCreateSembakoSupplier
 } from '@/lib/hooks/useSembakoData'
 import { formatRupiah, formatIDR } from '@/lib/format'
-import { Package, Calculator, Store, CheckCircle2, Building2 } from 'lucide-react'
+import { CustomSelect } from './sembakoSaleUtils'
+import { Package, Calculator, Store, CheckCircle2, Building2, Plus, X, Scissors, Sparkles, Phone, MapPin } from 'lucide-react'
 import { toast } from 'sonner'
 
 export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData = null, editItem = null, targetType = 'bahan_baku' }) {
@@ -25,6 +27,7 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
   const { data: suppliers = [] } = useSembakoSuppliers()
   const createMutation = useCreateSembakoRawMaterial()
   const updateMutation = useUpdateSembakoRawMaterial()
+  const createSupplierMutation = useCreateSembakoSupplier()
 
   // Determine if item is Bahan Baku or Kemasan
   const isBahanBakuMode = targetType === 'bahan_baku' || (activeItem && ['bawang_mentah', 'bawang_curah', 'bawang_putih', 'minyak_goreng', 'tepung_bumbu', 'bahan_baku', 'bahan_lain'].includes(activeItem.category))
@@ -38,6 +41,27 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
   const [minStockAlert, setMinStockAlert] = useState('50')
   const [supplierName, setSupplierName] = useState('')
   const [notes, setNotes] = useState('')
+
+  // Quick Add Supplier state
+  const [showAddSupplierModal, setShowAddSupplierModal] = useState(false)
+  const [newSupplierName, setNewSupplierName] = useState('')
+  const [newSupplierPhone, setNewSupplierPhone] = useState('')
+  const [newSupplierAddress, setNewSupplierAddress] = useState('')
+
+  // Sticker calculation state
+  const isSticker = useMemo(() => {
+    const cat = String(category || '').toLowerCase()
+    const nm = String(name || '').toLowerCase()
+    return cat.includes('sticker') || cat.includes('stiker') || cat.includes('label') ||
+           nm.includes('sticker') || nm.includes('stiker') || nm.includes('label') || nm.includes('cutting')
+  }, [category, name])
+
+  const [isStickerMode, setIsStickerMode] = useState(false)
+  const [sheetCount, setSheetCount] = useState('')
+  const [cuttingPerSheet, setCuttingPerSheet] = useState('12')
+  const [printPricePerSheet, setPrintPricePerSheet] = useState('6500')
+  const [includeCutting, setIncludeCutting] = useState(true)
+  const [cuttingFeePerSheet, setCuttingFeePerSheet] = useState('6500')
 
   // Track which field user typed last for bi-directional auto math
   const [lastEdited, setLastEdited] = useState('unitCost')
@@ -54,6 +78,15 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
       setSupplierName(activeItem.supplier_name || '')
       setNotes(activeItem.notes || '')
       setLastEdited('unitCost')
+      setShowAddSupplierModal(false)
+
+      const stickerDetected = String(activeItem.category || '').toLowerCase().includes('sticker') ||
+                              String(activeItem.material_name || '').toLowerCase().includes('cutting') ||
+                              String(activeItem.material_name || '').toLowerCase().includes('stiker')
+      setIsStickerMode(stickerDetected)
+      setPrintPricePerSheet('6500')
+      setIncludeCutting(true)
+      setCuttingFeePerSheet('6500')
     } else {
       setName('')
       setCategory(isBahanBakuMode ? 'bawang_mentah' : 'pouch')
@@ -65,6 +98,13 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
       setSupplierName('')
       setNotes('')
       setLastEdited('unitCost')
+      setShowAddSupplierModal(false)
+      setIsStickerMode(false)
+      setSheetCount('')
+      setCuttingPerSheet('12')
+      setPrintPricePerSheet('6500')
+      setIncludeCutting(true)
+      setCuttingFeePerSheet('6500')
     }
   }, [activeItem, open, isBahanBakuMode])
 
@@ -73,6 +113,65 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
     if (!val && val !== 0) return ''
     const num = Number(val)
     return isNaN(num) ? '' : num.toLocaleString('id-ID')
+  }
+
+  // Recalculate sticker math based on latest parameters
+  const recalculateStickerMath = ({
+    sheets = sheetCount,
+    cuts = cuttingPerSheet,
+    printPrice = printPricePerSheet,
+    cuttingFee = cuttingFeePerSheet,
+    withCutting = includeCutting
+  }) => {
+    const nSheets = parseFloat(sheets) || 0
+    const nCuts = parseFloat(cuts) || 12
+    const nPrint = parseFloat(printPrice) || 0
+    const nCutFee = withCutting ? (parseFloat(cuttingFee) || 0) : 0
+    const costPerSheet = nPrint + nCutFee
+
+    const nTotalPcs = Math.round(nSheets * nCuts)
+    const nTotalNota = Math.round(nSheets * costPerSheet)
+    const hppPcs = nCuts > 0 ? Math.round(costPerSheet / nCuts) : 0
+
+    if (nTotalPcs > 0) {
+      setQty(String(nTotalPcs))
+    }
+    if (nTotalNota > 0) {
+      setTotalSpent(String(nTotalNota))
+    }
+    if (hppPcs > 0) {
+      setUnitCost(String(hppPcs))
+    }
+  }
+
+  // Sticker event handlers
+  const handleSheetCountChange = (val) => {
+    const rawVal = val.replace(/[^0-9.]/g, '')
+    setSheetCount(rawVal)
+    recalculateStickerMath({ sheets: rawVal })
+  }
+
+  const handleCuttingPerSheetChange = (val) => {
+    const rawVal = val.replace(/\D/g, '')
+    setCuttingPerSheet(rawVal)
+    recalculateStickerMath({ cuts: rawVal })
+  }
+
+  const handlePrintPriceChange = (val) => {
+    const rawVal = val.replace(/\D/g, '')
+    setPrintPricePerSheet(rawVal)
+    recalculateStickerMath({ printPrice: rawVal })
+  }
+
+  const handleCuttingFeeChange = (val) => {
+    const rawVal = val.replace(/\D/g, '')
+    setCuttingFeePerSheet(rawVal)
+    recalculateStickerMath({ cuttingFee: rawVal })
+  }
+
+  const handleIncludeCuttingToggle = (checked) => {
+    setIncludeCutting(checked)
+    recalculateStickerMath({ withCutting: checked })
   }
 
   // Dynamic math calculator: adjusting Qty keeps unitCost fixed
@@ -108,12 +207,43 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
     }
   }
 
+  // Quick save new supplier
+  const handleQuickAddSupplier = async (e) => {
+    if (e) e.preventDefault()
+    if (!newSupplierName.trim()) {
+      toast.error('Nama Supplier / Percetakan wajib diisi')
+      return
+    }
+    try {
+      await createSupplierMutation.mutateAsync({
+        supplier_name: newSupplierName.trim(),
+        phone: newSupplierPhone.trim() || null,
+        address: newSupplierAddress.trim() || null,
+        category: isBahanBakuMode ? 'petani' : 'percetakan',
+      })
+      setSupplierName(newSupplierName.trim())
+      setShowAddSupplierModal(false)
+      setNewSupplierName('')
+      setNewSupplierPhone('')
+      setNewSupplierAddress('')
+      toast.success(`Suplier "${newSupplierName.trim()}" berhasil disimpan & dipilih!`)
+    } catch (err) {
+      // toast error handled by mutation
+    }
+  }
+
+  const costPerSheet = (parseFloat(printPricePerSheet) || 0) + (includeCutting ? (parseFloat(cuttingFeePerSheet) || 0) : 0)
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!name.trim()) {
       toast.error(`Nama ${isBahanBakuMode ? 'bahan baku' : 'kemasan'} wajib diisi`)
       return
     }
+
+    const calculatedNotes = isStickerMode && sheetCount
+      ? `${notes ? notes + ' | ' : ''}Cetak ${sheetCount} lbr A3+ @ Rp ${formatThousands(printPricePerSheet)} ${includeCutting ? `+ Cutting Rp ${formatThousands(cuttingFeePerSheet)}/lbr (${cuttingPerSheet} pcs/lbr)` : `(${cuttingPerSheet} pcs/lbr)`} | HPP Rp ${formatThousands(unitCost)}/pcs`
+      : notes
 
     const payload = {
       material_name: name.trim(),
@@ -124,7 +254,7 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
       unit_cost: unitCost ? parseFloat(unitCost) : 0,
       min_stock_alert: minStockAlert ? parseFloat(minStockAlert) : 0,
       supplier_name: supplierName.trim() || null,
-      notes: notes.trim() || null,
+      notes: calculatedNotes || null,
     }
 
     try {
@@ -150,7 +280,7 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
       }}
     >
       <SheetContent side="right" className="w-full sm:max-w-lg bg-white text-slate-900 border-l border-slate-200 p-0 flex flex-col shadow-2xl">
-        <SheetHeader className="p-5 border-b border-slate-100 bg-slate-50/80">
+        <SheetHeader className="p-5 border-b border-slate-100 bg-slate-50/80 pr-12">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold border border-amber-200">
               <Package size={18} />
@@ -183,7 +313,13 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
               required
               placeholder={isBahanBakuMode ? 'Contoh: Bawang Merah Basah Super Cepogo / Minyak Goreng Curah' : 'Contoh: Pouch Standing Zipper Matte 250g / Stiker Depan Gold'}
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value
+                setName(val)
+                if (val.toLowerCase().includes('stiker') || val.toLowerCase().includes('sticker') || val.toLowerCase().includes('cutting') || val.toLowerCase().includes('label')) {
+                  setIsStickerMode(true)
+                }
+              }}
               className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400 text-xs font-semibold focus:bg-white focus:border-amber-500 focus:outline-none transition"
             />
           </div>
@@ -207,12 +343,19 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
               ) : (
                 <select
                   value={category}
-                  onChange={(e) => setCategory(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    setCategory(val)
+                    if (val === 'sticker_depan' || val === 'sticker_belakang') {
+                      setIsStickerMode(true)
+                      setUnit('pcs')
+                    }
+                  }}
                   className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-semibold focus:bg-white focus:border-amber-500"
                 >
                   <option value="pouch">🛍️ Standing Pouch Ziplock</option>
                   <option value="toples">🫙 Toples PET Plastik</option>
-                  <option value="sticker_depan">🏷️ Stiker Label Depan</option>
+                  <option value="sticker_depan">🏷️ Stiker Label Depan (Cutting A3+)</option>
                   <option value="sticker_belakang">🏷️ Stiker Label Belakang (Halal/Gizi)</option>
                   <option value="kardus">📦 Kardus Master Box / Dus Karton</option>
                   <option value="polymailer">✉️ Plastik Polymailer Ekspedisi</option>
@@ -222,7 +365,7 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
               )}
             </div>
             <div>
-              <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">Satuan</label>
+              <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">Satuan Stok</label>
               {isBahanBakuMode ? (
                 <select
                   value={unit}
@@ -242,7 +385,7 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
                   onChange={(e) => setUnit(e.target.value)}
                   className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-semibold focus:bg-white focus:border-amber-500"
                 >
-                  <option value="pcs">pcs (buah / lembar)</option>
+                  <option value="pcs">pcs (buah / label stiker)</option>
                   <option value="lembar">lembar</option>
                   <option value="roll">roll</option>
                   <option value="pack">pack (isi pack)</option>
@@ -252,6 +395,169 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
               )}
             </div>
           </div>
+
+          {/* Mode Switcher for Stickers / Labels */}
+          {isSticker && (
+            <div className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-500/[0.08] to-orange-500/[0.08] border border-amber-300/80 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 font-black text-xs text-amber-900">
+                  <Scissors size={14} className="text-amber-600" />
+                  <span>Kalkulator Cetak Stiker per Lembar (A3+ / Sheet)</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsStickerMode(!isStickerMode)}
+                  className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border transition cursor-pointer ${
+                    isStickerMode
+                      ? 'bg-amber-500 text-white border-amber-600 shadow-xs'
+                      : 'bg-white text-slate-600 border-slate-200 hover:bg-amber-50'
+                  }`}
+                >
+                  {isStickerMode ? '✓ Mode Lembar Aktif' : '+ Aktifkan Hitung Lembar'}
+                </button>
+              </div>
+
+              {isStickerMode && (
+                <div className="space-y-3 pt-1">
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-1 block">
+                        Jumlah Lembar A3+ Dicetak <span className="text-rose-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          placeholder="Misal: 50"
+                          value={sheetCount}
+                          onChange={(e) => handleSheetCountChange(e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl bg-white border border-amber-300 text-slate-900 text-xs font-bold focus:border-amber-500 focus:outline-none"
+                        />
+                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-amber-700">
+                          lembar
+                        </span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-1 block">
+                        Isi Cutting per Lembar <span className="text-rose-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          placeholder="12"
+                          value={cuttingPerSheet}
+                          onChange={(e) => handleCuttingPerSheetChange(e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl bg-white border border-amber-300 text-slate-900 text-xs font-bold focus:border-amber-500 focus:outline-none"
+                        />
+                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-amber-700">
+                          pcs / lbr
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Preset Cutting Chips */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[10px] font-medium text-slate-500">Preset Cutting:</span>
+                    {[12, 15, 20, 24, 30].map((cut) => (
+                      <button
+                        key={cut}
+                        type="button"
+                        onClick={() => handleCuttingPerSheetChange(String(cut))}
+                        className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition cursor-pointer ${
+                          cuttingPerSheet === String(cut)
+                            ? 'bg-amber-500 text-white border-amber-600 shadow-xs'
+                            : 'bg-white text-slate-600 border-slate-200 hover:border-amber-400'
+                        }`}
+                      >
+                        {cut} pcs/lbr
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Rincian Biaya: Cetak Dasar + Biaya Cutting */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-1 block">
+                        🖨️ Biaya Cetak per Lembar A3+
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">Rp</span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          placeholder="6.500"
+                          value={formatThousands(printPricePerSheet)}
+                          onChange={(e) => handlePrintPriceChange(e.target.value)}
+                          className="w-full pl-9 pr-3 py-2 rounded-xl bg-white border border-amber-300 text-slate-900 text-xs font-bold focus:border-amber-500 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[10px] font-bold text-slate-700 uppercase tracking-wider block">
+                          ✂️ Biaya Jasa Cutting
+                        </label>
+                        <label className="flex items-center gap-1 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={includeCutting}
+                            onChange={(e) => handleIncludeCuttingToggle(e.target.checked)}
+                            className="rounded border-amber-400 text-amber-600 focus:ring-amber-500"
+                          />
+                          <span className="text-[9.5px] font-bold text-amber-700 select-none">
+                            +Cutting (+6.500)
+                          </span>
+                        </label>
+                      </div>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">Rp</span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          placeholder="6.500"
+                          disabled={!includeCutting}
+                          value={formatThousands(cuttingFeePerSheet)}
+                          onChange={(e) => handleCuttingFeeChange(e.target.value)}
+                          className={`w-full pl-9 pr-3 py-2 rounded-xl border text-xs font-bold focus:outline-none ${
+                            includeCutting
+                              ? 'bg-white border-amber-300 text-slate-900 focus:border-amber-500'
+                              : 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                          }`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Summary Box */}
+                  <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-[11px] space-y-1">
+                    <div className="flex justify-between font-medium text-slate-600">
+                      <span>Biaya per Lembar A3+:</span>
+                      <span className="font-bold text-slate-900">
+                        Rp {formatThousands(printPricePerSheet || 6500)} (Cetak) {includeCutting ? `+ Rp ${formatThousands(cuttingFeePerSheet || 6500)} (Cutting) = Rp ${formatThousands(costPerSheet)}/lbr` : `= Rp ${formatThousands(printPricePerSheet)}/lbr`}
+                      </span>
+                    </div>
+                    <div className="flex justify-between font-medium text-slate-600">
+                      <span>Hasil Fisik Masuk:</span>
+                      <span className="font-bold text-emerald-600">
+                        {sheetCount || 0} Lembar × {cuttingPerSheet} pcs = {(Number(qty) || 0).toLocaleString('id-ID')} pcs stiker
+                      </span>
+                    </div>
+                    <div className="flex justify-between font-bold text-amber-900 pt-1 border-t border-amber-300/60">
+                      <span>HPP per Pcs:</span>
+                      <span className="text-amber-600 text-xs font-black">
+                        {formatIDR(Number(unitCost))} / pcs
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Bi-directional Auto Calculator Box */}
           <div className="p-4 rounded-2xl bg-amber-50/80 border border-amber-200/90 space-y-3 shadow-sm">
@@ -344,63 +650,125 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
           </div>
 
           {/* Hubungkan ke Database Suplier (Petani / Pengepul / Percetakan) */}
-          <div className="p-3.5 rounded-2xl bg-amber-500/[0.05] border border-amber-500/25 space-y-2.5">
+          <div className="p-3.5 rounded-2xl bg-amber-500/[0.05] border border-amber-500/25 space-y-3">
             <div className="flex items-center justify-between">
               <label className="text-[10px] font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
                 <Store size={13} className="text-amber-600" />
                 {isBahanBakuMode ? 'Supplier Petani / Pengepul' : 'Supplier Percetakan / Vendor'}
               </label>
-              {suppliers.length > 0 && (
-                <span className="text-[10px] font-bold text-amber-700 bg-amber-100/90 px-2 py-0.5 rounded-full">
-                  {suppliers.length} Suplier Terdaftar
-                </span>
-              )}
+              <div className="flex items-center gap-2">
+                {suppliers.length > 0 && (
+                  <span className="text-[10px] font-bold text-amber-700 bg-amber-100/90 px-2 py-0.5 rounded-full">
+                    {suppliers.length} Suplier Terdaftar
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewSupplierName(supplierName || '')
+                    setShowAddSupplierModal(true)
+                  }}
+                  className="text-[10px] font-bold text-amber-700 hover:text-amber-800 flex items-center gap-1 bg-amber-100 px-2 py-0.5 rounded-lg border border-amber-300 hover:bg-amber-200 transition cursor-pointer"
+                >
+                  <Plus size={11} /> Tambah Suplier Baru
+                </button>
+              </div>
             </div>
 
-            {/* Dropdown Pemilihan dari Database Suplier */}
-            {suppliers.length > 0 && (
-              <div>
-                <select
-                  value={suppliers.some((s) => s.supplier_name?.toLowerCase() === supplierName.trim().toLowerCase()) ? supplierName : ''}
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      setSupplierName(e.target.value)
-                    }
-                  }}
-                  className="w-full px-3 py-2 rounded-xl bg-white border border-amber-300/80 text-slate-800 text-xs font-medium focus:border-amber-500 focus:outline-none cursor-pointer"
-                >
-                  <option value="">-- Pilih dari Daftar Suplier Terdaftar --</option>
-                  {suppliers.map((s) => (
-                    <option key={s.id} value={s.supplier_name}>
-                      {s.supplier_name} {s.phone ? `(${s.phone})` : ''} {s.address ? `- ${s.address}` : ''}
-                    </option>
-                  ))}
-                </select>
+            {/* Searchable CustomSelect for Suppliers */}
+            <div>
+              <CustomSelect
+                value={supplierName}
+                onChange={(val) => setSupplierName(val)}
+                options={suppliers.map((s) => ({
+                  value: s.supplier_name,
+                  label: s.supplier_name + (s.phone ? ` (${s.phone})` : ''),
+                  sublabel: s.address || ''
+                }))}
+                placeholder="-- Pilih / Cari Suplier Terdaftar --"
+                searchPlaceholder={isBahanBakuMode ? 'Cari nama petani / pengepul...' : 'Cari nama percetakan / vendor...'}
+                onAddNew={() => {
+                  setNewSupplierName(supplierName || '')
+                  setShowAddSupplierModal(true)
+                }}
+              />
+            </div>
+
+            {/* Quick Add Supplier inline form when triggered */}
+            {showAddSupplierModal && (
+              <div className="p-3 rounded-xl bg-amber-50/90 border border-amber-300 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-black text-amber-900 flex items-center gap-1">
+                    <Building2 size={13} className="text-amber-600" /> Daftarkan Suplier Baru ke Database
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddSupplierModal(false)}
+                    className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  <div>
+                    <label className="text-[9.5px] font-bold text-slate-600 block mb-0.5">
+                      Nama Suplier / Vendor / Percetakan *
+                    </label>
+                    <input
+                      type="text"
+                      autoFocus
+                      placeholder={isBahanBakuMode ? 'Misal: Petani Bawang Cepogo' : 'Misal: Percetakan Jaya Solo'}
+                      value={newSupplierName}
+                      onChange={(e) => setNewSupplierName(e.target.value)}
+                      className="w-full px-3 py-1.5 rounded-lg bg-white border border-amber-300 text-slate-900 text-xs font-semibold focus:outline-none"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[9.5px] font-bold text-slate-600 block mb-0.5">
+                        No HP / WA
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="0812..."
+                        value={newSupplierPhone}
+                        onChange={(e) => setNewSupplierPhone(e.target.value)}
+                        className="w-full px-3 py-1.5 rounded-lg bg-white border border-amber-300 text-slate-900 text-xs focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[9.5px] font-bold text-slate-600 block mb-0.5">
+                        Kota / Alamat
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Boyolali / Solo"
+                        value={newSupplierAddress}
+                        onChange={(e) => setNewSupplierAddress(e.target.value)}
+                        className="w-full px-3 py-1.5 rounded-lg bg-white border border-amber-300 text-slate-900 text-xs focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-end gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowAddSupplierModal(false)}
+                      className="px-2.5 py-1 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-200/60 transition cursor-pointer"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleQuickAddSupplier}
+                      disabled={createSupplierMutation.isPending || !newSupplierName.trim()}
+                      className="px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-xs transition cursor-pointer disabled:opacity-50"
+                    >
+                      {createSupplierMutation.isPending ? 'Menyimpan...' : 'Simpan & Pilih Suplier'}
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
-
-            {/* Input Manual / Autocomplete Datalist */}
-            <div className="relative">
-              <input
-                type="text"
-                list="registered-suppliers-datalist"
-                placeholder={
-                  isBahanBakuMode
-                    ? 'Ketik atau cari nama Petani / Pengepul...'
-                    : 'Ketik atau cari nama Percetakan / Vendor Pabrik...'
-                }
-                value={supplierName}
-                onChange={(e) => setSupplierName(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs focus:border-amber-500 focus:outline-none"
-              />
-              <datalist id="registered-suppliers-datalist">
-                {suppliers.map((s) => (
-                  <option key={s.id} value={s.supplier_name}>
-                    {s.phone ? `Telp: ${s.phone}` : ''}
-                  </option>
-                ))}
-              </datalist>
-            </div>
 
             {/* Quick Chip Preset / Suplier Pilihan */}
             <div className="flex items-center gap-1.5 flex-wrap pt-0.5">

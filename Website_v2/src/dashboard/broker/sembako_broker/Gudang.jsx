@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import { cn } from '@/lib/utils'
-import { Plus, ChevronDown, ChevronUp, X, Search, Package, ArrowRightLeft, History, CheckCircle2, RotateCcw, FileSpreadsheet } from 'lucide-react'
+import { Plus, ChevronDown, ChevronUp, X, Search, Package, ArrowRightLeft, History, CheckCircle2, RotateCcw, FileSpreadsheet, TrendingUp, Layers, ShoppingCart, Settings } from 'lucide-react'
 import ImportCsvModal from '@/components/ui/ImportCsvModal'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
@@ -13,7 +13,10 @@ import {
   useAddStockBatch,
   useSembakoReturns,
   useUpdateSembakoReturnStatus,
+  useSembakoSales,
+  useSembakoRawMaterials,
 } from '@/lib/hooks/useSembakoData'
+import { calculateBomProductStock, calculateBomProductHpp } from '@/lib/inventory/bomStockCalculator'
 import { useSearchParams, useOutletContext, useLocation, useNavigate } from 'react-router-dom'
 import { DatePicker } from '@/components/ui/DatePicker'
 import { C, fmtDate, CustomSelect, InputRupiah } from '@/dashboard/broker/sembako_broker/components/sembakoSaleUtils'
@@ -44,7 +47,7 @@ const inputSt = {
 
 // ── Tab: Stok Saat Ini ────────────────────────────────────────────────────────
 
-function StokSaatIni({ products, allBatches = [], onTambah, onAdjust, onShowHistory }) {
+function StokSaatIni({ products, allBatches = [], sales = [], rawMaterials = [], onShowHistory, navigate }) {
   const [expanded, setExpanded] = useState(null)
   const [search, setSearch] = useState('')
 
@@ -55,9 +58,6 @@ function StokSaatIni({ products, allBatches = [], onTambah, onAdjust, onShowHist
       p.product_name.toLowerCase().includes(search.toLowerCase())
     )
   }, [products, search])
-
-  const batchesForProduct = (productId) =>
-    allBatches.filter(b => b.product_id === productId && b.qty_sisa > 0)
 
   return (
     <div>
@@ -87,49 +87,65 @@ function StokSaatIni({ products, allBatches = [], onTambah, onAdjust, onShowHist
       )}
 
       {filtered.map(product => {
-        const batches = batchesForProduct(product.id)
-        const batchSum = batches.reduce((sum, b) => sum + Number(b.qty_sisa ?? b.qty_masuk ?? 0), 0)
-        const displayStock = (product.current_stock !== undefined && product.current_stock !== null) ? Number(product.current_stock) : batchSum
-        // Find latest buy price for fallback
-        const pAllBatches = allBatches.filter(b => b.product_id === product.id)
-        const latestBatch = [...pAllBatches].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0]
-        const fallbackPrice = latestBatch?.buy_price || product.avg_buy_price || 0
+        const bomInfo = calculateBomProductStock(product, rawMaterials)
+        const bomHpp = calculateBomProductHpp(product, rawMaterials) || product.avg_buy_price || 0
+        const displayStock = (product.current_stock !== undefined && product.current_stock !== null) 
+          ? Number(product.current_stock) 
+          : bomInfo.totalStock
 
-        let productValuation = batches.reduce((sum, b) => sum + (Number(b.qty_sisa || 0) * Number(b.buy_price || 0)), 0)
-        if (displayStock > batchSum) {
-          productValuation += (displayStock - batchSum) * fallbackPrice
-        }
-        const productAvgBuyPrice = displayStock > 0 ? Math.round(productValuation / displayStock) : fallbackPrice
-        const isOpen = expanded === product.id
+        // Sales Performance Analytics for this product
+        const productSalesItems = sales.flatMap(s => s.sembako_sale_items || []).filter(it => it.product_id === product.id)
+        const totalSold = productSalesItems.reduce((s, it) => s + (Number(it.quantity) || 0), 0)
+        const totalRevenue = productSalesItems.reduce((s, it) => s + ((Number(it.quantity) || 0) * (Number(it.price_per_unit) || 0)), 0)
+        const totalProfit = productSalesItems.reduce((s, it) => {
+          const itemHpp = Number(it.cogs_per_unit) || bomHpp || 0
+          return s + ((Number(it.quantity) || 0) * ((Number(it.price_per_unit) || 0) - itemHpp))
+        }, 0)
+
         const isLow = product.min_stock_alert > 0 && displayStock <= product.min_stock_alert
+        const isOpen = expanded === product.id
+        const productValuation = displayStock * bomHpp
 
         return (
-          <div key={product.id} style={{ marginBottom: 8, background: C.card, border: `1px solid ${isLow ? 'rgba(248,113,113,0.3)' : C.border}`, borderRadius: 14, overflow: 'hidden' }}>
+          <div key={product.id} className="mb-2.5 rounded-2xl overflow-hidden border transition-all duration-200" style={{ background: C.card, borderColor: isLow ? 'rgba(248,113,113,0.35)' : C.border }}>
             <button
               type="button"
               onClick={() => setExpanded(isOpen ? null : product.id)}
-              style={{ width: '100%', display: 'flex', alignItems: 'center', padding: '12px 14px', background: 'transparent', border: 'none', cursor: 'pointer', gap: 12 }}
+              className="w-full flex items-center justify-between p-3.5 sm:p-4 text-left bg-transparent border-none cursor-pointer gap-3 hover:bg-slate-500/5 transition-colors"
             >
-              <div style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-                  <span style={{ fontFamily: 'Sora', fontSize: 14, fontWeight: 700, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{product.product_name}</span>
-                  {isLow && <span style={{ fontSize: 10, background: 'rgba(248,113,113,0.15)', color: '#F87171', padding: '1px 8px', borderRadius: 20, fontFamily: 'DM Sans', fontWeight: 600 }}>Menipis</span>}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                  <span className="font-display font-bold text-sm text-foreground truncate">{product.product_name}</span>
+                  {isLow && (
+                    <span className="text-[10px] font-extrabold bg-rose-500/15 text-rose-600 border border-rose-500/30 px-2 py-0.5 rounded-full">
+                      Stok Menipis
+                    </span>
+                  )}
+                  {totalSold > 0 && (
+                    <span className="text-[10px] font-extrabold bg-indigo-500/10 text-indigo-700 border border-indigo-500/20 px-2 py-0.5 rounded-full">
+                      🔥 Terjual {fmt(totalSold)} {product.unit}
+                    </span>
+                  )}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 13, color: isLow ? '#F87171' : C.accent, fontFamily: 'DM Sans', fontWeight: 600 }}>
-                    {fmt(displayStock)} {product.unit}
+
+                <div className="flex items-center gap-2.5 sm:gap-3.5 flex-wrap text-xs">
+                  <span className={cn("font-bold", isLow ? "text-rose-600 font-extrabold" : "text-emerald-700 font-extrabold")}>
+                    📦 {fmt(displayStock)} {product.unit}
                   </span>
-                  <span style={{ fontSize: 13, color: '#6B7280', fontFamily: 'DM Sans' }}>
-                    Jual: Rp {fmt(product.sell_price)}
+                  <span className="text-slate-500 font-medium">
+                    Jual: <strong className="text-slate-800 font-bold">Rp {fmt(product.sell_price)}</strong>
                   </span>
-                  <span style={{ fontSize: 11, color: '#475569', background: 'rgba(15,23,42,0.06)', border: '1px solid rgba(15,23,42,0.15)', padding: '1px 8px', borderRadius: 8, fontFamily: 'DM Sans', fontWeight: 700 }}>
-                    Asset: Rp {fmt(productValuation)}
+                  <span className="text-slate-500 font-medium">
+                    HPP: <strong className="text-slate-700 font-bold">Rp {fmt(bomHpp)}</strong>
+                  </span>
+                  <span className="text-slate-600 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded-md font-semibold text-[11px]">
+                    Nilai Aset: Rp {fmt(productValuation)}
                   </span>
                 </div>
               </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 12, color: '#6B7280', fontFamily: 'DM Sans' }}>{batches.length} batch</div>
-                {isOpen ? <ChevronUp size={16} color="#6B7280" /> : <ChevronDown size={16} color="#6B7280" />}
+
+              <div className="flex items-center gap-2 shrink-0">
+                {isOpen ? <ChevronUp size={18} className="text-slate-400" /> : <ChevronDown size={18} className="text-slate-400" />}
               </div>
             </button>
 
@@ -140,85 +156,131 @@ function StokSaatIni({ products, allBatches = [], onTambah, onAdjust, onShowHist
                   animate={{ height: 'auto', opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
                   transition={{ duration: 0.2 }}
-                  style={{ overflow: 'hidden' }}
+                  className="overflow-hidden border-t"
+                  style={{ borderColor: C.border }}
                 >
-                  <div style={{ borderTop: `1px solid ${C.border}`, padding: '12px 14px' }}>
-                    {/* Valuation Breakdown Strip */}
-                    <div style={{ background: 'rgba(15,23,42,0.05)', border: '1px solid rgba(15,23,42,0.15)', borderRadius: 12, padding: '10px 14px', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                      <div>
-                        <div style={{ fontSize: 10, fontFamily: 'DM Sans', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>📊 Penjelasan Nilai Stok (Modal Asset)</div>
-                        <div style={{ fontSize: 12, color: '#94A3B8', fontFamily: 'DM Sans', marginTop: 2 }}>
-                          Total {fmt(displayStock)} {product.unit} @ Avg Modal Rp {fmt(productAvgBuyPrice)}
+                  <div className="p-3.5 sm:p-4 space-y-3.5 bg-slate-50/40 dark:bg-slate-900/30">
+                    {/* 1. Ringkasan Kinerja Penjualan */}
+                    <div className="p-3 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/60 shadow-xs">
+                      <div className="flex items-center justify-between gap-2 mb-2.5">
+                        <div className="flex items-center gap-1.5 text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider">
+                          <TrendingUp size={14} className="text-indigo-600" />
+                          <span>Performa Penjualan Produk Ini</span>
                         </div>
+                        {totalSold > 0 && (
+                          <span className="text-[10px] font-bold text-slate-400">
+                            {productSalesItems.length} transaksi
+                          </span>
+                        )}
                       </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: 10, color: '#94A3B8', fontFamily: 'DM Sans', fontWeight: 600 }}>Total Nilai Asset</div>
-                        <div style={{ fontFamily: 'Sora', fontSize: 14, fontWeight: 800, color: '#0F172A' }}>Rp {fmt(productValuation)}</div>
+
+                      <div className="grid grid-cols-3 gap-2 text-center sm:text-left">
+                        <div className="p-2 rounded-lg bg-indigo-50/60 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40">
+                          <p className="text-[10px] font-bold text-indigo-900/70 dark:text-indigo-300 uppercase">Total Terjual</p>
+                          <p className="text-sm font-black text-indigo-950 dark:text-indigo-100 font-mono mt-0.5">
+                            {fmt(totalSold)} <span className="text-[11px] font-sans font-normal text-indigo-700">{product.unit}</span>
+                          </p>
+                        </div>
+                        <div className="p-2 rounded-lg bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/40">
+                          <p className="text-[10px] font-bold text-emerald-900/70 dark:text-emerald-300 uppercase">Total Omset</p>
+                          <p className="text-sm font-black text-emerald-950 dark:text-emerald-100 font-mono mt-0.5">
+                            Rp {fmt(totalRevenue)}
+                          </p>
+                        </div>
+                        <div className="p-2 rounded-lg bg-amber-50/60 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/40">
+                          <p className="text-[10px] font-bold text-amber-900/70 dark:text-amber-300 uppercase">Laba Kotor</p>
+                          <p className={cn("text-sm font-black font-mono mt-0.5", totalProfit >= 0 ? "text-amber-950 dark:text-amber-100" : "text-rose-600")}>
+                            {totalProfit >= 0 ? `+Rp ${fmt(totalProfit)}` : `Rp ${fmt(totalProfit)}`}
+                          </p>
+                        </div>
                       </div>
                     </div>
 
-                    {batches.length === 0 ? (
-                      <p style={{ fontSize: 13, color: '#6B7280', fontFamily: 'DM Sans', padding: '8px 0' }}>Tidak ada stok tersisa di batch manapun.</p>
-                    ) : (
-                      batches.map((batch, i) => {
-                        const batchCode = batch.batch_code || `BTC-${String(batch.id || '').slice(0, 8).toUpperCase()}`
-                        const dateStr = fmtDate(batch.purchase_date || batch.created_at)
-                        const batchValuation = Number(batch.qty_sisa) * Number(batch.buy_price || 0)
-                        return (
-                          <div key={batch.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: i < batches.length - 1 ? `1px solid rgba(255,255,255,0.04)` : 'none' }}>
-                            <div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <span style={{ fontSize: 11, fontFamily: 'DM Sans', fontWeight: 700, color: '#94A3B8' }}>{batchCode}</span>
-                                {i === 0 && <span style={{ fontSize: 9, background: 'rgba(15,23,42,0.12)', color: C.accent, padding: '1px 6px', borderRadius: 10, fontWeight: 700, letterSpacing: '0.04em' }}>FIFO NEXT</span>}
-                              </div>
-                              <div style={{ fontSize: 12, color: '#6B7280', fontFamily: 'DM Sans', marginTop: 2 }}>
-                                Tgl Masuk: {dateStr}
-                                {batch.expiry_date && <span style={{ color: new Date(batch.expiry_date) < new Date() ? '#F87171' : '#6B7280' }}> · Exp: {fmtDate(batch.expiry_date)}</span>}
-                              </div>
-                              {batch.sembako_suppliers?.supplier_name && (
-                                <div style={{ fontSize: 11, color: '#4B5563', fontFamily: 'DM Sans' }}>Supplier: {batch.sembako_suppliers.supplier_name}</div>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-4">
-                              <div style={{ textAlign: 'right' }}>
-                                <div style={{ fontFamily: 'Sora', fontSize: 13, fontWeight: 700, color: C.text }}>{fmt(batch.qty_sisa)} {product.unit}</div>
-                                <div style={{ fontSize: 11, color: TEXT_SEC, fontFamily: 'DM Sans' }}>@ Rp {fmt(batch.buy_price)}</div>
-                                <div style={{ fontSize: 11, color: '#475569', fontFamily: 'DM Sans', fontWeight: 700, marginTop: 1 }}>
-                                  = Rp {fmt(batchValuation)}
-                                </div>
-                              </div>
-                              <button
-                                onClick={(e) => { e.stopPropagation(); onAdjust(batch, product) }}
-                                className="w-8 h-8 rounded-lg bg-slate-500/10 flex items-center justify-center text-slate-700 hover:bg-slate-700 hover:text-white transition-all"
-                              >
-                                <ArrowRightLeft size={14} />
-                              </button>
-                            </div>
+                    {/* 2. Komposisi Resep BOM & Kapasitas Bahan Baku */}
+                    {bomInfo.components && bomInfo.components.length > 0 ? (
+                      <div className="p-3 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/60 shadow-xs space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5 text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider">
+                            <Layers size={14} className="text-amber-600" />
+                            <span>Komposisi Resep & Sisa Bahan Baku</span>
                           </div>
-                        )
-                      })
-                    )}
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      <button
-                        type="button"
-                        onClick={() => onTambah(product.id)}
-                        style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(15,23,42,0.12)', border: `1px solid ${C.border}`, borderRadius: 10, padding: '7px 14px', color: C.accent, fontFamily: 'DM Sans', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
-                      >
-                        <Plus size={14} /> Stok Masuk
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onAdjust(batches[0] || null, product)}
-                        style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(251,146,60,0.12)', border: `1px solid ${C.border}`, borderRadius: 10, padding: '7px 14px', color: '#FB923C', fontFamily: 'DM Sans', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
-                      >
-                        <ArrowRightLeft size={14} /> Adjust Stok
-                      </button>
+                          <span className="text-[11px] font-bold text-slate-500">
+                            Kapasitas: <strong className="text-emerald-700 font-black">{fmt(bomInfo.totalStock)} {product.unit}</strong>
+                          </span>
+                        </div>
+
+                        <div className="space-y-1.5 pt-1">
+                          {bomInfo.components.map((comp, cIdx) => (
+                            <div
+                              key={cIdx}
+                              className={cn(
+                                "flex items-center justify-between p-2 rounded-lg text-xs transition-colors",
+                                comp.isBottleneck
+                                  ? "bg-rose-50/70 border border-rose-200 text-rose-950 font-medium"
+                                  : "bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800 text-slate-700"
+                              )}
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="font-semibold truncate">{comp.name}</span>
+                                {comp.isBottleneck && (
+                                  <span className="text-[9.5px] font-extrabold bg-rose-600 text-white px-1.5 py-0.5 rounded-md uppercase tracking-wider shrink-0">
+                                    Pembatas Stok
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-right shrink-0 flex items-center gap-3">
+                                <span className="text-slate-500 text-[11px]">
+                                  Sisa: <strong className="text-slate-800 dark:text-slate-200 font-bold">{comp.available} {comp.unit}</strong>
+                                </span>
+                                <span className="text-slate-500 text-[11px]">
+                                  Kapasitas: <strong className={cn("font-bold", comp.isBottleneck ? "text-rose-600" : "text-emerald-700")}>{comp.maxUnits} {product.unit}</strong>
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {/* 3. Penjelasan Nilai Modal Asset */}
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-100/70 dark:bg-slate-800 border border-slate-200 text-xs">
+                      <div className="text-slate-600 dark:text-slate-300">
+                        <span className="font-bold text-slate-800 dark:text-slate-100">Modal HPP Produk:</span> Rp {fmt(bomHpp)} / {product.unit}
+                        <span className="text-slate-400 mx-1.5">·</span>
+                        <span>Estimasi Nilai Aset: <strong>Rp {fmt(productValuation)}</strong></span>
+                      </div>
+                      <span className="text-[11px] font-medium text-slate-500">
+                        Harga Jual Standar: <strong>Rp {fmt(product.sell_price)}</strong>
+                      </span>
+                    </div>
+
+                    {/* 4. Aksi Cepat Operasional */}
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
                       <button
                         type="button"
                         onClick={() => onShowHistory(product)}
-                        style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.05)', border: `1px solid ${C.border}`, borderRadius: 10, padding: '7px 14px', color: '#94A3B8', fontFamily: 'DM Sans', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-xs transition-all cursor-pointer active:scale-95"
                       >
-                        <History size={14} /> Kartu Stok
+                        <History size={14} />
+                        <span>Kartu Stok & Riwayat</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/dashboard/broker/sembako/penjualan?action=new&product=${product.id}`)}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-xs transition-all cursor-pointer active:scale-95"
+                      >
+                        <ShoppingCart size={14} />
+                        <span>Buat Penjualan</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => navigate('/dashboard/broker/sembako/produk?tab=bahan_baku')}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 text-slate-700 dark:text-slate-200 font-bold text-xs transition-all cursor-pointer active:scale-95"
+                      >
+                        <Settings size={14} />
+                        <span>Kelola Resep / Bahan Baku</span>
                       </button>
                     </div>
                   </div>
@@ -624,6 +686,8 @@ export default function Gudang() {
   const { data: products = [], isLoading: productsLoading, isError: productsIsError, error: productsError, refetch: productsRefetch } = useSembakoProducts()
   const { data: suppliers = [], isError: supErr, error: supError, refetch: supRefetch } = useSembakoSuppliers()
   const { data: allBatches = [], isLoading: batchesLoading, isError: batchesIsError, error: batchesError, refetch: batchesRefetch } = useSembakoAllBatches()
+  const { data: sales = [], isLoading: salesLoading } = useSembakoSales()
+  const { data: rawMaterials = [], isLoading: rawLoading } = useSembakoRawMaterials()
 
   const [activeTab, setActiveTab] = useState(0)
   const [importCsvOpen, setImportCsvOpen] = useState(false)
@@ -661,32 +725,39 @@ export default function Gudang() {
   }
 
   const totalStokNilai = useMemo(() => {
-    return products.filter(p => p.is_active && !p.is_deleted).reduce((sum, p) => {
-      const pBatches = allBatches.filter(b => b.product_id === p.id && b.qty_sisa > 0)
-      const pAllBatches = allBatches.filter(b => b.product_id === p.id)
-      const latestBatch = [...pAllBatches].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0]
-      const fallbackPrice = latestBatch?.buy_price || p.avg_buy_price || 0
-      
-      const batchSum = pBatches.reduce((s, b) => s + Number(b.qty_sisa || 0), 0)
-      const displayStock = (p.current_stock !== undefined && p.current_stock !== null) ? Number(p.current_stock) : batchSum
-      
-      let valuation = pBatches.reduce((s, b) => s + (Number(b.qty_sisa || 0) * Number(b.buy_price || 0)), 0)
-      if (displayStock > batchSum) {
-        valuation += (displayStock - batchSum) * fallbackPrice
-      }
-      return sum + valuation
+    // Real physical asset = Total Nilai Bahan Baku & Kemasan Fisik
+    const rawValuation = rawMaterials.reduce((sum, r) => {
+      return sum + ((Number(r.current_stock) || 0) * (Number(r.unit_cost) || 0))
     }, 0)
-  }, [products, allBatches])
 
-  const lowStockCount = useMemo(() =>
-    products.filter(p => p.is_active && !p.is_deleted && p.min_stock_alert > 0 && p.current_stock <= p.min_stock_alert).length,
-    [products]
-  )
+    // Tambahkan batch produk fisik non-BOM / mandiri jika ada
+    const standaloneBatchValuation = allBatches.reduce((sum, b) => {
+      if (b.qty_sisa > 0 && !b.is_deleted) {
+        return sum + (Number(b.qty_sisa) * Number(b.buy_price || 0))
+      }
+      return sum
+    }, 0)
+
+    if (rawMaterials.length > 0) {
+      return rawValuation + standaloneBatchValuation
+    }
+
+    return products.filter(p => p.is_active && !p.is_deleted).reduce((sum, p) => {
+      return sum + ((Number(p.current_stock) || 0) * (Number(p.avg_buy_price) || 0))
+    }, 0)
+  }, [rawMaterials, allBatches, products])
+
+  const lowStockCount = useMemo(() => {
+    const lowProds = products.filter(p => p.is_active && !p.is_deleted && p.min_stock_alert > 0 && p.current_stock <= p.min_stock_alert).length
+    const lowRaws = rawMaterials.filter(r => r.min_stock_alert > 0 && r.current_stock <= r.min_stock_alert).length
+    return lowProds + lowRaws
+  }, [products, rawMaterials])
 
   const summaryItems = [
-    { label: 'Nilai Stok Gudang', value: totalStokNilai, isCurrency: true, color: 'amber' },
+    { label: 'Nilai Modal Gudang (Fisik)', value: totalStokNilai, isCurrency: true, color: 'amber' },
     { label: 'Total Produk Aktif', value: products.filter(p => p.is_active && !p.is_deleted).length },
-    { label: 'Stok Menipis', value: lowStockCount > 0 ? `${lowStockCount} produk` : 'Stok Aman', color: lowStockCount > 0 ? 'red' : 'green' },
+    { label: 'Bahan Baku & Kemasan', value: `${rawMaterials.length} jenis` },
+    { label: 'Stok Menipis', value: lowStockCount > 0 ? `${lowStockCount} item` : 'Stok Aman', color: lowStockCount > 0 ? 'red' : 'green' },
   ]
 
   return (
@@ -708,11 +779,11 @@ export default function Gudang() {
                 <span>Import CSV</span>
               </button>
               <button
-                onClick={() => openTambah()}
+                onClick={() => navigate('/dashboard/broker/sembako/produk?tab=bahan_baku')}
                 className="flex items-center gap-2 px-4 h-10 rounded-xl font-bold text-xs bg-[#0F172A] hover:bg-slate-900 text-white transition-all cursor-pointer shadow-lg shadow-slate-900/10 active:scale-95 shrink-0"
               >
-                <Plus size={16} />
-                <span>Stok Masuk</span>
+                <Layers size={16} />
+                <span>Kelola Bahan Baku</span>
               </button>
             </div>
           }
@@ -741,16 +812,17 @@ export default function Gudang() {
         {/* Tab content */}
         <div className="px-4 sm:px-6 pt-4">
           {activeTab === 0 && (
-            productsLoading || batchesLoading
+            productsLoading || batchesLoading || salesLoading || rawLoading
               ? <ProductSkeleton />
               : productsIsError || batchesIsError || supErr
                 ? <SembakoErrorState error={productsError || batchesError || supError} onRetry={() => { productsRefetch(); batchesRefetch(); supRefetch(); }} />
                 : <StokSaatIni
                   products={products}
                   allBatches={allBatches}
-                  onTambah={openTambah}
-                  onAdjust={openAdjust}
+                  sales={sales}
+                  rawMaterials={rawMaterials}
                   onShowHistory={p => { setHistoryProduct(p); setShowHistorySheet(true) }}
+                  navigate={navigate}
                 />
           )}
           {activeTab === 1 && (

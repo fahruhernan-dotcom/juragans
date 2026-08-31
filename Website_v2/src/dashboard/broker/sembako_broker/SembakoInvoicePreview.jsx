@@ -446,6 +446,12 @@ export function SembakoThermalReceipt({ data }) {
   const rawItems = data.items || data.sembako_sale_items || []
   const items = Array.isArray(rawItems) ? rawItems : []
 
+  const itemsSubtotal = items.reduce((s, it) => {
+    const qty = Number(it.quantity || it.quantity_kg || 0)
+    const price = Number(it.sell_price ?? it.price_per_unit ?? it.price_per_kg ?? it.unit_price ?? 0)
+    return s + (Number(it.subtotal) || Math.round(qty * price))
+  }, 0)
+
   const invoiceNo = data.invoiceNumber || data.invoice_number || 'SMB-POS'
   const txnDate = data.transactionDate || data.transaction_date || new Date().toISOString()
   const customerNotes = cleanCustomerNotes(data.notes)

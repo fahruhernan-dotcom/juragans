@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { BrokerMobileHeader } from '@/dashboard/broker/_shared/components/BrokerMobileHeader'
 import { SembakoPageHeader } from '@/dashboard/broker/sembako_broker/components/SembakoPageHeader'
 import { SembakoSummaryStrip } from '@/dashboard/broker/sembako_broker/components/SembakoSummaryStrip'
-import { C } from '@/dashboard/broker/sembako_broker/components/sembakoSaleUtils'
+import { C, CustomSelect } from '@/dashboard/broker/sembako_broker/components/sembakoSaleUtils'
 import {
   useSembakoProducts,
   useSembakoCustomers,
@@ -861,55 +861,4 @@ export default function SembakoRetur() {
   )
 }
 
-function CustomSelect({ value, onChange, options, placeholder }) {
-  const [open, setOpen] = useState(false)
-  const selected = options.find(o => o.value === value)
 
-  return (
-    <div className="relative w-full">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className={`w-full bg-background border ${open ? 'border-[#0F172A] ring-1 ring-slate-500/30' : 'border-border'} rounded-xl px-3.5 py-2.5 text-left text-xs text-foreground flex items-center justify-between transition-all cursor-pointer outline-none`}
-      >
-        <span className={`truncate ${selected && selected.value !== '' ? 'text-foreground font-bold' : 'text-muted-foreground font-normal'}`}>
-          {selected && selected.value !== '' ? selected.label : placeholder || 'Pilih...'}
-        </span>
-        <ChevronDown size={14} className={`text-muted-foreground transition-transform duration-200 flex-shrink-0 ml-2 ${open ? 'rotate-180 text-[#0F172A]' : ''}`} />
-      </button>
-
-      <AnimatePresence>
-        {open && (
-          <>
-            <div
-              className="fixed inset-0 z-40"
-              onClick={() => setOpen(false)}
-            />
-            <motion.div
-              initial={{ opacity: 0, y: -6, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -6, scale: 0.98 }}
-              transition={{ duration: 0.15 }}
-              className="absolute left-0 right-0 top-full mt-1 z-50 bg-card border border-border rounded-xl shadow-2xl overflow-hidden max-h-56 overflow-y-auto divide-y divide-border/40"
-            >
-              {options.map(opt => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => { onChange(opt.value); setOpen(false) }}
-                  className={`w-full text-left px-3.5 py-2.5 text-xs flex items-center justify-between transition-colors cursor-pointer ${value === opt.value
-                      ? 'bg-[#0F172A]/15 text-amber-400 font-bold'
-                      : 'text-muted-foreground hover:bg-background hover:text-foreground font-medium'
-                    }`}
-                >
-                  <span className="truncate">{opt.label}</span>
-                  {value === opt.value && <Check size={14} className="text-[#0F172A] flex-shrink-0 ml-2" />}
-                </button>
-              ))}
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-    </div>
-  )
-}

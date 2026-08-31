@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { formatIDR, formatIDRShort } from '@/lib/format'
 import { BrokerBaseCard } from '@/dashboard/_shared/components/transactions/BrokerBaseCard'
-import { ChevronDown, User, Package } from 'lucide-react'
+import { ChevronDown, User, Package, Sparkles } from 'lucide-react'
 import { useCreateSembakoDelivery } from '@/lib/hooks/useSembakoData'
 import { C, sBtn, sInput, sLabel, fmtDate, calculateSaleFinancials, CustomSelect } from '@/dashboard/broker/sembako_broker/components/sembakoSaleUtils'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet'
@@ -276,6 +276,23 @@ export function TambahTripSheet({ open, onClose, prefillSale, employees = [] }) 
   )
 }
 
+function getCustomPackagingLabel(sale, items) {
+  if (!sale) return null
+  for (const it of (items || [])) {
+    if (it.use_custom_packaging && it.custom_packaging_name) {
+      return it.custom_packaging_name
+    }
+    if (it.notes) {
+      const m = it.notes.match(/\[Kemasan:\s*([^\]]+)\]/i) || it.notes.match(/\[Kemasan Khusus:\s*([^\]]+)\]/i)
+      if (m) return m[1].trim()
+    }
+  }
+  if (sale.notes) {
+    const m = sale.notes.match(/\[Kemasan:\s*([^\]]+)\]/i) || sale.notes.match(/\[Kemasan Khusus:\s*([^\]]+)\]/i)
+    if (m) return m[1].trim()
+  }
+  return null
+}
 
 // ── Sale items panel (shown in mobile expand) ─────────────────────────────────
 function SaleItemsPanel({ sale, onOpenDetail, onEdit }) {
@@ -324,6 +341,9 @@ function SaleItemsPanel({ sale, onOpenDetail, onEdit }) {
             const matchPkg = rawName.match(/\[(\d+(?:\.\d+)?\s*[^\]]+)\]/)
             const pkgTag = matchPkg ? matchPkg[1] : null
             const cleanProdName = rawName.replace(/\s*\[\d+[^\]]+\]/g, '').trim()
+            const itCustomPkg = it.custom_packaging_name ||
+              (it.notes && (it.notes.match(/\[Kemasan:\s*([^\]]+)\]/i)?.[1] || it.notes.match(/\[Kemasan Khusus:\s*([^\]]+)\]/i)?.[1])) ||
+              (sale.notes && (sale.notes.match(/\[Kemasan:\s*([^\]]+)\]/i)?.[1] || sale.notes.match(/\[Kemasan Khusus:\s*([^\]]+)\]/i)?.[1]))
 
             return (
               <div key={it.id ?? i} style={{
@@ -340,6 +360,11 @@ function SaleItemsPanel({ sale, onOpenDetail, onEdit }) {
                     {pkgTag && (
                       <span style={{ fontSize: '9px', fontWeight: 800, padding: '1px 5px', borderRadius: '4px', background: '#EEF2FF', color: '#4F46E5', textTransform: 'uppercase' }}>
                         {pkgTag}
+                      </span>
+                    )}
+                    {itCustomPkg && (
+                      <span style={{ fontSize: '9px', fontWeight: 800, padding: '1px 5px', borderRadius: '4px', background: 'rgba(245, 158, 11, 0.15)', color: '#D97706', border: '1px solid rgba(245, 158, 11, 0.3)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                        ✨ {itCustomPkg}
                       </span>
                     )}
                   </div>
@@ -408,6 +433,7 @@ export function SembakoInvoiceCard({ sale, onOpenDetail, onEdit, onManageDeliver
   const totalReturnQty = cardReturns.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0)
   const netQty = Math.max(0, totalQty - totalReturnQty)
   const itemUnit = topItem?.unit || 'unit'
+  const customPackagingLabel = getCustomPackagingLabel(sale, items)
 
   const deliveryBadge = getDeliveryBadge(deliveries)
   const allDelivered = deliveries.length > 0 && deliveries.every(d => d.status === 'delivered')
@@ -533,11 +559,11 @@ export function SembakoInvoiceCard({ sale, onOpenDetail, onEdit, onManageDeliver
                   onClick={(e) => { e.stopPropagation(); onManageDelivery?.() }}
                   className="bg-sky-500/20 hover:bg-sky-500/30 text-sky-400 text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-tighter active:scale-90 transition-all"
                 >
-                  Kirim
+                  🚚 Set Kirim
                 </button>
               )}
             </div>
-            <p className={cn('font-display font-bold text-[#F87171] tabular-nums leading-none mt-1', valSize)}>
+            <p className={cn('font-display font-bold text-[#F87171] leading-none mt-1 tabular-nums', valSize)}>
               {fmt(remainingAmount)}
             </p>
           </div>
@@ -555,16 +581,22 @@ export function SembakoInvoiceCard({ sale, onOpenDetail, onEdit, onManageDeliver
 
   // ── DESKTOP body — 3 columns ──
   const desktopBody = (
-    <div className="grid grid-cols-[1fr_1fr_1.6fr] gap-4">
+    <div className="grid grid-cols-[1.1fr_1fr_1.5fr] gap-4">
       {/* Kolom 1: ITEM */}
       <div className="space-y-2 text-left border-r border-white/[0.08] pr-4 min-w-0">
         <p className="text-[10px] font-black text-[#94A3B8] uppercase tracking-widest">Item</p>
         <p className="font-display text-[22px] font-bold text-[#F1F5F9] tabular-nums leading-none">
           {noItems ? '—' : items.length} <span className="text-xs font-normal text-[#94A3B8] ml-0.5">jenis</span>
         </p>
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           {topItem && (
-            <p className="text-[11px] font-medium text-[#94A3B8] truncate">{topItem.product_name}</p>
+            <p className="text-[11px] font-bold text-[#F1F5F9] truncate">{topItem.product_name}</p>
+          )}
+          {customPackagingLabel && (
+            <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/15 border border-amber-500/30 text-[10px] font-extrabold text-amber-400 max-w-full">
+              <Sparkles size={11} className="text-amber-400 shrink-0" />
+              <span className="truncate">Kemasan: {customPackagingLabel}</span>
+            </div>
           )}
           {noItems
             ? <p className="text-[11px] font-medium text-[#FBBF24]">Buka nota untuk detail</p>
@@ -647,11 +679,19 @@ export function SembakoInvoiceCard({ sale, onOpenDetail, onEdit, onManageDeliver
         </span>
       </div>
 
-      {/* Row 2: top product + payment summary */}
+      {/* Row 2: top product + custom packaging badge + payment summary */}
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[12px] font-semibold text-muted-foreground truncate flex-1">
-          {topItem?.product_name || '—'}
-        </span>
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          <span className="text-[12px] font-semibold text-muted-foreground truncate">
+            {topItem?.product_name || '—'}
+          </span>
+          {customPackagingLabel && (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-500/30 text-[9.5px] font-black text-amber-500 dark:text-amber-400 shrink-0">
+              <Sparkles size={10} />
+              {customPackagingLabel.replace(/^Pouch\s+/i, '')}
+            </span>
+          )}
+        </div>
         {isOverpaid && overpayAmount > 0 ? (
           <span className="text-[12px] font-black text-emerald-500 shrink-0">
             Balikin {expanded ? formatIDR(overpayAmount) : formatIDRShort(overpayAmount)}

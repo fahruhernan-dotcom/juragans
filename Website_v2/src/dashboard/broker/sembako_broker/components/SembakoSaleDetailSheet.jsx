@@ -358,6 +358,9 @@ export function SembakoSaleDetailSheet({ isOpen, onOpenChange, sale, onEdit }) {
                       const matchPkg = rawName.match(/\[(\d+(?:\.\d+)?\s*[^\]]+)\]/)
                       const pkgTag = matchPkg ? matchPkg[1] : null
                       const cleanProdName = rawName.replace(/\s*\[\d+[^\]]+\]/g, '').trim()
+                      const itCustomPkg = it.custom_packaging_name ||
+                        (it.notes && (it.notes.match(/\[Kemasan:\s*([^\]]+)\]/i)?.[1] || it.notes.match(/\[Kemasan Khusus:\s*([^\]]+)\]/i)?.[1])) ||
+                        (sale.notes && (sale.notes.match(/\[Kemasan:\s*([^\]]+)\]/i)?.[1] || sale.notes.match(/\[Kemasan Khusus:\s*([^\]]+)\]/i)?.[1]))
 
                       return (
                         <tr key={idx} style={{ borderTop: `1px solid ${C.border}` }}>
@@ -367,6 +370,11 @@ export function SembakoSaleDetailSheet({ isOpen, onOpenChange, sale, onEdit }) {
                               {pkgTag && (
                                 <span style={{ fontSize: '10px', fontWeight: 800, padding: '1.5px 6px', borderRadius: '6px', background: '#EEF2FF', color: '#4F46E5', textTransform: 'uppercase' }}>
                                   {pkgTag}
+                                </span>
+                              )}
+                              {itCustomPkg && (
+                                <span style={{ fontSize: '10px', fontWeight: 800, padding: '1.5px 6px', borderRadius: '6px', background: 'rgba(245, 158, 11, 0.15)', color: '#D97706', border: '1px solid rgba(245, 158, 11, 0.3)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                  ✨ Kemasan: {itCustomPkg}
                                 </span>
                               )}
                             </div>

@@ -60,6 +60,12 @@ export const ALLOWED_COLUMNS = {
     'product_name', 'customer_id', 'supplier_id', 'sale_id', 'quantity',
     'unit', 'unit_price', 'total_amount', 'reason', 'action', 'status',
     'notes', 'is_deleted'
+  ],
+  sembako_inventory_mutations: [
+    'tenant_id', 'material_id', 'material_name', 'material_category',
+    'mutation_type', 'action_type', 'quantity', 'unit', 'unit_cost',
+    'total_cost', 'prev_stock', 'new_stock', 'ref_type', 'ref_id',
+    'ref_number', 'party_name', 'notes', 'created_by', 'created_at'
   ]
 }
 

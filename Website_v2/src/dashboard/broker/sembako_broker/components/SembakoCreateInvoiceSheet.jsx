@@ -7,6 +7,7 @@ import { PhoneInput } from '@/components/ui/PhoneInput'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
 import { formatIDR } from '@/lib/format'
+import { cn } from '@/lib/utils'
 import {
   useSembakoProducts, useSembakoCustomers, useSembakoSales, useSembakoEmployees, useSembakoDeliveries,
   useCreateSembakoProduct, useUpdateSembakoProduct, useCreateSembakoSale, useCreateSembakoDelivery,
@@ -25,7 +26,7 @@ import {
   formatFriendlyErrorMessage,
 } from './sembakoSaleUtils'
 import { SembakoSuccessCard } from './SembakoSuccessCard'
-import { calculateBomProductHpp } from '@/lib/inventory/bomStockCalculator'
+import { calculateBomProductHpp, matchKemasanMaterial } from '@/lib/inventory/bomStockCalculator'
 
 const PRESET_OTHER_COST_CATEGORIES = [
   { id: 'bensin', label: 'BBM / Bensin', Icon: Fuel, color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
@@ -46,11 +47,22 @@ const INPUT_BG = C.input    // #F1F5F9
 const inputCn = `w-full h-12 bg-[#F1F5F9] border border-[#E2E8F0] rounded-xl px-4 text-[#0F172A] text-sm font-semibold focus:border-slate-500/50 focus:outline-none focus:ring-1 focus:ring-[#0F172A]/20 transition-colors appearance-none`
 const labelCn = `block text-[9px] font-black text-[#64748B] uppercase tracking-[0.15em] mb-1.5`
 
-const getFactor = (u) => {
-  if (u === 'karton' || u === 'bal besar') return 40
-  if (u === 'dus' || u === 'box') return 20
-  if (u === 'lusin' || u === 'renceng') return 12
-  if (u === 'bal kecil' || u === 'pak' || u === 'slop' || u === 'strip') return 10
+const getFactor = (u, prod = null) => {
+  if (!u) return 1
+  const sel = String(u).toLowerCase()
+  if (prod?.secondary_unit && sel === String(prod.secondary_unit).toLowerCase() && Number(prod.conversion_rate) > 0) {
+    return Number(prod.conversion_rate)
+  }
+  const matchPcs = (prod?.product_name || '').match(/\((\d+)\s*pcs\)/i) || (prod?.notes || '').match(/\((\d+)\s*pcs\)/i)
+  if (matchPcs && Number(matchPcs[1]) > 0) {
+    const dynamicRate = Number(matchPcs[1])
+    if (sel === 'karton') return dynamicRate
+    if (sel === 'dus' && dynamicRate === 36) return 36
+  }
+  if (sel === 'karton' || sel === 'bal besar') return 40
+  if (sel === 'dus' || sel === 'box') return 20
+  if (sel === 'lusin' || sel === 'renceng') return 12
+  if (sel === 'bal kecil' || sel === 'pak' || sel === 'slop' || sel === 'strip') return 10
   return 1
 }
 
@@ -249,16 +261,25 @@ function QuickAddProduct({ form, onChange, onSave, onCancel, saving }) {
   )
 }
 
-// ─── Product Item Row ─────────────────────────────────────────────────────────
-function ProductItemRow({ item, idx, products: _products, productOptions, total: _total, overStock, onChangeItem, onRemove, onAddNew, isOnly, allBatches = [] }) {
+function ProductItemRow({
+  item, idx, products: _products, productOptions, total: _total,
+  overStock, isPouchOverstock, customPouchStock, customPouchName,
+  onChangeItem, onRemove, onAddNew, isOnly,
+  allBatches = [], packagingMaterials = [], rawMaterialsList = [],
+  getEffectivePouchStock
+}) {
   const [isUnitDropdownOpen, setIsUnitDropdownOpen] = useState(false)
   const [isFifoExpanded, setIsFifoExpanded] = useState(false)
+  const [isPackagingExpanded, setIsPackagingExpanded] = useState(Boolean(item.useCustomPackaging || item.customPackagingName || item.customPackagingNote))
   const prod = useMemo(() => _products.find(p => p.id === item.product_id), [item.product_id, _products])
   const baseUnit = item.unit || prod?.unit || 'pcs'
 
   const unitOptions = useMemo(() => {
     const base = item.unit || prod?.unit || 'pcs'
     const opts = [{ value: base, label: `${base} (Satuan Utama)` }]
+    const matchPcs = (prod?.product_name || '').match(/\((\d+)\s*pcs\)/i) || (prod?.notes || '').match(/\((\d+)\s*pcs\)/i)
+    const dynamicRate = matchPcs ? Number(matchPcs[1]) : (prod?.conversion_rate ? Number(prod.conversion_rate) : 40)
+
     if (prod?.secondary_unit && Number(prod?.conversion_rate) > 0 && prod.secondary_unit !== base) {
       opts.push({
         value: prod.secondary_unit,
@@ -268,8 +289,8 @@ function ProductItemRow({ item, idx, products: _products, productOptions, total:
       opts.push(
         { value: 'renceng', label: 'renceng (12 pcs)' },
         { value: 'lusin', label: 'lusin (12 pcs)' },
-        { value: 'dus', label: 'dus (20 pcs)' },
-        { value: 'karton', label: 'karton (40 pcs)' }
+        { value: 'dus', label: `dus (${dynamicRate === 36 ? 36 : 20} pcs)` },
+        { value: 'karton', label: `karton (${dynamicRate} pcs)` }
       )
     }
     return opts
@@ -277,10 +298,7 @@ function ProductItemRow({ item, idx, products: _products, productOptions, total:
 
   const factor = useMemo(() => {
     const sel = item.selectedUnit || baseUnit
-    if (prod?.secondary_unit && sel === prod.secondary_unit && Number(prod.conversion_rate) > 0) {
-      return Number(prod.conversion_rate)
-    }
-    return getFactor(sel)
+    return getFactor(sel, prod)
   }, [item.selectedUnit, baseUnit, prod])
 
   const isMultiUnitPackaging = factor > 1
@@ -328,6 +346,19 @@ function ProductItemRow({ item, idx, products: _products, productOptions, total:
     const qty = (Number(item.quantity) || 0) * factor
     if (qty <= 0 || prodBatches.length === 0) return []
 
+    const stdKemasan = prod ? matchKemasanMaterial(prod, rawMaterialsList) : null
+    const stdKemasanCost = Number(stdKemasan?.unit_cost) || 0
+    let customCost = 0
+    if (item.useCustomPackaging) {
+      if (item.customPackagingCost !== undefined && item.customPackagingCost !== '' && Number(item.customPackagingCost) >= 0) {
+        customCost = Number(item.customPackagingCost)
+      } else if (item.customPackagingId) {
+        const foundMat = rawMaterialsList.find(m => m.id === item.customPackagingId)
+        if (foundMat) customCost = Number(foundMat.unit_cost) || 0
+      }
+    }
+    const deltaPackaging = item.useCustomPackaging ? (customCost - stdKemasanCost) : 0
+
     let remaining = qty
     const breakdown = []
     
@@ -337,23 +368,24 @@ function ProductItemRow({ item, idx, products: _products, productOptions, total:
       breakdown.push({
         batch_code: batch.batch_code,
         qty: take,
-        buy_price: batch.buy_price,
+        buy_price: (batch.buy_price || 0) + deltaPackaging,
         supplier_name: batch.sembako_suppliers?.supplier_name || 'Tanpa Supplier'
       })
       remaining -= take
     }
     
     if (remaining > 0) {
+      const fallbackCost = prod ? (calculateBomProductHpp(prod, rawMaterialsList, item.useCustomPackaging ? { unit_cost: customCost } : null) || ((prod.avg_buy_price || 0) + deltaPackaging)) : 0
       breakdown.push({
         batch_code: 'Fallback (Stok Kurang)',
         qty: remaining,
-        buy_price: prod?.avg_buy_price || 0,
+        buy_price: fallbackCost,
         supplier_name: 'System Default'
       })
     }
     
     return breakdown
-  }, [item.quantity, prodBatches, prod, factor])
+  }, [item.quantity, item.useCustomPackaging, item.customPackagingCost, item.customPackagingId, prodBatches, prod, factor, rawMaterialsList])
 
   return (
     <div
@@ -371,6 +403,7 @@ function ProductItemRow({ item, idx, products: _products, productOptions, total:
           <CustomSelect
             value={item.product_id}
             placeholder="Pilih produk..."
+            searchPlaceholder="Cari produk / varian / kemasan..."
             options={productOptions}
             onChange={val => onChangeItem(idx, 'product_id', val)}
             onAddNew={onAddNew}
@@ -454,8 +487,22 @@ function ProductItemRow({ item, idx, products: _products, productOptions, total:
               <span>📦 = {Number(item.quantity) * factor} {baseUnit}</span>
             </p>
           )}
-          {overStock && (
-            <p className="text-[10px] font-bold mt-1" style={{ color: '#EF4444' }}>Stok tidak cukup</p>
+          {isPouchOverstock ? (
+            <p className="text-[10.5px] font-bold text-rose-600 mt-1 flex items-center gap-1">
+              <span>⚠️</span>
+              <span>Stok kemasan tidak cukup — sisa {customPouchStock} pcs</span>
+            </p>
+          ) : overStock ? (
+            <p className="text-[10.5px] font-bold text-rose-600 mt-1 flex items-center gap-1">
+              <span>⚠️</span>
+              <span>Stok produk tidak cukup — tersedia {prod?.current_stock || 0} {baseUnit}</span>
+            </p>
+          ) : null}
+          {isBelowHpp && (
+            <p className="text-[10px] font-bold text-rose-600 mt-0.5 flex items-center gap-1">
+              <span>⚠️</span>
+              <span>Harga di bawah HPP (Rugi Rp {formatIDR(baseCogsPerBase - pricePerBase)}/{baseUnit})</span>
+            </p>
           )}
         </div>
         <div>
@@ -654,6 +701,184 @@ function ProductItemRow({ item, idx, products: _products, productOptions, total:
               <span className="font-black text-emerald-700 font-mono text-xs">+{formatIDR(marginPerUnit)} / {baseUnit}</span>
             </div>
           )}
+
+          {/* Expandable Custom Packaging / Pouch Accordion */}
+          <div className="pt-2 border-t border-[#E2E8F0] mt-1">
+            <button
+              type="button"
+              onClick={() => setIsPackagingExpanded(!isPackagingExpanded)}
+              className={`w-full flex items-center justify-between py-1.5 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                item.useCustomPackaging
+                  ? 'bg-amber-500/10 border-amber-500/30 text-amber-900'
+                  : 'bg-[#F8FAFC] border-[#E2E8F0] text-slate-600 hover:bg-slate-100/70'
+              }`}
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <Package size={14} className={item.useCustomPackaging ? 'text-amber-600' : 'text-slate-400'} />
+                <span className="truncate">
+                  Kemasan: <strong className={item.useCustomPackaging ? 'text-amber-700' : 'text-slate-700'}>
+                    {item.useCustomPackaging ? (item.customPackagingName || 'Kemasan / Pouch Khusus') : 'Plastik Pouch (Standar)'}
+                  </strong>
+                </span>
+              </div>
+              <div className="flex items-center gap-1 shrink-0 text-[10px] text-amber-700 font-bold">
+                <span>{item.useCustomPackaging ? '✏️ Ganti Pouch' : '+ Detail Pouch'}</span>
+                <ChevronDown size={13} style={{ transform: isPackagingExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+              </div>
+            </button>
+
+            {isPackagingExpanded && (
+              <div className="mt-2 p-3 rounded-xl bg-amber-50/70 border border-amber-200/80 space-y-2.5 animate-in fade-in duration-150">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-amber-900 flex items-center gap-1">
+                    <span>🛍️</span> Kustomisasi Kemasan & Pouch Produk:
+                  </span>
+                  {item.useCustomPackaging && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onChangeItem(idx, {
+                          useCustomPackaging: false,
+                          customPackagingId: '',
+                          customPackagingName: '',
+                          customPackagingCost: 0,
+                          customPackagingNote: ''
+                        })
+                      }}
+                      className="text-[9.5px] font-bold text-rose-600 hover:underline cursor-pointer"
+                    >
+                      Reset ke Standar (Plastik Pouch)
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <div>
+                    <label className="text-[9.5px] font-bold text-slate-600 block mb-1">
+                      Pilih Pouch dari Stok:
+                    </label>
+                    <select
+                      value={item.customPackagingId || ''}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        if (val) {
+                          const selectedMat = packagingMaterials.find(m => m.id === val)
+                          if (selectedMat) {
+                            const cost = Number(selectedMat.unit_cost) || 0
+                            onChangeItem(idx, {
+                              useCustomPackaging: true,
+                              customPackagingId: selectedMat.id,
+                              customPackagingName: selectedMat.material_name,
+                              customPackagingCost: cost
+                            })
+                          }
+                        } else {
+                          onChangeItem(idx, {
+                            useCustomPackaging: false,
+                            customPackagingId: '',
+                            customPackagingName: '',
+                            customPackagingCost: 0
+                          })
+                        }
+                      }}
+                      className="w-full px-2.5 py-2 rounded-lg bg-white border border-amber-200 text-xs font-semibold text-slate-800 focus:outline-none focus:border-amber-500 cursor-pointer"
+                    >
+                      <option value="">-- Plastik Pouch Standar (Default) --</option>
+                      {packagingMaterials.map(m => {
+                        const effectiveStock = getEffectivePouchStock ? getEffectivePouchStock(m.id) : m.current_stock
+                        return (
+                          <option key={m.id} value={m.id}>
+                            {m.material_name} ({effectiveStock} {m.unit || 'pcs'} - HPP {formatIDR(m.unit_cost || 0)})
+                          </option>
+                        )
+                      })}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[9.5px] font-bold text-slate-600 block mb-1">
+                      Nama Pouch / Kustom:
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Misal: Pouch Silver Matte 100g / Toples"
+                      value={item.customPackagingName || ''}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        onChangeItem(idx, {
+                          useCustomPackaging: Boolean(val.trim() || item.customPackagingId || Number(item.customPackagingCost) > 0),
+                          customPackagingName: val
+                        })
+                      }}
+                      className="w-full px-2.5 py-2 rounded-lg bg-white border border-amber-200 text-xs font-semibold text-slate-800 focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[9.5px] font-bold text-slate-600 block mb-1">
+                      Biaya Pouch (Rp/pcs):
+                    </label>
+                    <InputRupiah
+                      value={item.customPackagingCost || 0}
+                      onChange={(val) => {
+                        onChangeItem(idx, {
+                          useCustomPackaging: true,
+                          customPackagingCost: val
+                        })
+                      }}
+                      className="w-full px-2.5 py-2 rounded-lg bg-white border border-amber-200 text-xs font-bold text-slate-800 focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Catatan Kemasan */}
+                <div>
+                  <label className="text-[9.5px] font-bold text-slate-600 block mb-1">
+                    Catatan Khusus Kemasan (Opsional):
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Misal: Pouch transparan biasa habis, pakai pouch matte"
+                    value={item.customPackagingNote || ''}
+                    onChange={(e) => onChangeItem(idx, { customPackagingNote: e.target.value })}
+                    className="w-full px-2.5 py-2 rounded-lg bg-white border border-amber-200 text-xs font-medium text-slate-800 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                {item.useCustomPackaging && (
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-300/50 text-[11px]">
+                    <div className="flex flex-col gap-0.5 text-amber-900 font-bold">
+                      <div className="flex items-center gap-1.5">
+                        <span>⚡</span>
+                        <span>HPP Terupdate: <strong className="font-mono text-amber-950 font-black">{formatIDR(baseCogsPerBase)} / {baseUnit}</strong></span>
+                        {Number(item.customPackagingCost) > 0 && (
+                          <span className="text-amber-800/80 font-semibold">(Biaya Kemasan: {formatIDR(item.customPackagingCost)}/pcs)</span>
+                        )}
+                      </div>
+                      {customPouchStock !== null && (
+                        <div className="text-[10.5px] text-amber-900 font-bold flex items-center gap-1 mt-0.5">
+                          <span>📦</span>
+                          <span>
+                            Kapasitas Pouch: <strong className={customPouchStock < (Number(item.quantity) || 0) * factor ? "text-rose-600 font-black" : "text-emerald-700 font-black"}>
+                              {customPouchStock} pcs tersedia
+                            </strong>
+                            {customPouchStock < (Number(item.quantity) || 0) * factor && (
+                              <span className="text-rose-600 font-bold ml-1">(Kurang {((Number(item.quantity) || 0) * factor) - customPouchStock} pcs)</span>
+                            )}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    {marginPerUnit !== null && (
+                      <span className={cn("font-bold text-[10.5px]", marginPerUnit >= 0 ? "text-emerald-700 font-black" : "text-rose-600 font-black")}>
+                        Margin: {marginPerUnit >= 0 ? `+${formatIDR(marginPerUnit)}` : formatIDR(marginPerUnit)} / {baseUnit}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -865,14 +1090,67 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
     products.map(p => ({ value: p.id, label: `${p.product_name} (${p.current_stock} ${p.unit})` })),
     [products]
   )
+  const packagingMaterials = useMemo(() => {
+    return rawMaterialsList.filter(m => {
+      const cat = String(m.category || '').toLowerCase()
+      const name = String(m.material_name || '').toLowerCase()
+      return cat.includes('pouch') || cat.includes('toples') || cat.includes('kemasan') || cat.includes('plastik') ||
+             cat.includes('alumunium') || cat.includes('foil') ||
+             name.includes('pouch') || name.includes('toples') || name.includes('standing') || name.includes('zipper') ||
+             name.includes('ziplock') || name.includes('alumunium') || name.includes('aluminium') || name.includes('foil') ||
+             name.includes('kemasan') || name.includes('plastik')
+    })
+  }, [rawMaterialsList])
   const editSale = useMemo(() => {
     if (!editId) return null
     return allSales.find(s => s.id === editId) || null
   }, [allSales, editId])
 
+  const getEffectivePouchStock = useCallback((pMatId) => {
+    if (!pMatId) return 0
+    const pMat = rawMaterialsList.find(m => m.id === pMatId)
+    if (!pMat) return 0
+    const cur = Number(pMat.current_stock) || 0
+    if (!editSale) return cur
+
+    // Check if editSale previously used this packaging
+    const matNameLower = (pMat.material_name || '').toLowerCase().trim()
+    const editSaleHasThisPkg = editSale.notes && editSale.notes.toLowerCase().includes(matNameLower)
+    let originalPouchQty = 0
+
+    const oldItems = editSale.sembako_sale_items || []
+    for (const oldIt of oldItems) {
+      const oldNotes = (oldIt.notes || '').toLowerCase()
+      if (
+        oldNotes.includes(matNameLower) ||
+        editSaleHasThisPkg ||
+        oldIt.custom_packaging_id === pMatId ||
+        (oldIt.use_custom_packaging && String(oldIt.custom_packaging_name).toLowerCase().trim() === matNameLower)
+      ) {
+        originalPouchQty += Number(oldIt.quantity || 0)
+      }
+    }
+
+    if (originalPouchQty === 0 && oldItems.length > 0) {
+      for (const oldIt of oldItems) {
+        const oldPName = (oldIt.product_name || '').toLowerCase()
+        if (matNameLower.includes('200') && oldPName.includes('200g')) {
+          originalPouchQty += Number(oldIt.quantity || 0)
+        } else if (matNameLower.includes('250') && oldPName.includes('250g')) {
+          originalPouchQty += Number(oldIt.quantity || 0)
+        } else if (matNameLower.includes('100') && oldPName.includes('100g')) {
+          originalPouchQty += Number(oldIt.quantity || 0)
+        }
+      }
+    }
+
+    return cur + originalPouchQty
+  }, [rawMaterialsList, editSale])
+
   const selectedCust = customers.find(c => c.id === custId)
   const productSubtotal = items.reduce((s, i) => {
-    const factor = getFactor(i.selectedUnit || i.unit || 'pcs')
+    const prod = products.find(p => p.id === i.product_id)
+    const factor = getFactor(i.selectedUnit || i.unit || 'pcs', prod)
     const isMultiUnitPackaging = factor > 1
     const mode = i.priceMode || 'per_base'
     const inputPrice = Number(i.price_per_unit || 0)
@@ -892,13 +1170,25 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
 
   const totalAmount  = productSubtotal + effectiveCustomerDelivery
   const totalCogs    = items.reduce((s, i) => {
-    const factor = getFactor(i.selectedUnit || i.unit || 'pcs')
-    return s + Math.round((i.quantity || 0) * factor * (i.cogs_per_unit || 0))
+    const prod = products.find(p => p.id === i.product_id)
+    const factor = getFactor(i.selectedUnit || i.unit || 'pcs', prod)
+    return s + Math.round((Number(i.quantity) || 0) * factor * (Number(i.cogs_per_unit) || 0))
   }, 0)
   const grossProfit  = productSubtotal - totalCogs
   const effectiveOtherCost = Number(otherCost || 0) + effectiveSellerShippingExpense
   const netProfit    = grossProfit - effectiveOtherCost
   const netMarginPct = productSubtotal > 0 ? Math.round((netProfit / productSubtotal) * 100) : 0
+
+  // Auto-sync payAmount to full totalAmount for cash customers if not manually set to partial in create mode
+  const prevTotalRef = useRef(totalAmount)
+  useEffect(() => {
+    if (!editId && selectedCust?.payment_terms === 'cash' && totalAmount > 0) {
+      if (payAmount === 0 || payAmount === prevTotalRef.current || payAmount === productSubtotal) {
+        setPayAmount(totalAmount)
+      }
+    }
+    prevTotalRef.current = totalAmount
+  }, [editId, selectedCust?.payment_terms, totalAmount, productSubtotal, payAmount])
 
   // ── Edit prefill ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -924,7 +1214,7 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
       setShippingBorneBy('buyer')
     } else if (editSale.notes?.includes('Ongkir Ditanggung Penjual')) {
       setShippingBorneBy('seller')
-      const matchSellerFee = editSale.notes.match(/\[Ongkir Ditanggung Penjual:\s*Rp\s*([\d\.]+)\]/)
+      const matchSellerFee = editSale.notes.match(/\[Ongkir Ditanggung Penjual:\s*Rp\s*([\d.]+)\]/)
       if (matchSellerFee && matchSellerFee[1]) {
         const raw = parseInt(matchSellerFee[1].replace(/\./g, ''), 10)
         if (!isNaN(raw)) setSellerShippingFee(raw)
@@ -998,6 +1288,40 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
           }
         }
 
+        let useCustomPackaging = Boolean(it.useCustomPackaging || it.use_custom_packaging)
+        let customPackagingId = it.customPackagingId || it.custom_packaging_id || ''
+        let customPackagingName = it.customPackagingName || it.custom_packaging_name || ''
+        let customPackagingCost = Number(it.customPackagingCost || it.custom_packaging_cost || 0)
+        let customPackagingNote = it.customPackagingNote || it.custom_packaging_note || ''
+
+        // Check if item notes or sale notes has [Kemasan: ...] tag
+        const itemPkgMatch = (it.notes && (it.notes.match(/\[Kemasan:\s*([^\]]+)\]/i) || it.notes.match(/\[Kemasan Khusus:\s*([^\]]+)\]/i))) ||
+          (editSale.notes && (editSale.notes.match(/\[Kemasan:\s*([^\]]+)\]/i) || editSale.notes.match(/\[Kemasan Khusus:\s*([^\]]+)\]/i)))
+
+        if (itemPkgMatch && itemPkgMatch[1]) {
+          const rawPkgStr = itemPkgMatch[1].trim()
+          const [pName, ...pNotesArr] = rawPkgStr.split(' - ')
+          const cleanPName = (pName || '').trim()
+          const cleanPNote = pNotesArr.join(' - ').trim()
+
+          const foundMat = rawMaterialsList.find(m =>
+            m.material_name.toLowerCase().trim() === cleanPName.toLowerCase() ||
+            m.material_name.toLowerCase().includes(cleanPName.toLowerCase())
+          )
+
+          if (foundMat) {
+            useCustomPackaging = true
+            customPackagingId = foundMat.id
+            customPackagingName = foundMat.material_name
+            customPackagingCost = Number(foundMat.unit_cost) || 0
+            if (cleanPNote) customPackagingNote = cleanPNote
+          } else {
+            useCustomPackaging = true
+            customPackagingName = cleanPName
+            if (cleanPNote) customPackagingNote = cleanPNote
+          }
+        }
+
         return {
           product_id: it.product_id,
           product_name: cleanName,
@@ -1006,17 +1330,22 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
           priceMode: priceMode,
           quantity: qty,
           price_per_unit: price,
-          cogs_per_unit: Number(it.cogs_per_unit || 0)
+          cogs_per_unit: Number(it.cogs_per_unit || 0),
+          useCustomPackaging,
+          customPackagingId,
+          customPackagingName,
+          customPackagingCost,
+          customPackagingNote,
         }
       }))
       // Data lengkap — buka di step 1 (barang) supaya langsung bisa review/edit/tambah
       setStep(1)
     } else {
       // Items kosong (data lama) — buka di step 1 juga, customer sudah prefill, tinggal isi barang
-      setItems([{ product_id: '', product_name: '', unit: '', selectedUnit: '', priceMode: 'per_base', quantity: 0, price_per_unit: 0, cogs_per_unit: 0 }])
+      setItems([{ product_id: '', product_name: '', unit: '', selectedUnit: '', priceMode: 'per_base', quantity: 0, price_per_unit: 0, cogs_per_unit: 0, useCustomPackaging: false, customPackagingId: '', customPackagingName: '', customPackagingCost: 0, customPackagingNote: '' }])
       setStep(1)
     }
-  }, [open, editSale])
+  }, [open, editSale, rawMaterialsList])
 
   const handleToggleCostChip = useCallback((chipLabel) => {
     setSelectedCostChips(prev => {
@@ -1075,70 +1404,66 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
     } catch { /* handled by hook */ }
   }
 
-  function handleItemChange(idx, field, val) {
-    const next = [...items]
-    
-    if (field === 'priceMode') {
-      const item = next[idx]
-      const prevMode = item.priceMode || 'per_base'
-      const newMode = val
-      const factor = getFactor(item.selectedUnit || item.unit || 'pcs')
-      const currentPrice = Number(item.price_per_unit || 0)
+  function handleItemChange(idx, fieldOrUpdates, maybeVal) {
+    setItems(prevItems => {
+      const next = [...prevItems]
+      const current = { ...next[idx] }
       
-      let newPrice = currentPrice
-      if (factor > 1) {
-        if (prevMode === 'per_base' && newMode === 'per_kemasan') {
-          newPrice = currentPrice * factor
-        } else if (prevMode === 'per_kemasan' && newMode === 'per_base') {
-          newPrice = Math.round(currentPrice / factor)
+      let updates = {}
+      if (typeof fieldOrUpdates === 'object' && fieldOrUpdates !== null) {
+        updates = fieldOrUpdates
+      } else {
+        updates = { [fieldOrUpdates]: maybeVal }
+      }
+
+      // Apply updates
+      Object.assign(current, updates)
+
+      const prod = products.find(p => p.id === current.product_id)
+
+      // Handle priceMode switch
+      if ('priceMode' in updates) {
+        const prevMode = prevItems[idx]?.priceMode || 'per_base'
+        const newMode = updates.priceMode
+        const factor = getFactor(current.selectedUnit || current.unit || 'pcs', prod)
+        const currentPrice = Number(current.price_per_unit || 0)
+        if (factor > 1) {
+          if (prevMode === 'per_base' && newMode === 'per_kemasan') {
+            current.price_per_unit = currentPrice * factor
+          } else if (prevMode === 'per_kemasan' && newMode === 'per_base') {
+            current.price_per_unit = Math.round(currentPrice / factor)
+          }
         }
       }
-      
-      next[idx] = {
-        ...item,
-        priceMode: newMode,
-        price_per_unit: newPrice
+
+      // Handle selectedUnit change
+      if ('selectedUnit' in updates) {
+        const prevUnit = prevItems[idx]?.selectedUnit || current.unit || 'pcs'
+        const newUnit = updates.selectedUnit
+        const prevFactor = getFactor(prevUnit, prod)
+        const newFactor = getFactor(newUnit, prod)
+        const mode = current.priceMode || 'per_base'
+        const currentQty = Number(prevItems[idx]?.quantity || 0)
+        const baseQty = currentQty * prevFactor
+        const newQty = newFactor > 0 ? (baseQty / newFactor) : baseQty
+        current.quantity = String(newQty)
+
+        if (mode === 'per_kemasan') {
+          const currentPrice = Number(current.price_per_unit || 0)
+          const basePrice = prevFactor > 0 ? (currentPrice / prevFactor) : currentPrice
+          current.price_per_unit = basePrice * newFactor
+        }
       }
-    } else if (field === 'selectedUnit') {
-      const item = next[idx]
-      const prevUnit = item.selectedUnit || item.unit || 'pcs'
-      const newUnit = val
-      
-      const prevFactor = getFactor(prevUnit)
-      const newFactor = getFactor(newUnit)
-      const mode = item.priceMode || 'per_base'
-      
-      const currentQty = Number(item.quantity || 0)
-      const baseQty = currentQty * prevFactor
-      const newQty = newFactor > 0 ? (baseQty / newFactor) : baseQty
-      
-      let newPrice = Number(item.price_per_unit || 0)
-      if (mode === 'per_kemasan') {
-        const basePrice = prevFactor > 0 ? (newPrice / prevFactor) : newPrice
-        newPrice = basePrice * newFactor
-      }
-      
-      next[idx] = {
-        ...item,
-        selectedUnit: newUnit,
-        quantity: String(newQty),
-        price_per_unit: newPrice
-      }
-    } else {
-      next[idx] = { ...next[idx], [field]: val }
-    }
-    
-    const item = next[idx]
-    if (field === 'product_id' || field === 'quantity' || field === 'selectedUnit') {
-      const pId = item.product_id
+
+      // Recalculate HPP when relevant fields change
+      const pId = current.product_id
       const p = products.find(x => x.id === pId)
-      
       if (p) {
-        if (field === 'product_id') {
-          next[idx].product_name = p.product_name
-          next[idx].unit         = p.unit || 'pcs'
-          next[idx].selectedUnit = p.unit || 'pcs'
-          next[idx].priceMode    = 'per_base'
+        if ('product_id' in updates) {
+          current.product_name = p.product_name
+          current.unit         = p.unit || 'pcs'
+          current.selectedUnit = p.unit || 'pcs'
+          current.priceMode    = 'per_base'
           
           let lastPrice = 0
           if (custId) {
@@ -1151,34 +1476,53 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
               lastPrice = lastItem?.price_per_unit
             }
           }
-          next[idx].price_per_unit = lastPrice || p.sell_price || 0
+          current.price_per_unit = lastPrice || p.sell_price || 0
+        } else if ('price_per_unit' in updates) {
+          current.price_per_unit = Number(updates.price_per_unit) || 0
         }
-        
-        // Calculate dynamic FIFO HPP per base unit
+
+        // Determine custom packaging override
+        let customKemasan = null
+        if (current.useCustomPackaging) {
+          if (current.customPackagingCost !== undefined && current.customPackagingCost !== '' && Number(current.customPackagingCost) >= 0) {
+            customKemasan = { unit_cost: Number(current.customPackagingCost) || 0 }
+          } else if (current.customPackagingId) {
+            const foundMat = rawMaterialsList.find(m => m.id === current.customPackagingId)
+            if (foundMat) customKemasan = foundMat
+          }
+        }
+
+        const stdKemasan = matchKemasanMaterial(p, rawMaterialsList)
+        const stdKemasanCost = Number(stdKemasan?.unit_cost) || 0
+        const newKemasanCost = customKemasan ? (Number(customKemasan.unit_cost) || 0) : stdKemasanCost
+        const deltaPackaging = current.useCustomPackaging ? (newKemasanCost - stdKemasanCost) : 0
+
+        const factor = getFactor(current.selectedUnit || p.unit || 'pcs', p)
+        const qtyInBase = (Number(current.quantity) || 0) * factor
+        const bomCost = calculateBomProductHpp(p, rawMaterialsList, customKemasan)
+
         const prodBatches = allBatches
           .filter(b => b.product_id === pId && !b.is_deleted && (b.qty_sisa || 0) > 0)
           .sort((a, b) => new Date(a.created_at || a.purchase_date) - new Date(b.created_at || b.purchase_date))
-          
-        const factor = getFactor(next[idx].selectedUnit || p.unit || 'pcs')
-        const qtyInBase = (Number(next[idx].quantity) || 0) * factor
-        
+
         let remaining = qtyInBase
         let totalCost = 0
         for (const batch of prodBatches) {
           if (remaining <= 0) break
           const take = Math.min(batch.qty_sisa, remaining)
-          totalCost += take * (batch.buy_price || 0)
+          totalCost += take * ((batch.buy_price || 0) + deltaPackaging)
           remaining -= take
         }
         if (remaining > 0) {
-          const bomCost = calculateBomProductHpp(p, rawMaterialsList)
-          totalCost += remaining * (bomCost || p.avg_buy_price || 0)
+          totalCost += remaining * (bomCost || ((p.avg_buy_price || 0) + deltaPackaging))
         }
-        const fallbackCost = calculateBomProductHpp(p, rawMaterialsList) || p.avg_buy_price || 0
-        next[idx].cogs_per_unit = qtyInBase > 0 ? Math.round(totalCost / qtyInBase) : fallbackCost
+        const fallbackCost = bomCost || ((p.avg_buy_price || 0) + deltaPackaging)
+        current.cogs_per_unit = qtyInBase > 0 ? Math.round(totalCost / qtyInBase) : fallbackCost
       }
-    }
-    setItems(next)
+
+      next[idx] = current
+      return next
+    })
   }
 
   async function handleSubmit() {
@@ -1192,7 +1536,8 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
     const validItems = items
       .filter(i => i.product_id && Number(i.quantity) > 0)
       .map(i => {
-        const factor = getFactor(i.selectedUnit || i.unit || 'pcs')
+        const prod = products.find(p => p.id === i.product_id)
+        const factor = getFactor(i.selectedUnit || i.unit || 'pcs', prod)
         const inputQty = Number(i.quantity)
         const inputUnit = i.selectedUnit || i.unit || 'pcs'
         const isMultiUnitPackaging = factor > 1
@@ -1204,18 +1549,27 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
 
         const packagingTag = factor > 1 ? `[${inputQty} ${inputUnit}]` : ''
         const cleanName = (i.product_name || '').replace(/\s*\[\d+[^\]]+\]/g, '').trim()
-        const prod = products.find(p => p.id === i.product_id)
         const finalName = packagingTag ? `${cleanName} ${packagingTag}` : (cleanName || prod?.product_name || i.product_name || 'Produk')
+
+        const customPackagingTag = i.useCustomPackaging && (i.customPackagingName || i.customPackagingNote)
+          ? `[Kemasan: ${i.customPackagingName || 'Khusus'}${i.customPackagingNote ? ` - ${i.customPackagingNote}` : ''}]`
+          : ''
+        const baseNotes = prod?.notes || i.notes || ''
+        const itemFinalNotes = [baseNotes, customPackagingTag].filter(Boolean).join(' ')
 
         return {
           ...i,
           product_name: finalName,
           category: prod?.category || i.category || '',
-          notes: prod?.notes || i.notes || '',
+          notes: itemFinalNotes,
           unit: i.unit || 'pcs',
           quantity: baseQty,
           price_per_unit: basePrice,
-          cogs_per_unit: Number(i.cogs_per_unit)
+          cogs_per_unit: Number(i.cogs_per_unit),
+          use_custom_packaging: Boolean(i.useCustomPackaging),
+          custom_packaging_id: i.customPackagingId || null,
+          custom_packaging_name: i.customPackagingName || null,
+          custom_packaging_note: i.customPackagingNote || null,
         }
       })
     if (!validItems.length) { toast.error('Tambahkan minimal 1 produk'); return }
@@ -1241,6 +1595,14 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
           finalNotes = finalNotes.replace(/\[Ongkir Ditanggung[^\]]+\]/g, '').trim()
           finalNotes = finalNotes ? `${finalNotes}\n${shipTag}` : shipTag
         }
+      }
+
+      const customPkgItems = validItems.filter(i => i.use_custom_packaging && i.custom_packaging_name)
+      if (customPkgItems.length > 0) {
+        const pkgNames = [...new Set(customPkgItems.map(i => i.custom_packaging_name))].join(', ')
+        const pkgTag = `[Kemasan: ${pkgNames}]`
+        finalNotes = finalNotes.replace(/\[Kemasan:[^\]]+\]/g, '').trim()
+        finalNotes = finalNotes ? `${pkgTag}\n${finalNotes}` : pkgTag
       }
 
       if (editId) {
@@ -1304,10 +1666,10 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
         })
       }
 
-      // Sync master prices if changed
+      // Sync master prices if changed (hanya jika kemasan standar, agar kemasan kustom tidak merusak harga dasar)
       for (const item of validItems) {
         const p = products.find(x => x.id === item.product_id)
-        if (p && item.price_per_unit > 0 && item.price_per_unit !== p.sell_price) {
+        if (p && item.price_per_unit > 0 && item.price_per_unit !== p.sell_price && !item.use_custom_packaging) {
           // Update global master price
           updateProduct.mutate({ id: p.id, sell_price: item.price_per_unit })
         }
@@ -1526,15 +1888,31 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
           : 0
         return (prod.current_stock || 0) + originalQty
       }
-      const overStockItem = validItems.find(i => {
-        const prod = products.find(p => p.id === i.product_id)
-        return prod && i.quantity > getEffectiveStock(i.product_id)
-      })
-      if (overStockItem) {
-        const prod = products.find(p => p.id === overStockItem.product_id)
-        const available = getEffectiveStock(overStockItem.product_id)
-        toast.error(`Stok ${prod?.product_name} tidak cukup — tersedia ${available} ${prod?.unit ?? 'unit'}`)
-        return
+
+      for (const item of validItems) {
+        const prod = products.find(p => p.id === item.product_id)
+        if (!prod) continue
+        const factor = getFactor(item.selectedUnit || item.unit || 'pcs', prod)
+        const qtyInBase = Number(item.quantity) * factor
+
+        // 1. Check custom pouch stock constraint with edit mode allocation
+        if (item.useCustomPackaging && item.customPackagingId) {
+          const pMat = rawMaterialsList.find(m => m.id === item.customPackagingId)
+          if (pMat) {
+            const pouchStock = getEffectivePouchStock(item.customPackagingId)
+            if (qtyInBase > pouchStock) {
+              toast.error(`Stok kemasan ${pMat.material_name} tidak cukup — tersedia ${pouchStock} pcs, diminta ${qtyInBase} pcs`)
+              return
+            }
+          }
+        }
+
+        // 2. Check general product / BOM stock
+        const available = getEffectiveStock(item.product_id)
+        if (available > 0 && qtyInBase > available) {
+          toast.error(`Stok ${prod.product_name} tidak cukup — tersedia ${available} ${prod.unit ?? 'unit'}, diminta ${qtyInBase} ${prod.unit ?? 'unit'}`)
+          return
+        }
       }
     }
     setStep(s => s + 1)
@@ -1854,9 +2232,24 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
                               .filter(it => it.product_id === item.product_id)
                               .reduce((s, it) => s + (it.quantity || 0), 0)
                           : 0
-                        const factor = getFactor(item.selectedUnit || item.unit || 'pcs')
+                        const factor = getFactor(item.selectedUnit || item.unit || 'pcs', prod)
                         const qtyInBase = Number(item.quantity || 0) * factor
-                        const overStock = prod && qtyInBase > ((prod.current_stock || 0) + originalQty)
+
+                        let customPouchStock = null
+                        let customPouchName = ''
+                        if (item.useCustomPackaging) {
+                          const pMat = (item.customPackagingId && rawMaterialsList.find(m => m.id === item.customPackagingId)) ||
+                            (item.customPackagingName && rawMaterialsList.find(m => m.material_name.toLowerCase().trim() === item.customPackagingName.toLowerCase().trim()))
+                          if (pMat) {
+                            customPouchStock = getEffectivePouchStock(pMat.id)
+                            customPouchName = pMat.material_name
+                          }
+                        }
+
+                        const isPouchOverstock = customPouchStock !== null && qtyInBase > customPouchStock
+                        const isGeneralOverstock = prod && qtyInBase > ((prod.current_stock || 0) + originalQty)
+                        const overStock = isPouchOverstock || isGeneralOverstock
+
                         return (
                           <ProductItemRow
                             key={idx}
@@ -1865,11 +2258,17 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
                             products={products}
                             productOptions={productOptions}
                             overStock={overStock}
+                            isPouchOverstock={isPouchOverstock}
+                            customPouchStock={customPouchStock}
+                            customPouchName={customPouchName}
                             onChangeItem={handleItemChange}
                             onRemove={idx => setItems(items.filter((_, i) => i !== idx))}
                             onAddNew={() => setQuickAddProd(true)}
                             isOnly={items.length === 1}
                             allBatches={allBatches}
+                            packagingMaterials={packagingMaterials}
+                            rawMaterialsList={rawMaterialsList}
+                            getEffectivePouchStock={getEffectivePouchStock}
                           />
                         )
                       })}
@@ -2929,8 +3328,54 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
                       className="rounded-2xl p-4 space-y-3"
                       style={{ background: '#F0FDF4', border: '1px solid #BBF7D0' }}
                     >
-                      <label className={labelCn + ' text-[#16A34A]'}>Pembayaran Awal (Opsional)</label>
+                      <div className="flex items-center justify-between">
+                        <label className={labelCn + ' text-[#16A34A] mb-0'}>Pembayaran / Pelunasan</label>
+                        {selectedCust?.payment_terms === 'cash' && (
+                          <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full">
+                            Pelanggan Cash (Lunas)
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Quick payment presets */}
+                      <div className="flex flex-wrap gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setPayAmount(totalAmount)}
+                          className={`px-2.5 py-1 rounded-lg text-[10.5px] font-bold border transition-all cursor-pointer ${
+                            payAmount === totalAmount && totalAmount > 0
+                              ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                              : 'bg-white text-emerald-700 border-emerald-300 hover:bg-emerald-50'
+                          }`}
+                        >
+                          ⚡ Bayar Lunas (100% - {formatIDR(totalAmount)})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPayAmount(Math.round(totalAmount * 0.5))}
+                          className={`px-2.5 py-1 rounded-lg text-[10.5px] font-bold border transition-all cursor-pointer ${
+                            payAmount === Math.round(totalAmount * 0.5) && totalAmount > 0
+                              ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
+                              : 'bg-white text-amber-700 border-amber-300 hover:bg-amber-50'
+                          }`}
+                        >
+                          50% DP ({formatIDR(Math.round(totalAmount * 0.5))})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPayAmount(0)}
+                          className={`px-2.5 py-1 rounded-lg text-[10.5px] font-bold border transition-all cursor-pointer ${
+                            payAmount === 0
+                              ? 'bg-slate-700 text-white border-slate-700 shadow-xs'
+                              : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+                          }`}
+                        >
+                          Tempo / Belum Bayar (Rp 0)
+                        </button>
+                      </div>
+
                       <InputRupiah value={payAmount} onChange={setPayAmount} placeholder="Jumlah bayar..." />
+
                       <AnimatePresence>
                         {payAmount > 0 && (
                           <motion.div
@@ -2945,14 +3390,12 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
                           </motion.div>
                         )}
                       </AnimatePresence>
-                      {payAmount > 0 && (
-                        <div className="flex justify-between text-[11px]">
-                          <span style={{ color: MUTED }}>Sisa Piutang</span>
-                          <span className="font-black" style={{ color: totalAmount - payAmount > 0 ? '#DC2626' : '#16A34A' }}>
-                            {formatIDR(Math.max(0, totalAmount - payAmount))}
-                          </span>
-                        </div>
-                      )}
+                      <div className="flex justify-between text-[11px] pt-1 border-t border-emerald-200/60">
+                        <span style={{ color: MUTED }}>Sisa Piutang</span>
+                        <span className="font-black" style={{ color: totalAmount - payAmount > 0 ? '#DC2626' : '#16A34A' }}>
+                          {totalAmount - payAmount <= 0 ? '✓ LUNAS (Rp 0)' : formatIDR(totalAmount - payAmount)}
+                        </span>
+                      </div>
                     </div>
 
                     {/* Notes */}

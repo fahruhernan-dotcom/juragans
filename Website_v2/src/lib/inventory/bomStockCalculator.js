@@ -153,9 +153,10 @@ export function matchStickerBackMaterial(product, rawMaterials = []) {
  * Menghitung kapasitas stok produk jadi dari BOM
  * @param {object} product
  * @param {Array} rawMaterials
+ * @param {object|string|null} customKemasan - Override kemasan kustom jika ada
  * @returns {object} { totalStock, bottleneck, components: [...] }
  */
-export function calculateBomProductStock(product, rawMaterials = []) {
+export function calculateBomProductStock(product, rawMaterials = [], customKemasan = null) {
   if (!product || !rawMaterials || rawMaterials.length === 0) {
     return {
       totalStock: Number(product?.current_stock) || 0,
@@ -188,7 +189,15 @@ export function calculateBomProductStock(product, rawMaterials = []) {
     }
 
     const bawangMat = matchBawangMaterial(product, rawMaterials)
-    const kemasanMat = matchKemasanMaterial(product, rawMaterials)
+    let kemasanMat = matchKemasanMaterial(product, rawMaterials)
+    if (customKemasan) {
+      if (typeof customKemasan === 'object' && customKemasan.current_stock !== undefined) {
+        kemasanMat = customKemasan
+      } else if (typeof customKemasan === 'string') {
+        const found = rawMaterials.find(r => r.id === customKemasan || r.material_name === customKemasan)
+        if (found) kemasanMat = found
+      }
+    }
     const sFrontMat = matchStickerFrontMaterial(product, rawMaterials)
     const sBackMat = matchStickerBackMaterial(product, rawMaterials)
 
@@ -271,7 +280,15 @@ export function calculateBomProductStock(product, rawMaterials = []) {
   // ── Penanganan Produk Standar (Grade S Murni / Grade A Crispy / Curah) ──
   const gram = extractProductGrammage(name, product.notes)
   const bawangMat = matchBawangMaterial(product, rawMaterials)
-  const kemasanMat = matchKemasanMaterial(product, rawMaterials)
+  let kemasanMat = matchKemasanMaterial(product, rawMaterials)
+  if (customKemasan) {
+    if (typeof customKemasan === 'object' && customKemasan.current_stock !== undefined) {
+      kemasanMat = customKemasan
+    } else if (typeof customKemasan === 'string') {
+      const found = rawMaterials.find(r => r.id === customKemasan || r.material_name === customKemasan)
+      if (found) kemasanMat = found
+    }
+  }
   const sFrontMat = matchStickerFrontMaterial(product, rawMaterials)
   const sBackMat = matchStickerBackMaterial(product, rawMaterials)
 
@@ -361,9 +378,10 @@ export function calculateBomProductStock(product, rawMaterials = []) {
  * Menghitung HPP Pokok Produk Jadi dari komponen bahan baku & kemasan terkini
  * @param {object} product
  * @param {Array} rawMaterials
+ * @param {object|number|null} customKemasan - Override kemasan jika menggunakan pouch khusus
  * @returns {number} HPP per unit (dalam Rupiah)
  */
-export function calculateBomProductHpp(product, rawMaterials = []) {
+export function calculateBomProductHpp(product, rawMaterials = [], customKemasan = null) {
   if (!product || !rawMaterials || rawMaterials.length === 0) {
     return Number(product?.avg_buy_price) || 0
   }
@@ -388,7 +406,10 @@ export function calculateBomProductHpp(product, rawMaterials = []) {
       gramPerPack = 2000
     }
     const bawangMat = matchBawangMaterial(product, rawMaterials)
-    const kemasanMat = matchKemasanMaterial(product, rawMaterials)
+    let kemasanMat = matchKemasanMaterial(product, rawMaterials)
+    if (customKemasan) {
+      kemasanMat = typeof customKemasan === 'object' ? customKemasan : { unit_cost: Number(customKemasan) || 0 }
+    }
     const sFrontMat = matchStickerFrontMaterial(product, rawMaterials)
     const sBackMat = matchStickerBackMaterial(product, rawMaterials)
 
@@ -407,7 +428,10 @@ export function calculateBomProductHpp(product, rawMaterials = []) {
 
   const gram = extractProductGrammage(name, product.notes)
   const bawangMat = matchBawangMaterial(product, rawMaterials)
-  const kemasanMat = matchKemasanMaterial(product, rawMaterials)
+  let kemasanMat = matchKemasanMaterial(product, rawMaterials)
+  if (customKemasan) {
+    kemasanMat = typeof customKemasan === 'object' ? customKemasan : { unit_cost: Number(customKemasan) || 0 }
+  }
   const sFrontMat = matchStickerFrontMaterial(product, rawMaterials)
   const sBackMat = matchStickerBackMaterial(product, rawMaterials)
 

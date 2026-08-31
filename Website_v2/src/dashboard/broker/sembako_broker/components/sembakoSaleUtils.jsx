@@ -1,6 +1,6 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion' // eslint-disable-line no-unused-vars
-import { ChevronDown, Check, Plus } from 'lucide-react'
+import { ChevronDown, Check, Plus, Search, X } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatIDR } from '@/lib/format'
 
@@ -117,9 +117,33 @@ export function generateWAMessage(sale, tenant) {
 }
 
 // ── UI Primitives ─────────────────────────────────────────────────────────────
-export function CustomSelect({ value, onChange, options, placeholder, onAddNew, id, style }) {
+export function CustomSelect({ value, onChange, options = [], placeholder, onAddNew, id, style, searchable = true, searchPlaceholder }) {
   const [open, setOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const searchInputRef = useRef(null)
+
   const selected = options.find(o => o.value === value)
+  const isSearchEnabled = searchable && (options.length > 3 || searchable === true)
+
+  useEffect(() => {
+    if (open) {
+      setSearchQuery('')
+      const timer = setTimeout(() => {
+        searchInputRef.current?.focus()
+      }, 50)
+      return () => clearTimeout(timer)
+    }
+  }, [open])
+
+  const filteredOptions = useMemo(() => {
+    if (!searchQuery.trim()) return options
+    const q = searchQuery.toLowerCase().trim()
+    return options.filter(opt =>
+      String(opt.label || '').toLowerCase().includes(q) ||
+      String(opt.value || '').toLowerCase().includes(q) ||
+      String(opt.sublabel || '').toLowerCase().includes(q)
+    )
+  }, [options, searchQuery])
 
   return (
     <div style={{ position: 'relative', width: '100%', ...style }}>
@@ -136,10 +160,10 @@ export function CustomSelect({ value, onChange, options, placeholder, onAddNew, 
           transition: 'all 0.2s'
         }}
       >
-        <span style={{ color: value ? C.text : C.muted, fontSize: '14px' }}>
+        <span style={{ color: value ? C.text : C.muted, fontSize: '14px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {selected ? selected.label : placeholder}
         </span>
-        <ChevronDown size={16} color={C.muted} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+        <ChevronDown size={16} color={C.muted} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', shrink: 0, marginLeft: 6 }} />
       </div>
       <AnimatePresence>
         {open && (
@@ -155,17 +179,76 @@ export function CustomSelect({ value, onChange, options, placeholder, onAddNew, 
               style={{
                 position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '8px',
                 background: C.card, border: `1px solid ${C.border}`, borderRadius: '14px',
-                zIndex: 5060, overflow: 'hidden', boxShadow: '0 10px 30px rgba(15,23,42,0.08)',
+                zIndex: 5060, overflow: 'hidden', boxShadow: '0 10px 30px rgba(15,23,42,0.12)',
                 backdropFilter: 'blur(10px)',
               }}
             >
+              {isSearchEnabled && (
+                <div
+                  style={{
+                    padding: '8px 10px',
+                    borderBottom: `1px solid ${C.border}`,
+                    background: C.card,
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 2,
+                  }}
+                  onClick={e => e.stopPropagation()}
+                >
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                    <Search size={14} style={{ position: 'absolute', left: 10, color: C.muted, pointerEvents: 'none' }} />
+                    <input
+                      ref={searchInputRef}
+                      type="text"
+                      value={searchQuery}
+                      onChange={e => setSearchQuery(e.target.value)}
+                      placeholder={searchPlaceholder || 'Cari pilihan...'}
+                      onKeyDown={e => {
+                        if (e.key === 'Escape') {
+                          setOpen(false)
+                        } else if (e.key === 'Enter' && filteredOptions.length > 0) {
+                          e.preventDefault()
+                          onChange(filteredOptions[0].value)
+                          setOpen(false)
+                        }
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '8px 28px 8px 32px',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        borderRadius: '10px',
+                        background: C.input,
+                        color: C.text,
+                        border: `1px solid ${C.border}`,
+                        outline: 'none',
+                      }}
+                    />
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setSearchQuery('')}
+                        style={{
+                          position: 'absolute', right: 8,
+                          background: 'transparent', border: 'none',
+                          color: C.muted, cursor: 'pointer', display: 'flex', alignItems: 'center',
+                          padding: 2,
+                        }}
+                      >
+                        <X size={13} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <div style={{ maxHeight: '240px', overflowY: 'auto' }}>
-                {options.length === 0 && !onAddNew && (
+                {filteredOptions.length === 0 && !onAddNew && (
                   <div style={{ padding: '16px', textAlign: 'center', color: C.muted, fontSize: '13px' }}>
-                    Tidak ada pilihan
+                    {searchQuery ? `Tidak ada hasil "${searchQuery}"` : 'Tidak ada pilihan'}
                   </div>
                 )}
-                {options.map(opt => (
+                {filteredOptions.map(opt => (
                   <div
                     key={opt.value}
                     onClick={() => { onChange(opt.value); setOpen(false) }}
@@ -176,7 +259,7 @@ export function CustomSelect({ value, onChange, options, placeholder, onAddNew, 
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between'
                     }}
                   >
-                    <span>{opt.label}</span>
+                    <span style={{ fontWeight: value === opt.value ? 700 : 500 }}>{opt.label}</span>
                     {value === opt.value && <Check size={14} color={C.accent} />}
                   </div>
                 ))}

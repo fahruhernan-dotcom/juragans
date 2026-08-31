@@ -86,18 +86,38 @@ export function prefetchAppModules() {
   }, 3000)
 }
 
-const SembakoBeranda          = React.lazy(pageImporters.beranda)
-const SembakoPenjualan        = React.lazy(pageImporters.penjualan)
-const SembakoProduk           = React.lazy(pageImporters.produk)
-const SembakoGudang           = React.lazy(pageImporters.gudang)
-const SembakoTokoSupplier     = React.lazy(pageImporters.tokoSupplier)
-const SembakoTokoSupplierDetail = React.lazy(pageImporters.tokoSupplierDetail)
-const SembakoRetur            = React.lazy(pageImporters.retur)
-const SembakoLaporan          = React.lazy(pageImporters.laporan)
-const SembakoTimManajemenPage = React.lazy(pageImporters.tim)
-const SembakoAkun             = React.lazy(pageImporters.akun)
-const SembakoDevAdminHub      = React.lazy(pageImporters.kelolaAkun)
-const SembakoB2BLeadsOutreach = React.lazy(pageImporters.b2bOutreach)
+function lazyWithRetry(componentImport) {
+  return React.lazy(async () => {
+    try {
+      return await componentImport()
+    } catch (error) {
+      console.warn('[Lazy] Dynamic import failed, retrying once...', error)
+      try {
+        return await componentImport()
+      } catch (retryError) {
+        const isChunkError = /Failed to fetch dynamically imported module|Loading chunk/i.test(retryError?.message || '')
+        if (isChunkError && typeof window !== 'undefined' && !sessionStorage.getItem('chunk_retry_' + window.location.pathname)) {
+          sessionStorage.setItem('chunk_retry_' + window.location.pathname, '1')
+          window.location.reload()
+        }
+        throw retryError
+      }
+    }
+  })
+}
+
+const SembakoBeranda          = lazyWithRetry(pageImporters.beranda)
+const SembakoPenjualan        = lazyWithRetry(pageImporters.penjualan)
+const SembakoProduk           = lazyWithRetry(pageImporters.produk)
+const SembakoGudang           = lazyWithRetry(pageImporters.gudang)
+const SembakoTokoSupplier     = lazyWithRetry(pageImporters.tokoSupplier)
+const SembakoTokoSupplierDetail = lazyWithRetry(pageImporters.tokoSupplierDetail)
+const SembakoRetur            = lazyWithRetry(pageImporters.retur)
+const SembakoLaporan          = lazyWithRetry(pageImporters.laporan)
+const SembakoTimManajemenPage = lazyWithRetry(pageImporters.tim)
+const SembakoAkun             = lazyWithRetry(pageImporters.akun)
+const SembakoDevAdminHub      = lazyWithRetry(pageImporters.kelolaAkun)
+const SembakoB2BLeadsOutreach = lazyWithRetry(pageImporters.b2bOutreach)
 
 // ─── Fase 2: Single source of truth untuk semua route ───────────────────────
 // Format: [slug, element]

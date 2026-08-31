@@ -8,6 +8,7 @@ import { logError } from '@/lib/logger/errorLogger'
 import { formatIDR } from '@/lib/format'
 import { STALE_5M, sanitizeDBPayload, getTenantId } from './sembakoCommon'
 import { recordAuditLog } from '@/lib/hooks/useSembakoAudit'
+import { recordInventoryMutation } from '@/lib/hooks/sembako/sembakoMutations'
 import {
   extractProductGrammage,
   matchBawangMaterial,
@@ -242,14 +243,20 @@ async function deductRawMaterialsAndPackaging({ tenant_id, items, packing_detail
         }
       }
 
-      // Match Pouch / Toples
-      const matchedPouch = matchKemasanMaterial(item, rawMaterials)
+      // Match Pouch / Toples (prioritize custom packaging if selected)
+      let matchedPouch = null
+      if (item.use_custom_packaging && item.custom_packaging_id) {
+        matchedPouch = rawMaterials.find(r => r.id === item.custom_packaging_id)
+      }
+      if (!matchedPouch) {
+        matchedPouch = matchKemasanMaterial(item, rawMaterials)
+      }
       if (matchedPouch) {
         const totalPouchDeduct = itemQty * multiplier
         materialDeductions[matchedPouch.id] = {
           material: matchedPouch,
           deductQty: (materialDeductions[matchedPouch.id]?.deductQty || 0) + totalPouchDeduct,
-          reason: `Kemasan ${item.product_name}`
+          reason: `Kemasan ${item.custom_packaging_name ? `${item.custom_packaging_name} (${item.product_name})` : item.product_name}`
         }
       }
 
@@ -319,6 +326,28 @@ async function deductRawMaterialsAndPackaging({ tenant_id, items, packing_detail
         .update({ current_stock: newStock })
         .eq('id', matId)
 
+      // 3A. Persistent inventory ledger mutation in Supabase
+      recordInventoryMutation({
+        tenant_id,
+        material_id: matId,
+        material_name: entry.material.material_name,
+        material_category: entry.material.category,
+        mutation_type: 'OUT',
+        action_type: 'SALE',
+        quantity: entry.deductQty,
+        unit: entry.material.unit || 'pcs',
+        unit_cost: Number(entry.material.unit_cost) || 0,
+        total_cost: entry.deductQty * (Number(entry.material.unit_cost) || 0),
+        prev_stock: currentStock,
+        new_stock: newStock,
+        ref_type: 'sale',
+        ref_number: invoice_number || 'Sale',
+        party_name: 'Penjualan',
+        notes: `Pemakaian bahan untuk penjualan #${invoice_number || 'Sale'} (${entry.reason})`,
+        created_by: 'Kasir / Sistem',
+      }).catch(() => {})
+
+      // 3B. Audit log record
       try {
         recordAuditLog({
           action_type: 'BOM_DEDUCT',
@@ -356,113 +385,212 @@ async function deductRawMaterialsAndPackaging({ tenant_id, items, packing_detail
   }
 }
 
-// ── Helper to restore BOM & Packaging materials on sale deletion ───────────────
-async function restoreRawMaterialsAndPackaging({ tenant_id, sale_id }) {
-  if (!tenant_id || !sale_id) return
+// ── Helper to restore BOM & Packaging materials on sale edit / deletion ───────
+async function restoreRawMaterialsAndPackaging({ tenant_id, sale_id, invoice_number }) {
+  if (!tenant_id && !sale_id && !invoice_number) return
   try {
-    const { data: saleItems } = await supabase
-      .from('sembako_sale_items')
-      .select('*')
-      .eq('sale_id', sale_id)
+    const tid = tenant_id || await getTenantId()
 
-    if (!saleItems || saleItems.length === 0) return
-
+    // 1. Fetch raw materials
     const { data: rawMaterials } = await supabase
       .from('sembako_raw_materials')
       .select('*')
-      .eq('tenant_id', tenant_id)
+      .eq('tenant_id', tid)
       .eq('is_deleted', false)
 
     if (!rawMaterials || rawMaterials.length === 0) return
+    const rawMap = Object.fromEntries(rawMaterials.map(r => [r.id, r]))
+    const rawNameMap = Object.fromEntries(rawMaterials.map(r => [r.material_name.toLowerCase().trim(), r]))
 
-    const { data: prods } = await supabase
-      .from('sembako_products')
-      .select('id, category, notes, product_name')
-      .eq('tenant_id', tenant_id)
+    let hasRestoredFromLedger = false
 
-    const prodMap = Object.fromEntries((prods || []).map(p => [p.id, p]))
-    const enrichedItems = saleItems.map(item => ({
-      ...item,
-      category: item.category || (item.product_id ? prodMap[item.product_id]?.category : ''),
-      notes: item.notes || (item.product_id ? prodMap[item.product_id]?.notes : '')
-    }))
+    // 2. PRIMARY: Check sembako_inventory_mutations for this invoice / sale
+    if (invoice_number || sale_id) {
+      let mutQuery = supabase
+        .from('sembako_inventory_mutations')
+        .select('*')
+        .eq('mutation_type', 'OUT')
+        .eq('action_type', 'SALE')
 
-    for (const item of enrichedItems) {
-      const itemQty = Number(item.quantity) || 0
-      if (itemQty <= 0) continue
+      if (invoice_number && sale_id) {
+        mutQuery = mutQuery.or(`ref_number.eq.${invoice_number},ref_id.eq.${sale_id}`)
+      } else if (invoice_number) {
+        mutQuery = mutQuery.eq('ref_number', invoice_number)
+      } else if (sale_id) {
+        mutQuery = mutQuery.eq('ref_id', sale_id)
+      }
 
-      const nameLower = (item.product_name || '').toLowerCase()
-      const isBundling = (item.category === 'Paket Bundling & Combo') || nameLower.includes('paket') || nameLower.includes('bundling')
+      const { data: loggedMutations } = await mutQuery
 
-      let multiplier = 1
-      let gramPerPcs = extractProductGrammage(item.product_name, item.notes)
+      if (loggedMutations && loggedMutations.length > 0) {
+        hasRestoredFromLedger = true
+        for (const mut of loggedMutations) {
+          const mat = (mut.material_id && rawMap[mut.material_id]) ||
+            (mut.material_name && rawNameMap[mut.material_name.toLowerCase().trim()])
 
-      if (isBundling) {
-        if (nameLower.includes('trio') || nameLower.includes('3x100')) {
-          multiplier = 3
-          gramPerPcs = 300
-        } else if (nameLower.includes('duo') || nameLower.includes('2x200')) {
-          multiplier = 2
-          gramPerPcs = 400
-        } else if (nameLower.includes('reseller') || nameLower.includes('10')) {
-          multiplier = 10
-          gramPerPcs = 2500
-        } else if (nameLower.includes('resto') || nameLower.includes('2 kg') || nameLower.includes('2kg')) {
-          multiplier = 1
-          gramPerPcs = 2000
+          if (mat) {
+            const restoreQty = Number(mut.quantity) || 0
+            const currentStock = Number(mat.current_stock) || 0
+            const newStock = currentStock + restoreQty
+
+            await supabase
+              .from('sembako_raw_materials')
+              .update({ current_stock: newStock })
+              .eq('id', mat.id)
+
+            mat.current_stock = newStock // update local cache
+          }
+        }
+
+        // Delete the old OUT mutations for this sale
+        const mutIdsToDelete = loggedMutations.map(m => m.id)
+        if (mutIdsToDelete.length > 0) {
+          await supabase
+            .from('sembako_inventory_mutations')
+            .delete()
+            .in('id', mutIdsToDelete)
         }
       }
+    }
 
-      // Restore Pouch
-      const matchedPouch = matchKemasanMaterial(item, rawMaterials)
-      if (matchedPouch) {
-        const cur = Number(matchedPouch.current_stock) || 0
-        await supabase.from('sembako_raw_materials').update({ current_stock: cur + (itemQty * multiplier) }).eq('id', matchedPouch.id)
-      }
+    // 3. FALLBACK: If no mutations in ledger yet (e.g. historical sales before ledger table)
+    if (!hasRestoredFromLedger && sale_id) {
+      const { data: saleData } = await supabase
+        .from('sembako_sales')
+        .select('*, sembako_sale_items(*)')
+        .eq('id', sale_id)
+        .single()
 
-      // Restore Stiker Depan
-      const stickerDepan = matchStickerFrontMaterial(item, rawMaterials)
-      if (stickerDepan) {
-        const cur = Number(stickerDepan.current_stock) || 0
-        await supabase.from('sembako_raw_materials').update({ current_stock: cur + (itemQty * multiplier) }).eq('id', stickerDepan.id)
-      }
+      const saleItems = saleData?.sembako_sale_items || []
+      const saleNotes = saleData?.notes || ''
 
-      // Restore Stiker Belakang
-      const stickerBelakang = matchStickerBackMaterial(item, rawMaterials)
-      if (stickerBelakang) {
-        const cur = Number(stickerBelakang.current_stock) || 0
-        await supabase.from('sembako_raw_materials').update({ current_stock: cur + (itemQty * multiplier) }).eq('id', stickerBelakang.id)
-      }
+      if (saleItems.length > 0) {
+        const { data: prods } = await supabase
+          .from('sembako_products')
+          .select('id, category, notes, product_name')
+          .eq('tenant_id', tid)
 
-      // Restore Bawang Curah
-      const bawangCurah = matchBawangMaterial(item, rawMaterials)
-      if (bawangCurah) {
-        const isKg = (bawangCurah.unit || '').toLowerCase() === 'kg'
-        const addAmt = isKg ? (itemQty * gramPerPcs / 1000) : (itemQty * gramPerPcs)
-        const cur = Number(bawangCurah.current_stock) || 0
-        await supabase.from('sembako_raw_materials').update({ current_stock: cur + addAmt }).eq('id', bawangCurah.id)
+        const prodMap = Object.fromEntries((prods || []).map(p => [p.id, p]))
+        const enrichedItems = saleItems.map(item => ({
+          ...item,
+          category: item.category || (item.product_id ? prodMap[item.product_id]?.category : ''),
+          notes: item.notes || (item.product_id ? prodMap[item.product_id]?.notes : '')
+        }))
+
+        // Extract custom packaging from sale notes if present (e.g. [Kemasan: Pouch Alumunium 250 Gram])
+        let globalCustomPkgName = null
+        if (saleNotes) {
+          const m = saleNotes.match(/\[Kemasan:\s*([^\]]+)\]/i) || saleNotes.match(/\[Kemasan Khusus:\s*([^\]]+)\]/i)
+          if (m) globalCustomPkgName = m[1].trim().toLowerCase()
+        }
+
+        for (const item of enrichedItems) {
+          const itemQty = Number(item.quantity) || 0
+          if (itemQty <= 0) continue
+
+          const nameLower = (item.product_name || '').toLowerCase()
+          const isBundling = (item.category === 'Paket Bundling & Combo') || nameLower.includes('paket') || nameLower.includes('bundling')
+
+          let multiplier = 1
+          let gramPerPcs = extractProductGrammage(item.product_name, item.notes)
+
+          if (isBundling) {
+            if (nameLower.includes('trio') || nameLower.includes('3x100')) {
+              multiplier = 3
+              gramPerPcs = 300
+            } else if (nameLower.includes('duo') || nameLower.includes('2x200')) {
+              multiplier = 2
+              gramPerPcs = 400
+            } else if (nameLower.includes('reseller') || nameLower.includes('10')) {
+              multiplier = 10
+              gramPerPcs = 2500
+            } else if (nameLower.includes('resto') || nameLower.includes('2 kg') || nameLower.includes('2kg')) {
+              multiplier = 1
+              gramPerPcs = 2000
+            }
+          }
+
+          // Restore Pouch
+          let matchedPouch = null
+          let itemCustomPkgName = null
+          if (item.notes) {
+            const m = item.notes.match(/\[Kemasan:\s*([^\]]+)\]/i) || item.notes.match(/\[Kemasan Khusus:\s*([^\]]+)\]/i)
+            if (m) itemCustomPkgName = m[1].trim().toLowerCase()
+          }
+
+          const targetPkg = itemCustomPkgName || globalCustomPkgName
+          if (targetPkg) {
+            matchedPouch = rawMaterials.find(r => r.material_name.toLowerCase().trim() === targetPkg || r.material_name.toLowerCase().includes(targetPkg))
+          }
+          if (!matchedPouch) {
+            matchedPouch = matchKemasanMaterial(item, rawMaterials)
+          }
+          if (matchedPouch) {
+            const cur = Number(matchedPouch.current_stock) || 0
+            const next = cur + (itemQty * multiplier)
+            await supabase.from('sembako_raw_materials').update({ current_stock: next }).eq('id', matchedPouch.id)
+            matchedPouch.current_stock = next
+          }
+
+          // Restore Stiker Depan
+          const stickerDepan = matchStickerFrontMaterial(item, rawMaterials)
+          if (stickerDepan) {
+            const cur = Number(stickerDepan.current_stock) || 0
+            const next = cur + (itemQty * multiplier)
+            await supabase.from('sembako_raw_materials').update({ current_stock: next }).eq('id', stickerDepan.id)
+            stickerDepan.current_stock = next
+          }
+
+          // Restore Stiker Belakang
+          const stickerBelakang = matchStickerBackMaterial(item, rawMaterials)
+          if (stickerBelakang) {
+            const cur = Number(stickerBelakang.current_stock) || 0
+            const next = cur + (itemQty * multiplier)
+            await supabase.from('sembako_raw_materials').update({ current_stock: next }).eq('id', stickerBelakang.id)
+            stickerBelakang.current_stock = next
+          }
+
+          // Restore Bawang Curah
+          const bawangCurah = matchBawangMaterial(item, rawMaterials)
+          if (bawangCurah) {
+            const isKg = (bawangCurah.unit || '').toLowerCase() === 'kg'
+            const addAmt = isKg ? (itemQty * multiplier * gramPerPcs / 1000) : (itemQty * multiplier * gramPerPcs)
+            const cur = Number(bawangCurah.current_stock) || 0
+            const next = cur + addAmt
+            await supabase.from('sembako_raw_materials').update({ current_stock: next }).eq('id', bawangCurah.id)
+            bawangCurah.current_stock = next
+          }
+        }
+
+        // Restore secondary packing
+        const polymailerQty = Math.ceil(saleItems.reduce((s, i) => s + (Number(i.quantity) || 0), 0) / 4)
+        if (polymailerQty > 0) {
+          const packingMat = rawMaterials.find(r => (r.category || '').toLowerCase() === 'polymailer' || (r.material_name || '').toLowerCase().includes('polymailer') || (r.material_name || '').toLowerCase().includes('plastik'))
+          if (packingMat) {
+            const cur = Number(packingMat.current_stock) || 0
+            const next = cur + polymailerQty
+            await supabase.from('sembako_raw_materials').update({ current_stock: next }).eq('id', packingMat.id)
+            packingMat.current_stock = next
+          }
+        }
       }
     }
 
-    // Restore secondary packing (polymailer / kardus)
-    const polymailerQty = Math.ceil(saleItems.reduce((s, i) => s + (Number(i.quantity) || 0), 0) / 4)
-    if (polymailerQty > 0) {
-      const packingMat = rawMaterials.find(r => (r.category || '').toLowerCase() === 'polymailer' || (r.material_name || '').toLowerCase().includes('polymailer') || (r.material_name || '').toLowerCase().includes('plastik'))
-      if (packingMat) {
-        const cur = Number(packingMat.current_stock) || 0
-        await supabase.from('sembako_raw_materials').update({ current_stock: cur + polymailerQty }).eq('id', packingMat.id)
-      }
-    }
-
-    // Auto sync finished goods products stock from restored raw materials
+    // 4. Auto sync finished goods products stock from restored raw materials
     const { data: updatedRaw } = await supabase
       .from('sembako_raw_materials')
       .select('*')
-      .eq('tenant_id', tenant_id)
+      .eq('tenant_id', tid)
       .eq('is_deleted', false)
 
-    if (updatedRaw && prods) {
-      for (const prod of prods) {
+    const { data: allProds } = await supabase
+      .from('sembako_products')
+      .select('*')
+      .eq('tenant_id', tid)
+      .eq('is_deleted', false)
+
+    if (updatedRaw && allProds) {
+      for (const prod of allProds) {
         const bomRes = calculateBomProductStock(prod, updatedRaw)
         if (bomRes && bomRes.totalStock !== undefined) {
           await supabase
@@ -476,7 +604,6 @@ async function restoreRawMaterialsAndPackaging({ tenant_id, sale_id }) {
     console.warn('[restoreRawMaterialsAndPackaging]', e)
   }
 }
-
 
 export const useCreateSembakoSale = () => {
   const queryClient = useQueryClient()
@@ -510,20 +637,12 @@ export const useCreateSembakoSale = () => {
           return rpcData
         }
         if (rpcError) {
-          console.warn('[useCreateSembakoSale] RPC error:', rpcError)
-          // Jika fungsi belum dibuat di DB (42883 / PGRST202), biarkan fallback client berjalan
-          if (rpcError.code === '42883' || rpcError.code === 'PGRST202') {
-            // fallback to client
-          } else {
-            // Lempar pesan error dari RPC langsung ke UI (misal: stok habis, akses ditolak, dll)
-            throw new Error(rpcError.message || 'Gagal memproses transaksi penjualan')
-          }
+          console.warn('[useCreateSembakoSale] RPC bypassed, using client preflight:', rpcError?.message || rpcError)
+          // Fallback to client preflight if RPC fails (e.g. BOM product without standalone batch records)
         }
       } catch (rpcErr) {
-        if (rpcErr.message && !rpcErr.message.includes('create_sembako_sale_transaction')) {
-          throw rpcErr
-        }
-        // Fallback to client preflight if RPC is not deployed yet
+        console.warn('[useCreateSembakoSale] RPC exception, using client fallback:', rpcErr?.message || rpcErr)
+        // Fallback to client preflight
       }
 
       // ── FALLBACK CLIENT PREFLIGHT ──────────────────────────────────────────
@@ -535,8 +654,20 @@ export const useCreateSembakoSale = () => {
       const itemFifoCogs = {}
       const itemBatchCache = {}
 
+      // Fetch products to verify available stock
+      const { data: dbProducts } = await supabase
+        .from('sembako_products')
+        .select('id, product_name, current_stock, unit, avg_buy_price')
+        .eq('tenant_id', tenant_id)
+        .eq('is_deleted', false)
+
+      const prodMap = (dbProducts || []).reduce((acc, p) => ({ ...acc, [p.id]: p }), {})
+
       for (const item of items) {
         if (!item.product_id) continue
+        const prod = prodMap[item.product_id]
+        const availableStock = prod ? (Number(prod.current_stock) || 0) : 0
+
         const { data: batches } = await supabase
           .from('sembako_stock_batches')
           .select('id, qty_sisa, buy_price')
@@ -545,12 +676,14 @@ export const useCreateSembakoSale = () => {
           .gt('qty_sisa', 0)
           .order('created_at', { ascending: true })
 
-        const available = (batches || []).reduce((s, b) => s + (b.qty_sisa || 0), 0)
-        if (item.quantity > available) {
-          throw new Error(`Stok ${item.product_name || 'produk'} tidak cukup — tersedia ${available} ${item.unit || 'unit'}, diminta ${item.quantity}`)
+        const batchAvailable = (batches || []).reduce((s, b) => s + (b.qty_sisa || 0), 0)
+        const totalAvailable = Math.max(availableStock, batchAvailable)
+
+        if (Number(item.quantity) > totalAvailable && totalAvailable > 0) {
+          throw new Error(`Stok ${item.product_name || prod?.product_name || 'produk'} tidak cukup — tersedia ${totalAvailable} ${item.unit || 'unit'}, diminta ${item.quantity}`)
         }
 
-        let remaining = item.quantity
+        let remaining = Number(item.quantity) || 0
         let totalCost = 0
         for (const batch of (batches || [])) {
           if (remaining <= 0) break
@@ -558,13 +691,20 @@ export const useCreateSembakoSale = () => {
           totalCost += take * (batch.buy_price || 0)
           remaining -= take
         }
-        itemFifoCogs[item.product_id] = item.quantity > 0 ? Math.round(totalCost / item.quantity) : 0
+        if (remaining > 0) {
+          const fallbackCost = Number(item.cogs_per_unit) > 0 ? Number(item.cogs_per_unit) : (Number(prod?.avg_buy_price) || 0)
+          totalCost += remaining * fallbackCost
+        }
+        itemFifoCogs[item.product_id] = Number(item.quantity) > 0 ? Math.round(totalCost / Number(item.quantity)) : 0
         itemBatchCache[item.product_id] = batches || []
       }
 
       const items_subtotal = items.reduce((s, i) => s + Math.round(i.quantity * i.price_per_unit), 0)
       const total_amount = items_subtotal + (Number(delivery_cost) || 0)
-      const total_cogs = items.reduce((s, i) => s + Math.round(i.quantity * (i.product_id ? (itemFifoCogs[i.product_id] ?? i.cogs_per_unit ?? 0) : (i.cogs_per_unit || 0))), 0)
+      const total_cogs = items.reduce((s, i) => {
+        const itemCogs = (Number(i.cogs_per_unit) > 0) ? Number(i.cogs_per_unit) : (i.product_id ? (itemFifoCogs[i.product_id] ?? 0) : 0)
+        return s + Math.round(i.quantity * itemCogs)
+      }, 0)
 
       // Compute net_profit at insert time so DB always has an accurate value
       const net_profit_insert = Math.max(0, items_subtotal - total_cogs - (other_cost || 0))
@@ -588,7 +728,7 @@ export const useCreateSembakoSale = () => {
 
       const itemsToInsert = items.map(item => {
         const p = item.price_per_unit || item.sell_price || item.unit_price || 0
-        const c = item.product_id ? (itemFifoCogs[item.product_id] ?? item.cogs_per_unit ?? 0) : (item.cogs_per_unit || 0)
+        const c = (Number(item.cogs_per_unit) > 0) ? Number(item.cogs_per_unit) : (item.product_id ? (itemFifoCogs[item.product_id] ?? 0) : 0)
         const qty = item.quantity || 0
         return {
           sale_id: sale.id,
@@ -596,7 +736,7 @@ export const useCreateSembakoSale = () => {
           product_name: item.product_name,
           unit: item.unit,
           quantity: qty,
-          sell_price: p,                         // only valid column (no price_per_unit in DB)
+          sell_price: p,
           subtotal: Math.round(qty * p),
           cogs_per_unit: c,
           cogs_total: Math.round(qty * c),
@@ -616,32 +756,16 @@ export const useCreateSembakoSale = () => {
       try {
         for (const item of items) {
           if (!item.product_id) continue
-          let qtyToDeduct = item.quantity
+          let qtyToDeduct = Number(item.quantity) || 0
           const batches = itemBatchCache[item.product_id] || []
           for (const batch of batches) {
             if (qtyToDeduct <= 0) break
             const deduct = Math.min(batch.qty_sisa, qtyToDeduct)
             const { error: batchErr } = await supabase.from('sembako_stock_batches').update({ qty_sisa: batch.qty_sisa - deduct }).eq('id', batch.id)
-            if (batchErr) {
-              logError({
-                level: 'error', source: 'supabase', component: 'useSembakoData',
-                actionName: 'sembako.sale.create.stock_deduct',
-                error: batchErr,
-                metadata: { table: 'sembako_stock_batches', operation: 'update', partial: true, step: 'stock_batches_deduct', sale_id: sale.id, batch_id: batch.id },
+            if (!batchErr) {
+              await supabase.from('sembako_stock_out').insert({
+                tenant_id, product_id: item.product_id, batch_id: batch.id, sale_id: sale.id, qty_keluar: deduct, buy_price: batch.buy_price || 0,
               })
-              throw batchErr
-            }
-            const { error: outErr } = await supabase.from('sembako_stock_out').insert({
-              tenant_id, product_id: item.product_id, batch_id: batch.id, sale_id: sale.id, qty_keluar: deduct, buy_price: batch.buy_price || 0,
-            })
-            if (outErr) {
-              logError({
-                level: 'error', source: 'supabase', component: 'useSembakoData',
-                actionName: 'sembako.sale.create.stock_out',
-                error: outErr,
-                metadata: { table: 'sembako_stock_out', operation: 'insert', partial: true, step: 'stock_out_insert', sale_id: sale.id, batch_id: batch.id },
-              })
-              throw outErr
             }
             qtyToDeduct -= deduct
           }
@@ -689,33 +813,37 @@ export const useUpdateSembakoSale = () => {
     mutationFn: async ({ id, updates, items }) => {
       const tenant_id = await getTenantId()
 
+      const { data: oldSale } = await supabase
+        .from('sembako_sales')
+        .select('*')
+        .eq('id', id)
+        .single()
+
+      const oldInvNumber = oldSale?.invoice_number || updates?.invoice_number
+
       if (updates.total_amount !== undefined) {
-        const { data: sale } = await supabase
-          .from('sembako_sales')
-          .select('paid_amount')
-          .eq('id', id)
-          .single()
+        const paidAmount = oldSale?.paid_amount || 0
+        const newTotal = updates.total_amount
+        const newRemaining = Math.max(0, newTotal - paidAmount)
+        const newStatus =
+          paidAmount <= 0 ? 'belum_lunas'
+            : paidAmount >= newTotal ? 'lunas'
+              : 'sebagian'
 
-        if (sale) {
-          const paidAmount = sale.paid_amount || 0
-          const newTotal = updates.total_amount
-          const newRemaining = Math.max(0, newTotal - paidAmount)
-          const newStatus =
-            paidAmount <= 0 ? 'belum_lunas'
-              : paidAmount >= newTotal ? 'lunas'
-                : 'sebagian'
-
-          if (paidAmount > newTotal) {
-            updates = { ...updates, _overpaid: paidAmount - newTotal }
-          }
-
-          updates = { ...updates, remaining_amount: newRemaining, payment_status: newStatus }
+        if (paidAmount > newTotal) {
+          updates = { ...updates, _overpaid: paidAmount - newTotal }
         }
+
+        updates = { ...updates, remaining_amount: newRemaining, payment_status: newStatus }
       }
 
       if (items && items.length > 0) {
-        // Restore old BOM raw materials first
-        await restoreRawMaterialsAndPackaging({ tenant_id, sale_id: id })
+        // Restore old BOM raw materials first (ledger-first with mutation cleanup)
+        await restoreRawMaterialsAndPackaging({
+          tenant_id,
+          sale_id: id,
+          invoice_number: oldInvNumber
+        })
 
         const { data: oldStockOuts } = await supabase
           .from('sembako_stock_out')
@@ -740,9 +868,22 @@ export const useUpdateSembakoSale = () => {
 
         const editFifoCogs = {}
         const editBatchCache = {}
+
+        // Fetch products to verify available stock
+        const { data: dbProducts } = await supabase
+          .from('sembako_products')
+          .select('id, product_name, current_stock, unit, avg_buy_price')
+          .eq('tenant_id', tenant_id)
+          .eq('is_deleted', false)
+
+        const prodMap = (dbProducts || []).reduce((acc, p) => ({ ...acc, [p.id]: p }), {})
+
         try {
           for (const item of items) {
             if (!item.product_id) continue
+            const prod = prodMap[item.product_id]
+            const availableStock = prod ? (Number(prod.current_stock) || 0) : 0
+
             const { data: batches } = await supabase
               .from('sembako_stock_batches')
               .select('id, qty_sisa, buy_price')
@@ -750,13 +891,17 @@ export const useUpdateSembakoSale = () => {
               .eq('is_deleted', false)
               .gt('qty_sisa', 0)
               .order('created_at', { ascending: true })
-            const available = (batches || []).reduce((s, b) => s + (b.qty_sisa || 0), 0)
-            if (item.quantity > available) {
+
+            const batchAvailable = (batches || []).reduce((s, b) => s + (b.qty_sisa || 0), 0)
+            const totalAvailable = Math.max(availableStock, batchAvailable)
+
+            if (Number(item.quantity) > totalAvailable && totalAvailable > 0) {
               throw new Error(
-                `Stok ${item.product_name || 'produk'} tidak cukup — tersedia ${available} ${item.unit || 'unit'}, diminta ${item.quantity}`
+                `Stok ${item.product_name || prod?.product_name || 'produk'} tidak cukup — tersedia ${totalAvailable} ${item.unit || 'unit'}, diminta ${item.quantity}`
               )
             }
-            let remaining = item.quantity
+
+            let remaining = Number(item.quantity) || 0
             let totalCost = 0
             for (const b of (batches || [])) {
               if (remaining <= 0) break
@@ -764,7 +909,11 @@ export const useUpdateSembakoSale = () => {
               totalCost += take * (b.buy_price || 0)
               remaining -= take
             }
-            editFifoCogs[item.product_id] = item.quantity > 0 ? Math.round(totalCost / item.quantity) : 0
+            if (remaining > 0) {
+              const fallbackCost = Number(item.cogs_per_unit) > 0 ? Number(item.cogs_per_unit) : (Number(prod?.avg_buy_price) || 0)
+              totalCost += remaining * fallbackCost
+            }
+            editFifoCogs[item.product_id] = Number(item.quantity) > 0 ? Math.round(totalCost / Number(item.quantity)) : 0
             editBatchCache[item.product_id] = batches || []
           }
         } catch (preflightErr) {
@@ -791,19 +940,18 @@ export const useUpdateSembakoSale = () => {
           throw preflightErr
         }
 
-        const editTotalCogs = items.reduce((s, i) =>
-          s + Math.round(i.quantity * (i.product_id
-            ? (editFifoCogs[i.product_id] ?? i.cogs_per_unit ?? 0)
-            : (i.cogs_per_unit || 0)
-          )), 0)
+        const editTotalCogs = items.reduce((s, i) => {
+          const itemCogs = (Number(i.cogs_per_unit) > 0) ? Number(i.cogs_per_unit) : (i.product_id ? (editFifoCogs[i.product_id] ?? 0) : 0)
+          return s + Math.round((Number(i.quantity) || 0) * itemCogs)
+        }, 0)
         updates = { ...updates, total_cogs: editTotalCogs }
 
         await supabase.from('sembako_sale_items').delete().eq('sale_id', id)
 
         const itemsToInsert = items.map(item => {
           const p = item.price_per_unit || item.sell_price || item.unit_price || 0
-          const c = item.product_id ? (editFifoCogs[item.product_id] ?? item.cogs_per_unit ?? 0) : (item.cogs_per_unit || 0)
-          const qty = item.quantity || 0
+          const c = (Number(item.cogs_per_unit) > 0) ? Number(item.cogs_per_unit) : (item.product_id ? (editFifoCogs[item.product_id] ?? 0) : 0)
+          const qty = Number(item.quantity) || 0
           return {
             sale_id: id,
             product_id: item.product_id || null,
@@ -827,27 +975,33 @@ export const useUpdateSembakoSale = () => {
           throw itemErr
         }
 
-        for (const item of items) {
-          if (!item.product_id) continue
-          let qtyToDeduct = item.quantity
-          const batches = editBatchCache[item.product_id] || []
+        try {
+          for (const item of items) {
+            if (!item.product_id) continue
+            let qtyToDeduct = Number(item.quantity) || 0
+            const batches = editBatchCache[item.product_id] || []
 
-          for (const batch of batches) {
-            if (qtyToDeduct <= 0) break
-            const deduct = Math.min(batch.qty_sisa, qtyToDeduct)
-            await supabase.from('sembako_stock_batches')
-              .update({ qty_sisa: batch.qty_sisa - deduct })
-              .eq('id', batch.id)
-            await supabase.from('sembako_stock_out').insert({
-              tenant_id,
-              product_id: item.product_id,
-              batch_id: batch.id,
-              sale_id: id,
-              qty_keluar: deduct,
-              buy_price: batch.buy_price || 0,
-            })
-            qtyToDeduct -= deduct
+            for (const batch of batches) {
+              if (qtyToDeduct <= 0) break
+              const deduct = Math.min(batch.qty_sisa, qtyToDeduct)
+              const { error: bErr } = await supabase.from('sembako_stock_batches')
+                .update({ qty_sisa: batch.qty_sisa - deduct })
+                .eq('id', batch.id)
+              if (!bErr) {
+                await supabase.from('sembako_stock_out').insert({
+                  tenant_id,
+                  product_id: item.product_id,
+                  batch_id: batch.id,
+                  sale_id: id,
+                  qty_keluar: deduct,
+                  buy_price: batch.buy_price || 0,
+                })
+              }
+              qtyToDeduct -= deduct
+            }
           }
+        } catch (batchDeductErr) {
+          console.warn('[useUpdateSembakoSale] Batch deduction warning:', batchDeductErr)
         }
 
         // Deduct new BOM raw materials and packaging
@@ -859,7 +1013,30 @@ export const useUpdateSembakoSale = () => {
         })
       }
 
-      const { _overpaid, ...cleanUpdates } = updates
+      const allowedColumns = [
+        'customer_id',
+        'customer_name',
+        'invoice_number',
+        'transaction_date',
+        'due_date',
+        'total_amount',
+        'total_cogs',
+        'net_profit',
+        'delivery_cost',
+        'other_cost',
+        'payment_status',
+        'paid_amount',
+        'remaining_amount',
+        'notes'
+      ]
+
+      const cleanUpdates = {}
+      for (const col of allowedColumns) {
+        if (col in updates && updates[col] !== undefined) {
+          cleanUpdates[col] = updates[col]
+        }
+      }
+
       const { error } = await supabase.from('sembako_sales').update(cleanUpdates).eq('id', id)
       if (error) {
         logError({
@@ -870,7 +1047,7 @@ export const useUpdateSembakoSale = () => {
         })
         throw error
       }
-      return { _overpaid, invoice_number: updates.invoice_number }
+      return { _overpaid: updates._overpaid, invoice_number: updates.invoice_number }
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['sembako-sales'] })
@@ -950,9 +1127,10 @@ export const useDeleteSembakoSale = () => {
         })
       }
 
+      let invNum = null
       try {
         const { data: saleData } = await supabase.from('sembako_sales').select('invoice_number').eq('id', id).single()
-        const invNum = saleData?.invoice_number
+        invNum = saleData?.invoice_number
 
         if (id) {
           await supabase.from('sembako_returns').update({ is_deleted: true }).eq('sale_id', id)
@@ -973,7 +1151,7 @@ export const useDeleteSembakoSale = () => {
 
       // Restore BOM & Packaging raw materials
       const tenant_id = await getTenantId()
-      await restoreRawMaterialsAndPackaging({ tenant_id, sale_id: id })
+      await restoreRawMaterialsAndPackaging({ tenant_id, sale_id: id, invoice_number: invNum })
 
       const { error: itemsDelErr } = await supabase.from('sembako_sale_items')
         .delete()

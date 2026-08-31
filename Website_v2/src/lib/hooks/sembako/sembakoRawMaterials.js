@@ -5,6 +5,7 @@ import { useAuth } from '../useAuth'
 import { normalizeSupabaseError } from '../../supabaseErrorHandler'
 import { logSupabaseError } from '@/lib/logger/supabaseLogger'
 import { STALE_5M, sanitizeDBPayload, getTenantId } from './sembakoCommon'
+import { recordAuditLog } from '@/lib/hooks/useSembakoAudit'
 
 export const useSembakoRawMaterials = () => {
   const { tenant } = useAuth()
@@ -73,6 +74,31 @@ export const useCreateSembakoRawMaterial = () => {
         throw error
       }
 
+      // Record Initial Stock in Audit Logs if stock > 0
+      if (currentStock > 0) {
+        try {
+          await recordAuditLog({
+            action_type: 'RESTOCK_BAHAN',
+            product_name: payload.material_name,
+            old_value: '0',
+            new_value: `${currentStock} ${payload.unit || 'pcs'}`,
+            notes: JSON.stringify({
+              qty_added: currentStock,
+              unit: payload.unit || 'pcs',
+              unit_cost: unitCost,
+              total_spent: payload.total_spent || (unitCost * currentStock),
+              supplier_name: payload.supplier_name || 'Supplier Mandiri',
+              prev_stock: 0,
+              new_stock: currentStock,
+              notes: 'Stok terdaftar saat pendaftaran item'
+            }),
+            tenant_id
+          })
+        } catch (e) {
+          console.warn('[useCreateSembakoRawMaterial] Audit log warning:', e)
+        }
+      }
+
       // Auto-register supplier to sembako_suppliers if not already present
       if (payload.supplier_name && payload.supplier_name.trim()) {
         const sName = payload.supplier_name.trim()
@@ -103,6 +129,7 @@ export const useCreateSembakoRawMaterial = () => {
       queryClient.invalidateQueries({ queryKey: ['sembako-products'] })
       queryClient.invalidateQueries({ queryKey: ['sembako-dashboard-stats'] })
       queryClient.invalidateQueries({ queryKey: ['sembako-suppliers'] })
+      queryClient.invalidateQueries({ queryKey: ['sembako-audit-logs'] })
       toast.success('Bahan baku / kemasan berhasil ditambahkan')
     },
     onError: (err) => toast.error(normalizeSupabaseError(err).message),

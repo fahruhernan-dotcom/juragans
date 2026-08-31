@@ -25,13 +25,14 @@ import {
   useSembakoRawMaterials,
   useDeleteSembakoRawMaterial,
 } from '@/lib/hooks/useSembakoData'
+import { useSembakoSales } from '@/lib/hooks/sembako/sembakoSales'
 import SembakoBahanBakuSheet from './components/SembakoBahanBakuSheet'
 import { SembakoRestockBahanModal } from './components/SembakoRestockBahanModal'
 import { SembakoAdjustStockModal } from './components/SembakoAdjustStockModal'
 import { SembakoBahanBeliHistoryModal } from './components/SembakoBahanBeliHistoryModal'
 import { formatIDR } from '@/lib/format'
 import { useOutletContext, useLocation, useNavigate } from 'react-router-dom'
-import { C } from '@/dashboard/broker/sembako_broker/components/sembakoSaleUtils'
+import { C, CustomSelect } from '@/dashboard/broker/sembako_broker/components/sembakoSaleUtils'
 import { BrokerMobileHeader } from '@/dashboard/broker/_shared/components/BrokerMobileHeader'
 import { SembakoErrorState, SembakoEmptyState } from '@/dashboard/broker/sembako_broker/components/SembakoUiPrimitives'
 import { SembakoPageHeader } from '@/dashboard/broker/sembako_broker/components/SembakoPageHeader'
@@ -1843,74 +1844,7 @@ function Field({ label, children }) {
   )
 }
 
-function CustomSelect({ value, onChange, options, placeholder, id }) {
-  const [open, setOpen] = useState(false)
-  const selected = options.find(o => o.value === value)
 
-  return (
-    <div style={{ position: 'relative', width: '100%' }}>
-      <div
-        id={id}
-        onClick={() => setOpen(!open)}
-        style={{
-          ...inputStyle,
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          border: open ? `1px solid ${C.accent}` : `1px solid ${C.border}`,
-          transition: 'all 0.2s'
-        }}
-      >
-        <span style={{ color: value ? C.text : TEXT_SEC, fontSize: '14px' }}>
-          {selected ? selected.label : placeholder}
-        </span>
-        <ChevronDown size={16} color={TEXT_SEC} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
-      </div>
-      <AnimatePresence>
-        {open && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              style={{ position: 'fixed', inset: 0, zIndex: 5050, background: 'transparent' }}
-              onClick={() => setOpen(false)}
-            />
-            <motion.div
-              initial={{ opacity: 0, y: -8, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -8, scale: 0.95 }}
-              style={{
-                position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '8px',
-                background: 'var(--bg-surface)', border: `1px solid var(--border-soft)`, borderRadius: '14px',
-                zIndex: 5060, overflow: 'hidden', boxShadow: '0 12px 40px rgba(0,0,0,0.6)',
-                backdropFilter: 'blur(10px)',
-              }}
-            >
-              <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                {options.map(opt => (
-                  <div
-                    key={opt.value}
-                    onClick={() => { onChange(opt.value); setOpen(false) }}
-                    style={{
-                      padding: '12px 16px', fontSize: '14px', color: value === opt.value ? C.accent : C.text,
-                      background: value === opt.value ? 'rgba(15,23,42,0.08)' : 'transparent',
-                      cursor: 'pointer', transition: 'all 0.2s',
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      borderBottom: `1px solid var(--border-soft)`
-                    }}
-                  >
-                    <span>{opt.label}</span>
-                    {value === opt.value && <span style={{ fontSize: '10px' }}>✓</span>}
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-    </div>
-  )
-}
 
 
 const inputStyle = {
@@ -2076,8 +2010,9 @@ export default function Produk() {
   const { data: products = [], isLoading, isError, error, refetch } = useSembakoProducts()
   const deleteMut = useSoftDeleteSembakoProduct()
 
-  // Raw Materials Hook
+  // Raw Materials & Sales Hooks
   const { data: rawMaterials = [], isLoading: isLoadingRaw, refetch: refetchRaw } = useSembakoRawMaterials()
+  const { data: sales = [] } = useSembakoSales()
   const deleteRawMut = useDeleteSembakoRawMaterial()
 
   const [activeSubTab, setActiveSubTab] = useState('produk') // 'produk' | 'bahan_baku' | 'kemasan'
@@ -2103,6 +2038,32 @@ export default function Produk() {
   const [adjustModalOpen, setAdjustModalOpen] = useState(false)
   const [historyMaterial, setHistoryMaterial] = useState(null)
   const [historyModalOpen, setHistoryModalOpen] = useState(false)
+
+  // Helper: Get internal customization usage notes & counts for raw material / packaging
+  const getMaterialCustomUsage = (mat) => {
+    if (!mat) return { count: 0, totalQty: 0, latestNote: null }
+    const matName = (mat.material_name || '').toLowerCase().trim()
+    let count = 0
+    let totalQty = 0
+    let latestNote = null
+
+    sales.forEach((sale) => {
+      (sale.sembako_sale_items || []).forEach((it) => {
+        const isMatchId = it.custom_packaging_id && it.custom_packaging_id === mat.id
+        const isMatchName = it.custom_packaging_name && it.custom_packaging_name.toLowerCase().trim() === matName
+        const isMatchNotes = it.notes && it.notes.toLowerCase().includes(matName)
+        if (it.use_custom_packaging && (isMatchId || isMatchName || isMatchNotes)) {
+          count += 1
+          totalQty += (Number(it.quantity) || 0)
+          if (!latestNote && it.custom_packaging_note) {
+            latestNote = it.custom_packaging_note
+          }
+        }
+      })
+    })
+
+    return { count, totalQty, latestNote }
+  }
 
   useEffect(() => {
     const params = new URLSearchParams(location.search)
@@ -2523,6 +2484,26 @@ export default function Produk() {
                             </div>
                           )}
                         </div>
+
+                        {(() => {
+                          const customUsage = getMaterialCustomUsage(raw)
+                          if (customUsage.count === 0) return null
+                          return (
+                            <div className="mt-2 p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs space-y-1">
+                              <div className="flex items-center justify-between text-amber-900 dark:text-amber-300 font-bold">
+                                <span className="flex items-center gap-1">
+                                  <span>✨</span> Terpakai Kustom:
+                                </span>
+                                <span className="font-mono">{customUsage.totalQty} {raw.unit}</span>
+                              </div>
+                              {customUsage.latestNote && (
+                                <p className="text-[10.5px] text-amber-800/80 dark:text-amber-300/80 italic line-clamp-1">
+                                  "{customUsage.latestNote}"
+                                </p>
+                              )}
+                            </div>
+                          )
+                        })()}
                       </div>
 
                       <div className="mt-3 pt-2.5 border-t border-border/60 space-y-2">
@@ -2699,6 +2680,26 @@ export default function Produk() {
                             </div>
                           )}
                         </div>
+
+                        {(() => {
+                          const customUsage = getMaterialCustomUsage(raw)
+                          if (customUsage.count === 0) return null
+                          return (
+                            <div className="mt-2 p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs space-y-1">
+                              <div className="flex items-center justify-between text-amber-900 dark:text-amber-300 font-bold">
+                                <span className="flex items-center gap-1">
+                                  <span>✨</span> Terpakai Kustom:
+                                </span>
+                                <span className="font-mono">{customUsage.totalQty} {raw.unit}</span>
+                              </div>
+                              {customUsage.latestNote && (
+                                <p className="text-[10.5px] text-amber-800/80 dark:text-amber-300/80 italic line-clamp-1">
+                                  "{customUsage.latestNote}"
+                                </p>
+                              )}
+                            </div>
+                          )
+                        })()}
                       </div>
 
                       <div className="mt-3 pt-2.5 border-t border-border/60 space-y-2">
