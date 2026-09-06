@@ -21,15 +21,24 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
-  const [rememberMe, setRememberMe] = useState(false)
+  const [rememberMe, setRememberMe] = useState(() => {
+    if (isCapacitor()) return true
+    try {
+      const saved = localStorage.getItem('ternakos_remember_me')
+      return saved !== null ? saved === 'true' : true
+    } catch {
+      return true
+    }
+  })
 
   const { user, profile, loading: authLoading, isSuperadmin, loginAsBypass } = useAuth()
 
   const handleBypassLogin = (roleKey = 'owner') => {
     setIsLoading(true)
     try {
+      saveRememberMe(true)
       const mockProf = loginAsBypass(roleKey)
-      toast.success(`Mode Demo Juragans: Masuk sebagai ${mockProf.full_name}`)
+      toast.success(`Mode Kerja Juragans: Masuk sebagai ${mockProf.full_name}`)
       if (roleKey === 'dev') {
         navigate('/admin', { replace: true })
       } else {

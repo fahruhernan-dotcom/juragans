@@ -1,3 +1,5 @@
+import { isCapacitor } from './capacitor'
+
 const REMEMBER_KEY = 'ternakos_remember_me'
 
 export function setRememberMe(value) {
@@ -7,6 +9,8 @@ export function setRememberMe(value) {
 
 function getStorage() {
   if (typeof window === 'undefined') return null
+  // Di aplikasi native Android (Capacitor), selalu gunakan localStorage agar sesi tetap tersimpan saat aplikasi ditutup
+  if (isCapacitor()) return window.localStorage
   const remember = window.localStorage.getItem(REMEMBER_KEY) === 'true'
   return remember ? window.localStorage : window.sessionStorage
 }
