@@ -6,6 +6,10 @@
 !Website/package-lock.json
 !Website_v2/package.json
 !Website_v2/package-lock.json
+!Website_v2/capacitor.config.json
+!Website_v2/components.json
+!Website_v2/jsconfig.json
+!Website_v2/android/**/*.json
 !Scraping/shopee_*.json
 !Automasi_n8n/*.json
 !Automasi_n8n/**/*.json

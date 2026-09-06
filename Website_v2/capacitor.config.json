@@ -1,0 +1,15 @@
+{
+  "appId": "com.virgin.erp",
+  "appName": "VirginERP",
+
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "PushNotifications": {
+      "presentationOptions": ["badge", "sound", "alert"]
+    }
+  }
+}
