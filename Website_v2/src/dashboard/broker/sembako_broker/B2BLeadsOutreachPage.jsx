@@ -34,6 +34,7 @@ import {
   Radio,
   Play,
   Loader2,
+  MessageSquare,
   X
 } from 'lucide-react'
 import {
@@ -67,9 +68,10 @@ export default function B2BLeadsOutreachPage() {
 
   const [activeTab, setActiveTab] = useState('leads') // 'leads' | 'queue' | 'sample_calculator'
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all') // 'all' | 'pending' | 'sent' | 'replied'
+  const [statusFilter, setStatusFilter] = useState('all') // 'all' | 'pending' | 'sent' | 'replied' | 'wa_pending' | 'wa_sent' | 'wa_replied'
   const [cityFilter, setCityFilter] = useState('all')
-  const [countryTabFilter, setCountryTabFilter] = useState('all') // 'all' | 'Indonesia' | 'Singapore'
+  const [countryTabFilter, setCountryTabFilter] = useState('all') // 'all' | 'indonesia' | 'singapore'
+  const [outreachChannel, setOutreachChannel] = useState('all') // 'all' | 'email' | 'whatsapp'
 
   // Webhook State (Default: TEST Mode)
   const [isTriggeringWebhook, setIsTriggeringWebhook] = useState(false)
@@ -95,6 +97,7 @@ export default function B2BLeadsOutreachPage() {
   const [formReviewCount, setFormReviewCount] = useState('50')
   const [formPriority, setFormPriority] = useState('hot')
   const [formStatusEmail, setFormStatusEmail] = useState('pending')
+  const [formStatusWhatsapp, setFormStatusWhatsapp] = useState('pending')
   const [formNotes, setFormNotes] = useState('')
 
   // Queue Form State
@@ -137,7 +140,8 @@ export default function B2BLeadsOutreachPage() {
     const payload = JSON.stringify({
       country: currentCountry,
       region: currentRegion,
-      action: 'trigger_outreach_and_scrape',
+      channel: outreachChannel,
+      action: outreachChannel === 'whatsapp' ? 'trigger_whatsapp_outreach' : outreachChannel === 'email' ? 'trigger_email_outreach' : 'trigger_outreach_and_scrape',
       source: 'Juragan Web Dashboard',
       timestamp: new Date().toISOString()
     })
@@ -186,15 +190,35 @@ export default function B2BLeadsOutreachPage() {
 
   const filteredLeads = useMemo(() => {
     return leads.filter(l => {
-      if (countryTabFilter !== 'all' && l.country?.toLowerCase() !== countryTabFilter.toLowerCase()) return false
-      if (statusFilter !== 'all' && l.status_email !== statusFilter) return false
+      const leadCountry = (l.country || '').toLowerCase()
+      const isLeadSg = leadCountry.includes('singapore') || leadCountry.includes('singapura') || leadCountry === 'sg' || (l.phone && (l.phone.startsWith('+65') || l.phone.startsWith('65'))) || (l.address && l.address.toLowerCase().includes('singapore'))
+      const isLeadIndo = (leadCountry.includes('indonesia') || leadCountry.includes('indo') || leadCountry === 'id' || !leadCountry) && !isLeadSg
+
+      if (countryTabFilter !== 'all') {
+        if (countryTabFilter === 'indonesia' && !isLeadIndo) return false
+        if (countryTabFilter === 'singapore' && !isLeadSg) return false
+      }
+
+      if (statusFilter !== 'all') {
+        if (statusFilter === 'pending' || statusFilter === 'sent' || statusFilter === 'replied') {
+          if (l.status_email !== statusFilter) return false
+        } else if (statusFilter === 'wa_pending') {
+          if ((l.status_whatsapp !== 'pending' && l.status_whatsapp != null) || !l.phone) return false
+        } else if (statusFilter === 'wa_sent') {
+          if (l.status_whatsapp !== 'sent') return false
+        } else if (statusFilter === 'wa_replied') {
+          if (l.status_whatsapp !== 'replied') return false
+        }
+      }
+
       if (cityFilter !== 'all' && l.city !== cityFilter) return false
       if (search) {
         const q = search.toLowerCase()
         const matchName = l.name?.toLowerCase().includes(q) || l.clean_name?.toLowerCase().includes(q)
         const matchEmail = l.email?.toLowerCase().includes(q)
+        const matchPhone = l.phone?.toLowerCase().includes(q)
         const matchAddr = l.address?.toLowerCase().includes(q)
-        if (!matchName && !matchEmail && !matchAddr) return false
+        if (!matchName && !matchEmail && !matchPhone && !matchAddr) return false
       }
       return true
     })
@@ -202,20 +226,30 @@ export default function B2BLeadsOutreachPage() {
 
   const stats = useMemo(() => {
     const total = leads.length
-    const indoTotal = leads.filter(l => (l.country || '').toLowerCase() === 'indonesia').length
-    const sgTotal = leads.filter(l => (l.country || '').toLowerCase() === 'singapore').length
+    const sgTotal = leads.filter(l => {
+      const c = (l.country || '').toLowerCase()
+      return c.includes('singapore') || c.includes('singapura') || c === 'sg' || (l.phone && (l.phone.startsWith('+65') || l.phone.startsWith('65'))) || (l.address && l.address.toLowerCase().includes('singapore'))
+    }).length
+    const indoTotal = leads.filter(l => {
+      const c = (l.country || '').toLowerCase()
+      const isSg = c.includes('singapore') || c.includes('singapura') || c === 'sg' || (l.phone && (l.phone.startsWith('+65') || l.phone.startsWith('65'))) || (l.address && l.address.toLowerCase().includes('singapore'))
+      return !isSg
+    }).length
     const hot = leads.filter(l => l.lead_priority === 'hot').length
     const sent = leads.filter(l => l.status_email === 'sent').length
     const replied = leads.filter(l => l.status_email === 'replied').length
+    const waPending = leads.filter(l => (l.status_whatsapp === 'pending' || !l.status_whatsapp) && l.phone).length
+    const waSent = leads.filter(l => l.status_whatsapp === 'sent').length
     const hasEmail = leads.filter(l => l.email && l.email.includes('@')).length
-    return { total, indoTotal, sgTotal, hot, sent, replied, hasEmail }
+    const hasPhone = leads.filter(l => l.phone && l.phone.trim()).length
+    return { total, indoTotal, sgTotal, hot, sent, replied, waPending, waSent, hasEmail, hasPhone }
   }, [leads])
 
   const summaryItems = [
     { label: 'Total Prospek Kuliner', value: stats.total, color: 'amber', subLabel: `${stats.indoTotal} Indo · ${stats.sgTotal} SG` },
     { label: 'Hot Leads Prioritas', value: stats.hot, color: 'red', subLabel: 'Kategori Restoran Utama' },
-    { label: 'Outreach Terkirim', value: `${stats.sent} email`, color: 'green', subLabel: `${stats.hasEmail} kontak valid` },
-    { label: 'Respon / Balasan', value: stats.replied, color: 'default', subLabel: 'Tindak lanjut negosiasi' },
+    { label: 'Outreach Terkirim', value: `${stats.sent} email · ${stats.waSent} WA`, color: 'green', subLabel: `${stats.hasEmail} email · ${stats.hasPhone} telp` },
+    { label: 'Antrean Siap Outreach', value: `${leads.filter(l => l.status_email === 'pending' || !l.status_email).length} email · ${stats.waPending} WA`, color: 'default', subLabel: 'Sinkron dengan Bot n8n' },
   ]
 
   const openAddLead = () => {
@@ -233,6 +267,7 @@ export default function B2BLeadsOutreachPage() {
     setFormReviewCount('50')
     setFormPriority('hot')
     setFormStatusEmail('pending')
+    setFormStatusWhatsapp('pending')
     setFormNotes('')
     setLeadModalOpen(true)
   }
@@ -242,8 +277,9 @@ export default function B2BLeadsOutreachPage() {
     setFormName(l.name || '')
     setFormCleanName(l.clean_name || '')
     setFormCategory(l.category || 'Indonesian restaurant')
-    setFormCountry(l.country || 'Indonesia')
-    setFormCity(l.city || 'Surakarta')
+    const detectedCountry = l.country || ((l.phone && (l.phone.startsWith('+65') || l.phone.startsWith('65'))) || (l.address && l.address.toLowerCase().includes('singapore')) ? 'Singapore' : 'Indonesia')
+    setFormCountry(detectedCountry)
+    setFormCity(l.city || (detectedCountry === 'Singapore' ? 'Singapore' : 'Surakarta'))
     setFormAddress(l.address || '')
     setFormEmail(l.email || '')
     setFormPhone(l.phone || '')
@@ -252,6 +288,7 @@ export default function B2BLeadsOutreachPage() {
     setFormReviewCount(String(l.review_count || '0'))
     setFormPriority(l.lead_priority || 'warm')
     setFormStatusEmail(l.status_email || 'pending')
+    setFormStatusWhatsapp(l.status_whatsapp || 'pending')
     setFormNotes(l.notes || '')
     setLeadModalOpen(true)
   }
@@ -277,6 +314,7 @@ export default function B2BLeadsOutreachPage() {
       review_count: parseInt(formReviewCount, 10) || 0,
       lead_priority: formPriority,
       status_email: formStatusEmail,
+      status_whatsapp: formStatusWhatsapp,
       notes: formNotes.trim() || null,
       email_source: editingLead ? editingLead.email_source : 'manual_input'
     }
@@ -426,6 +464,7 @@ export default function B2BLeadsOutreachPage() {
                       ? 'bg-amber-500 text-slate-950 shadow-sm'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
+                  title="Filter antrean khusus Indonesia (Solo Raya & Domestik)"
                 >
                   🇮🇩 Indonesia (Solo Raya)
                 </button>
@@ -436,6 +475,7 @@ export default function B2BLeadsOutreachPage() {
                       ? 'bg-amber-500 text-slate-950 shadow-sm'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
+                  title="Filter antrean khusus Singapore F&B"
                 >
                   🇸🇬 Singapore
                 </button>
@@ -446,8 +486,46 @@ export default function B2BLeadsOutreachPage() {
                       ? 'bg-slate-900 text-white shadow-sm'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
+                  title="Semua Wilayah"
                 >
                   Semua
+                </button>
+              </div>
+
+              {/* Outreach Channel Switcher */}
+              <div className="flex items-center bg-slate-50 p-1 rounded-xl border border-slate-200 text-xs">
+                <span className="px-2 text-slate-500 font-semibold text-[11px]">Saluran:</span>
+                <button
+                  onClick={() => setOutreachChannel('all')}
+                  className={`px-2.5 py-1.5 rounded-lg font-bold transition ${
+                    outreachChannel === 'all'
+                      ? 'bg-slate-900 text-white shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Semua
+                </button>
+                <button
+                  onClick={() => setOutreachChannel('email')}
+                  className={`px-2.5 py-1.5 rounded-lg font-bold transition flex items-center gap-1 ${
+                    outreachChannel === 'email'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Mail size={12} />
+                  <span>Email</span>
+                </button>
+                <button
+                  onClick={() => setOutreachChannel('whatsapp')}
+                  className={`px-2.5 py-1.5 rounded-lg font-bold transition flex items-center gap-1 ${
+                    outreachChannel === 'whatsapp'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <MessageSquare size={12} />
+                  <span>WhatsApp</span>
                 </button>
               </div>
 
@@ -485,7 +563,7 @@ export default function B2BLeadsOutreachPage() {
                 ) : (
                   <>
                     <Play size={13} className="fill-white" />
-                    <span>Jalankan Bot Sekarang</span>
+                    <span>Jalankan Bot {outreachChannel === 'whatsapp' ? 'WA' : outreachChannel === 'email' ? 'Email' : 'Sekarang'}</span>
                   </>
                 )}
               </button>
@@ -507,15 +585,19 @@ export default function B2BLeadsOutreachPage() {
 
           {/* Quick Context Summary Pill */}
           <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-600 flex-wrap gap-2">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="font-semibold text-slate-700">Fokus Wilayah Aktif:</span>
               <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 font-bold">
-                {currentCountry === 'Indonesia' ? '📍 Solo Raya, Jogja, & Domestik' : currentCountry === 'Singapore' ? '📍 Singapore & ASEAN' : '📍 Global'}
+                {currentCountry === 'Indonesia' ? '📍 Solo Raya, Jogja, & Domestik' : currentCountry === 'Singapore' ? '📍 Singapore & ASEAN' : '📍 Global / Semua'}
               </span>
               <span className="text-slate-400">|</span>
               <span className="flex items-center gap-1">
                 <ShieldCheck size={13} className="text-emerald-600" />
-                <span>Batas Kuota: <strong>{currentLimit} email/hari</strong></span>
+                <span>Batas Kuota: <strong>{currentLimit} email/hari</strong> · <strong>{settings?.daily_whatsapp_limit || 10} WA/hari</strong></span>
+              </span>
+              <span className="text-slate-400">|</span>
+              <span className="text-[10px] text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                Sync View: <strong>v_n8n_pending_emails</strong> & <strong>v_n8n_pending_whatsapp</strong>
               </span>
             </div>
             <span className="text-slate-400 font-mono text-[10px] truncate max-w-xs">
@@ -615,10 +697,17 @@ export default function B2BLeadsOutreachPage() {
                   onChange={(e) => setStatusFilter(e.target.value)}
                   className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 font-medium focus:outline-none focus:border-amber-500 focus:bg-white"
                 >
-                  <option value="all">Semua Status Email</option>
-                  <option value="pending">Pending (Belum Dikirim)</option>
-                  <option value="sent">Sent (Terkirim)</option>
-                  <option value="replied">Replied (Dibalas)</option>
+                  <option value="all">Semua Status Outreach</option>
+                  <optgroup label="📧 Email Outreach">
+                    <option value="pending">Email Pending (Siap Kirim)</option>
+                    <option value="sent">Email Sent (Terkirim)</option>
+                    <option value="replied">Email Replied (Dibalas)</option>
+                  </optgroup>
+                  <optgroup label="💬 WhatsApp Outreach">
+                    <option value="wa_pending">WA Pending (Ada No Telp)</option>
+                    <option value="wa_sent">WA Sent (Terkirim)</option>
+                    <option value="wa_replied">WA Replied (Dibalas)</option>
+                  </optgroup>
                 </select>
 
                 <select
@@ -665,9 +754,14 @@ export default function B2BLeadsOutreachPage() {
                 {filteredLeads.map((lead) => {
                   const isSent = lead.status_email === 'sent'
                   const isReplied = lead.status_email === 'replied'
+                  const isWaSent = lead.status_whatsapp === 'sent'
+                  const isWaReplied = lead.status_whatsapp === 'replied'
                   const isHot = lead.lead_priority === 'hot'
                   const isCold = lead.lead_priority === 'cold'
-                  const isIndo = (lead.country || '').toLowerCase() === 'indonesia'
+                  
+                  const leadCountry = (lead.country || '').toLowerCase()
+                  const isSg = leadCountry.includes('singapore') || leadCountry.includes('singapura') || leadCountry === 'sg' || (lead.phone && (lead.phone.startsWith('+65') || lead.phone.startsWith('65'))) || (lead.address && lead.address.toLowerCase().includes('singapore'))
+                  const isIndo = !isSg
 
                   return (
                     <motion.div
@@ -679,9 +773,22 @@ export default function B2BLeadsOutreachPage() {
                         {/* Header Badges */}
                         <div className="flex items-center justify-between gap-2 mb-2.5">
                           <div className="flex items-center gap-1.5">
-                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                              {isIndo ? '🇮🇩 ID' : '🇸🇬 SG'}
-                            </span>
+                            {/* Interactive Country Switcher Button */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                const nextCountry = isIndo ? 'Singapore' : 'Indonesia'
+                                const nextCity = nextCountry === 'Singapore' ? 'Singapore' : (lead.city || 'Surakarta')
+                                updateLeadMut.mutate({ id: lead.id, country: nextCountry, city: nextCity })
+                                toast.success(`Negara "${lead.clean_name || lead.name}" diubah ke ${nextCountry === 'Indonesia' ? '🇮🇩 Indonesia' : '🇸🇬 Singapore'}`)
+                              }}
+                              className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 hover:bg-amber-100 hover:border-amber-300 text-slate-700 hover:text-slate-900 border border-slate-200 transition flex items-center gap-1 cursor-pointer"
+                              title="Klik untuk langsung ganti negara di web (Indonesia ⇄ Singapore)"
+                            >
+                              <span>{isIndo ? '🇮🇩 ID' : '🇸🇬 SG'}</span>
+                              <span className="text-[9px] text-slate-400">⇄</span>
+                            </button>
                             <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${
                               isHot ? 'bg-rose-50 text-rose-700 border-rose-200' :
                               isCold ? 'bg-slate-100 text-slate-600 border-slate-200' :
@@ -690,14 +797,26 @@ export default function B2BLeadsOutreachPage() {
                               {lead.lead_priority?.toUpperCase() || 'WARM'}
                             </span>
                           </div>
-                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold flex items-center gap-1 border ${
-                            isReplied ? 'bg-purple-50 text-purple-700 border-purple-200' :
-                            isSent ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                            'bg-amber-50 text-amber-700 border-amber-200'
-                          }`}>
-                            {isReplied ? <CheckCircle2 size={10} /> : isSent ? <Send size={10} /> : <Clock size={10} />}
-                            {lead.status_email?.toUpperCase() || 'PENDING'}
-                          </span>
+
+                          {/* Status Badges (Email & WhatsApp) */}
+                          <div className="flex items-center gap-1">
+                            <span className={`px-1.5 py-0.5 rounded-md text-[9px] font-bold flex items-center gap-1 border ${
+                              isReplied ? 'bg-purple-50 text-purple-700 border-purple-200' :
+                              isSent ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                              'bg-amber-50 text-amber-700 border-amber-200'
+                            }`} title={`Status Email: ${lead.status_email || 'pending'}`}>
+                              <Mail size={9} />
+                              {lead.status_email?.toUpperCase() || 'PENDING'}
+                            </span>
+                            <span className={`px-1.5 py-0.5 rounded-md text-[9px] font-bold flex items-center gap-1 border ${
+                              isWaReplied ? 'bg-purple-50 text-purple-700 border-purple-200' :
+                              isWaSent ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                              'bg-slate-50 text-slate-600 border-slate-200'
+                            }`} title={`Status WhatsApp: ${lead.status_whatsapp || 'pending'}`}>
+                              <MessageSquare size={9} />
+                              {lead.status_whatsapp?.toUpperCase() || 'PENDING'}
+                            </span>
+                          </div>
                         </div>
 
                         {/* Title & Category */}
@@ -719,6 +838,31 @@ export default function B2BLeadsOutreachPage() {
                             <div className="flex items-center gap-2 text-slate-400 italic">
                               <Mail size={13} className="shrink-0 text-slate-400" />
                               <span>Email belum tersedia</span>
+                            </div>
+                          )}
+
+                          {lead.phone ? (
+                            <div className="flex items-center justify-between gap-2 text-slate-900 font-medium">
+                              <div className="flex items-center gap-2 truncate">
+                                <Phone size={13} className="shrink-0 text-emerald-600" />
+                                <span className="truncate">{lead.phone}</span>
+                              </div>
+                              <a
+                                href={`https://wa.me/${lead.phone.replace(/[^0-9]/g, '')}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-[10px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200 shrink-0 flex items-center gap-1 transition"
+                                title="Chat langsung via WhatsApp"
+                              >
+                                <MessageSquare size={10} />
+                                <span>Chat WA</span>
+                              </a>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 text-slate-400 italic">
+                              <Phone size={13} className="shrink-0 text-slate-400" />
+                              <span>No. telp belum ada</span>
                             </div>
                           )}
 
@@ -1014,7 +1158,28 @@ export default function B2BLeadsOutreachPage() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-2.5">
+              <div>
+                <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">
+                  Negara <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  value={formCountry}
+                  onChange={(e) => {
+                    const nextC = e.target.value
+                    setFormCountry(nextC)
+                    if (nextC === 'Singapore' && (!formCity || formCity === 'Surakarta')) {
+                      setFormCity('Singapore')
+                    } else if (nextC === 'Indonesia' && formCity === 'Singapore') {
+                      setFormCity('Surakarta')
+                    }
+                  }}
+                  className="w-full px-2.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-bold focus:bg-white focus:border-amber-500"
+                >
+                  <option value="Indonesia">🇮🇩 Indonesia</option>
+                  <option value="Singapore">🇸🇬 Singapore</option>
+                </select>
+              </div>
               <div>
                 <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">Kategori Resto</label>
                 <input
@@ -1022,17 +1187,17 @@ export default function B2BLeadsOutreachPage() {
                   placeholder="Warung Soto / Resto Padang"
                   value={formCategory}
                   onChange={(e) => setFormCategory(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs focus:bg-white focus:border-amber-500 focus:outline-none"
+                  className="w-full px-2.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs focus:bg-white focus:border-amber-500 focus:outline-none"
                 />
               </div>
               <div>
                 <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">Kota / Wilayah</label>
                 <input
                   type="text"
-                  placeholder="Surakarta / Solo Baru / Boyolali"
+                  placeholder="Surakarta / Singapore"
                   value={formCity}
                   onChange={(e) => setFormCity(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs focus:bg-white focus:border-amber-500 focus:outline-none"
+                  className="w-full px-2.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs focus:bg-white focus:border-amber-500 focus:outline-none"
                 />
               </div>
             </div>
@@ -1063,7 +1228,7 @@ export default function B2BLeadsOutreachPage() {
                 <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">No. Telp / WhatsApp</label>
                 <input
                   type="text"
-                  placeholder="+62 812-3456-7890"
+                  placeholder="+62 812-3456-7890 / +65 9123 4567"
                   value={formPhone}
                   onChange={(e) => setFormPhone(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs focus:bg-white focus:border-amber-500 focus:outline-none"
@@ -1071,15 +1236,15 @@ export default function B2BLeadsOutreachPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-2.5">
               <div>
                 <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">Prioritas Lead</label>
                 <select
                   value={formPriority}
                   onChange={(e) => setFormPriority(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-semibold focus:bg-white focus:border-amber-500"
+                  className="w-full px-2.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-semibold focus:bg-white focus:border-amber-500"
                 >
-                  <option value="hot">🔥 Hot Lead (Prioritas)</option>
+                  <option value="hot">🔥 Hot Lead</option>
                   <option value="warm">⚡ Warm Lead</option>
                   <option value="cold">❄️ Cold Lead</option>
                 </select>
@@ -1089,11 +1254,23 @@ export default function B2BLeadsOutreachPage() {
                 <select
                   value={formStatusEmail}
                   onChange={(e) => setFormStatusEmail(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-semibold focus:bg-white focus:border-amber-500"
+                  className="w-full px-2.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-semibold focus:bg-white focus:border-amber-500"
                 >
-                  <option value="pending">Pending (Belum Dikirim)</option>
-                  <option value="sent">Sent (Terkirim)</option>
-                  <option value="replied">Replied (Dibalas)</option>
+                  <option value="pending">Pending</option>
+                  <option value="sent">Sent</option>
+                  <option value="replied">Replied</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">Status WA</label>
+                <select
+                  value={formStatusWhatsapp}
+                  onChange={(e) => setFormStatusWhatsapp(e.target.value)}
+                  className="w-full px-2.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-semibold focus:bg-white focus:border-amber-500"
+                >
+                  <option value="pending">Pending</option>
+                  <option value="sent">Sent</option>
+                  <option value="replied">Replied</option>
                 </select>
               </div>
             </div>

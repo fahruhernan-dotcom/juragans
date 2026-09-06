@@ -37,7 +37,7 @@ export const ALLOWED_COLUMNS = {
   ],
   juragan_b2b_settings: [
     'tenant_id', 'active_target_country', 'active_target_region', 'is_auto_outreach_active',
-    'daily_email_limit', 'offer_tasting_sample', 'sample_size_gram'
+    'daily_email_limit', 'daily_whatsapp_limit', 'offer_tasting_sample', 'sample_size_gram'
   ],
   sembako_stock_batches: [
     'tenant_id', 'product_id', 'supplier_id', 'batch_code', 'qty_masuk',

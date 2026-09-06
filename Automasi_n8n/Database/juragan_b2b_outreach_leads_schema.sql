@@ -367,29 +367,117 @@ ORDER BY
 -- View 2: Antrian WhatsApp Outreach Siap Tarik oleh n8n
 CREATE OR REPLACE VIEW v_n8n_pending_whatsapp AS
 SELECT 
-    id AS lead_id,
-    name,
-    clean_name,
-    category,
-    address,
-    phone,
-    website,
-    instagram_url,
-    rating,
-    review_count,
-    lead_priority,
-    ai_menu_highlight
-FROM b2b_leads
-WHERE phone IS NOT NULL 
-  AND phone != ''
-  AND status_whatsapp = 'pending'
+    l.id AS lead_id,
+    l.id,
+    l.place_id,
+    l.name AS restaurant_name,
+    l.name,
+    l.clean_name,
+    l.category,
+    l.country,
+    l.city,
+    l.address,
+    l.phone,
+    l.email,
+    l.rating,
+    l.review_count,
+    l.website,
+    l.instagram_url,
+    l.maps_url,
+    l.lead_priority,
+    l.status_whatsapp,
+    COALESCE(l.status_whatsapp::text, 'pending') AS status,
+    l.ai_menu_highlight,
+    l.ai_custom_icebreaker,
+    l.ai_generated_pitch,
+    l.created_at,
+    s.active_target_country AS current_active_country,
+    s.is_auto_outreach_active,
+    s.daily_whatsapp_limit,
+    s.offer_tasting_sample,
+    s.sample_size_gram
+FROM b2b_leads l
+CROSS JOIN (
+  SELECT 
+    COALESCE(
+      (SELECT active_target_country FROM juragan_b2b_settings LIMIT 1),
+      'All'
+    ) AS active_target_country,
+    COALESCE(
+      (SELECT is_auto_outreach_active FROM juragan_b2b_settings LIMIT 1),
+      true
+    ) AS is_auto_outreach_active,
+    COALESCE(
+      (SELECT daily_whatsapp_limit FROM juragan_b2b_settings LIMIT 1),
+      10
+    ) AS daily_whatsapp_limit,
+    COALESCE(
+      (SELECT offer_tasting_sample FROM juragan_b2b_settings LIMIT 1),
+      true
+    ) AS offer_tasting_sample,
+    COALESCE(
+      (SELECT sample_size_gram FROM juragan_b2b_settings LIMIT 1),
+      100
+    ) AS sample_size_gram
+) s
+WHERE 
+  (l.status_whatsapp::text ILIKE 'pending' OR l.status_whatsapp IS NULL)
+  AND (l.phone IS NOT NULL AND TRIM(l.phone) != '')
+  AND (l.is_deleted = false OR l.is_deleted IS NULL)
+  AND (
+    s.active_target_country ILIKE 'All'
+    OR s.active_target_country ILIKE 'Semua'
+    OR (
+      s.active_target_country ILIKE 'Indonesia'
+      AND (
+        l.country ILIKE '%indonesia%'
+        OR l.country ILIKE '%indo%'
+        OR l.country = 'ID'
+        OR (
+          (l.country IS NULL OR TRIM(l.country) = '')
+          AND (l.phone LIKE '+62%' OR l.phone LIKE '62%' OR l.phone LIKE '08%')
+        )
+      )
+      AND NOT (
+        l.country ILIKE '%singapore%'
+        OR l.country ILIKE '%singapura%'
+        OR l.country = 'SG'
+        OR l.phone LIKE '+65%'
+        OR l.phone LIKE '65%'
+        OR l.address ILIKE '%singapore%'
+      )
+    )
+    OR (
+      s.active_target_country ILIKE 'Singapore'
+      AND (
+        l.country ILIKE '%singapore%'
+        OR l.country ILIKE '%singapura%'
+        OR l.country = 'SG'
+        OR l.phone LIKE '+65%'
+        OR l.phone LIKE '65%'
+        OR l.address ILIKE '%singapore%'
+      )
+      AND NOT (
+        l.country ILIKE '%indonesia%'
+        OR (l.phone LIKE '+62%' OR l.phone LIKE '62%' OR l.phone LIKE '08%')
+      )
+    )
+    OR (
+      s.active_target_country NOT ILIKE 'All'
+      AND s.active_target_country NOT ILIKE 'Semua'
+      AND s.active_target_country NOT ILIKE 'Indonesia'
+      AND s.active_target_country NOT ILIKE 'Singapore'
+      AND l.country ILIKE s.active_target_country
+    )
+  )
 ORDER BY 
-    CASE lead_priority 
+    CASE l.lead_priority 
         WHEN 'hot' THEN 1 
         WHEN 'warm' THEN 2 
         ELSE 3 
     END,
-    review_count DESC;
+    l.rating DESC NULLS LAST,
+    l.review_count DESC NULLS LAST;
 
 -- ==============================================================================
 -- 10. ROW LEVEL SECURITY (RLS) POLICIES FOR SUPABASE ANON & N8N
