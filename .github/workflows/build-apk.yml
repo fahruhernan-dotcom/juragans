@@ -15,10 +15,10 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
           cache-dependency-path: Website_v2/package-lock.json
 
@@ -39,7 +39,10 @@ jobs:
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_MAIA_API_KEY: ${{ secrets.VITE_MAIA_API_KEY }}
           VITE_AI_MODEL: ${{ secrets.VITE_AI_MODEL }}
+          VITE_GLM_API_KEY: ${{ secrets.VITE_GLM_API_KEY }}
           VITE_WHATSAPP_NUMBER: ${{ secrets.VITE_WHATSAPP_NUMBER }}
+          VITE_N8N_WEBHOOK_PROD_URL: ${{ secrets.VITE_N8N_WEBHOOK_PROD_URL }}
+          VITE_N8N_WEBHOOK_TEST_URL: ${{ secrets.VITE_N8N_WEBHOOK_TEST_URL }}
         run: npm run build
 
       - name: Sync Capacitor Android
