@@ -13,7 +13,22 @@ import { MobileWheelDatePicker } from '@/components/ui/MobileWheelDatePicker'
 
 export function DatePicker({ id, value, onChange, placeholder, className, allowClear = true }) {
   const isMobile = useIsMobile()
-  const dateValue = value ? (value instanceof Date ? value : new Date(value)) : null
+  const [open, setOpen] = React.useState(false)
+
+  const dateValue = React.useMemo(() => {
+    if (!value) return null
+    if (value instanceof Date) return isNaN(value.getTime()) ? null : value
+    if (typeof value === 'string') {
+      const parts = value.split('T')[0].split('-')
+      if (parts.length === 3) {
+        const [y, m, d] = parts.map(Number)
+        const dt = new Date(y, m - 1, d)
+        return isNaN(dt.getTime()) ? null : dt
+      }
+    }
+    const parsed = new Date(value)
+    return isNaN(parsed.getTime()) ? null : parsed
+  }, [value])
 
   if (isMobile) {
     return (
@@ -40,25 +55,24 @@ export function DatePicker({ id, value, onChange, placeholder, className, allowC
   }
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <div className="relative w-full">
         <PopoverTrigger asChild>
           <Button
             id={id}
             variant="outline"
             className={cn(
-              "h-12 w-full rounded-xl px-4 flex items-center justify-start gap-3 transition-all",
-              "bg-slate-50 border-slate-200 hover:bg-slate-100 hover:border-slate-300",
-              "dark:bg-slate-900 dark:border-slate-800 dark:hover:bg-slate-800 dark:hover:border-slate-700",
-              !value && "text-slate-400 dark:text-slate-500",
-              value && "text-slate-900 font-semibold text-sm dark:text-slate-200",
+              "h-11 w-full rounded-xl px-3.5 flex items-center justify-start gap-2.5 transition-all text-left font-bold cursor-pointer",
+              "bg-white border-slate-300 hover:bg-slate-50 hover:border-slate-400 text-slate-900 shadow-xs",
+              "dark:bg-slate-900 dark:border-slate-800 dark:hover:bg-slate-800 dark:text-slate-100",
+              !value && "text-slate-400 dark:text-slate-500 font-medium",
               className
             )}
           >
-            <CalendarIcon size={18} className={cn("transition-colors", value ? "text-slate-900 dark:text-slate-200" : "text-slate-400 dark:text-slate-500")} />
-            <span className="flex-1 text-left">
-              {dateValue && !isNaN(dateValue.getTime())
-                ? format(dateValue, 'dd MMM yyyy', { locale: idLocale })
+            <CalendarIcon size={16} className={cn("transition-colors shrink-0", value ? "text-[#0EA5E9]" : "text-slate-400")} />
+            <span className="flex-1 truncate text-xs sm:text-sm">
+              {dateValue
+                ? format(dateValue, 'dd MMMM yyyy', { locale: idLocale })
                 : (placeholder || 'PILIH TANGGAL')}
             </span>
           </Button>
@@ -68,11 +82,12 @@ export function DatePicker({ id, value, onChange, placeholder, className, allowC
             onClick={(e) => {
               e.preventDefault()
               e.stopPropagation()
-              onChange(null)
+              onChange('')
             }}
-            className="absolute right-3 top-1/2 -translate-y-1/2 p-2 hover:bg-slate-100 dark:hover:bg-white/10 rounded-full cursor-pointer transition-colors z-10"
+            className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-slate-100 dark:hover:bg-white/10 rounded-full cursor-pointer transition-colors z-10"
+            title="Hapus tanggal"
           >
-            <X size={14} className="text-slate-400 hover:text-slate-600 dark:text-white/50 dark:hover:text-white" />
+            <X size={13} className="text-slate-400 hover:text-slate-600 dark:text-white/50 dark:hover:text-white" />
           </div>
         )}
       </div>
@@ -83,6 +98,7 @@ export function DatePicker({ id, value, onChange, placeholder, className, allowC
           onSelect={(date) => {
             if (date) {
               onChange(format(date, 'yyyy-MM-dd'))
+              setOpen(false)
             }
           }}
           locale={idLocale}

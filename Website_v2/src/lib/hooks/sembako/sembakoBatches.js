@@ -99,29 +99,30 @@ export const useAdjustBatchStock = () => {
         throw updErr
       }
 
-      // Sync product current_stock and weighted average buy_price with active batches
+      // Sync product current_stock and FIFO active buy_price with active batches
       const { data: activeBatches } = await supabase
         .from('sembako_stock_batches')
-        .select('qty_sisa, buy_price')
+        .select('qty_sisa, buy_price, purchase_date, created_at')
         .eq('product_id', batch.product_id)
         .eq('is_deleted', false)
         .gt('qty_sisa', 0)
+        .order('purchase_date', { ascending: true })
+        .order('created_at', { ascending: true })
 
       let syncedStock = 0
-      let totalAssetValue = 0
       if (activeBatches && activeBatches.length > 0) {
         for (const b of activeBatches) {
-          const q = Number(b.qty_sisa || 0)
-          const p = Number(b.buy_price || 0)
-          syncedStock += q
-          totalAssetValue += (q * p)
+          syncedStock += Number(b.qty_sisa || 0)
         }
       }
-      const weightedAvgBuyPrice = syncedStock > 0 ? Math.round(totalAssetValue / syncedStock) : Number(batch.buy_price || 0)
+      // Pure FIFO: the active unit cost is the purchase price of the oldest active batch in queue
+      const fifoActiveBuyPrice = activeBatches && activeBatches.length > 0
+        ? Number(activeBatches[0].buy_price)
+        : Number(batch.buy_price || 0)
 
       const { error: prodSyncErr } = await supabase
         .from('sembako_products')
-        .update({ current_stock: Math.round(syncedStock), avg_buy_price: weightedAvgBuyPrice })
+        .update({ current_stock: Math.round(syncedStock), avg_buy_price: fifoActiveBuyPrice })
         .eq('id', batch.product_id)
       if (prodSyncErr) {
         logError({
@@ -215,29 +216,30 @@ export const useAddStockBatch = () => {
         throw error
       }
 
-      // Automatically recalculate & sync current_stock & weighted average buy_price on sembako_products
+      // Automatically recalculate & sync current_stock & FIFO active buy_price on sembako_products
       const { data: batchTotals } = await supabase
         .from('sembako_stock_batches')
-        .select('qty_sisa, buy_price')
+        .select('qty_sisa, buy_price, purchase_date, created_at')
         .eq('product_id', product_id)
         .eq('is_deleted', false)
         .gt('qty_sisa', 0)
+        .order('purchase_date', { ascending: true })
+        .order('created_at', { ascending: true })
 
       let syncedStock = 0
-      let totalAssetValue = 0
       if (batchTotals && batchTotals.length > 0) {
         for (const b of batchTotals) {
-          const q = Number(b.qty_sisa || 0)
-          const p = Number(b.buy_price || 0)
-          syncedStock += q
-          totalAssetValue += (q * p)
+          syncedStock += Number(b.qty_sisa || 0)
         }
       }
-      const weightedAvgBuyPrice = syncedStock > 0 ? Math.round(totalAssetValue / syncedStock) : Number(buy_price || 0)
+      // Pure FIFO: the active unit cost is the purchase price of the oldest active batch in queue
+      const fifoActiveBuyPrice = batchTotals && batchTotals.length > 0
+        ? Number(batchTotals[0].buy_price)
+        : Number(buy_price || 0)
 
       await supabase
         .from('sembako_products')
-        .update({ current_stock: Math.round(syncedStock), avg_buy_price: weightedAvgBuyPrice })
+        .update({ current_stock: Math.round(syncedStock), avg_buy_price: fifoActiveBuyPrice })
         .eq('id', product_id)
     },
     onSuccess: (_, vars) => {

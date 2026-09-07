@@ -13,10 +13,13 @@ export function calculatePL(sales, expenses, payroll, batches, supplierPayments,
   const totalExpenses = expenses.reduce((s, e) => s + (Number(e.amount) || 0), 0)
   const totalPayroll = payroll.reduce((s, p) => s + (Number(p.total_pay) || 0), 0)
 
-  const grossProfit = totalRevenue - totalCOGS
-  const netProfit = grossProfit - totalDeliveryCost - totalOtherCost - totalExpenses - totalPayroll
+  // Gross Profit = Net Merchandise Revenue - COGS (merchandise only, no delivery)
+  const netMerchandiseRevenue = totalGrossRevenue - totalReturns
+  const grossProfit = netMerchandiseRevenue - totalCOGS
+  // Net Profit = Gross Profit + Delivery Income - Operating Costs
+  const netProfit = grossProfit + totalDeliveryCost - totalOtherCost - totalExpenses - totalPayroll
 
-  const grossMarginPct = totalRevenue > 0 ? Number((grossProfit / totalRevenue * 100).toFixed(1)) : 0
+  const grossMarginPct = netMerchandiseRevenue > 0 ? Number((grossProfit / netMerchandiseRevenue * 100).toFixed(1)) : 0
   const netMarginPct = totalRevenue > 0 ? Number((netProfit / totalRevenue * 100).toFixed(1)) : 0
 
   // Hutang Supplier Baru yang Terbentuk di Periode Ini (Belanja Stok - Pembayaran Supplier)
@@ -35,6 +38,7 @@ export function calculatePL(sales, expenses, payroll, batches, supplierPayments,
   return {
     totalGrossRevenue,
     totalReturns,
+    netMerchandiseRevenue,
     totalRevenue,
     totalCOGS,
     totalDeliveryCost,
@@ -80,6 +84,8 @@ export function calculateCashFlow(
   // 1a. From payments before start date
   ;(allPayments || []).forEach(p => {
     if (p.is_deleted) return
+    // Exclude potong_piutang_retur from cash-in (it's a non-cash accounting marker, not real money)
+    if (p.payment_method === 'potong_piutang_retur') return
     const payDate = (p.payment_date || p.created_at)?.slice(0, 10)
     if (payDate && payDate < startDay) {
       const amt = Number(p.amount) || 0
@@ -150,6 +156,8 @@ export function calculateCashFlow(
   // 2a. Dari tabel sembako_payments
   ;(allPayments || []).forEach(p => {
     if (p.is_deleted) return
+    // Exclude potong_piutang_retur from cash-in (it's a non-cash accounting marker, not real money)
+    if (p.payment_method === 'potong_piutang_retur') return
     const payDate = (p.payment_date || p.created_at)?.slice(0, 10)
     if (payDate && payDate >= startDay && payDate <= endDay) {
       const amt = Number(p.amount) || 0
@@ -216,21 +224,20 @@ export function calculateCashFlow(
   // Biaya Kirim / Pengiriman Armada dari transaksi penjualan (diasumsikan Tunai)
   const deliveryOutPeriodTunai = (sales || []).reduce((s, i) => s + (Number(i.delivery_cost) || 0), 0)
 
-  // Net Cash Flow Period
+  // Net Cash Flow Period (delivery cost is NOT cash-out, it's billed to customers)
   const cashInTotal = cashInPeriodTunai + cashInPeriodTransfer
   const cashOutTotal =
     supplierOutPeriodTunai +
     supplierOutPeriodTransfer +
     payrollOutPeriodTunai +
     priveOutPeriodTunai +
-    regularExpensesOutPeriodTunai +
-    deliveryOutPeriodTunai
+    regularExpensesOutPeriodTunai
 
   const netCashFlowPeriod = cashInTotal - cashOutTotal
 
   // Ending Cash Balances
-  const endingCashOnHand = Math.max(0, openingCashOnHand + (cashInPeriodTunai - supplierOutPeriodTunai - payrollOutPeriodTunai - priveOutPeriodTunai - regularExpensesOutPeriodTunai - deliveryOutPeriodTunai))
-  const endingBankBalance = Math.max(0, openingBankBalance + (cashInPeriodTransfer - supplierOutPeriodTransfer))
+  const endingCashOnHand = openingCashOnHand + (cashInPeriodTunai - supplierOutPeriodTunai - payrollOutPeriodTunai - priveOutPeriodTunai - regularExpensesOutPeriodTunai)
+  const endingBankBalance = openingBankBalance + (cashInPeriodTransfer - supplierOutPeriodTransfer)
 
   return {
     openingCashOnHand,
@@ -269,15 +276,22 @@ export function calculateCashFlow(
 /**
  * 3. Modal Beredar / Aset Lancar & Hutang Supplier (Liabilitas)
  */
-export function calculateWorkingCapital(allSales, allBatches, allSupplierPayments) {
+export function calculateWorkingCapital(allSales, allBatches, allSupplierPayments, allProducts = []) {
   // Piutang Dagang (Aset Lancar - Seluruh Tagihan Belum Terbayar dari Dulu s/d Sekarang)
   const outstandingReceivable = allSales.reduce((s, sale) => s + (Number(sale.remaining_amount) || 0), 0)
 
-  // Persediaan Barang (Aset Lancar - Nilai Stok Gudang Aktif saat ini)
+  // Persediaan Barang (Aset Lancar - Gabungkan batch-based dan non-batch products)
   const activeBatches = allBatches.filter(b => Number(b.qty_sisa) > 0)
-  const stockValue = activeBatches.reduce((s, b) => {
+  const batchProductIds = new Set(activeBatches.map(b => b.product_id))
+  const batchStockValue = activeBatches.reduce((s, b) => {
     return s + (Number(b.qty_sisa || 0) * Number(b.buy_price || 0))
   }, 0)
+  // Products that do NOT have active batches — use current_stock * avg_buy_price
+  const nonBatchStockValue = (allProducts || []).reduce((s, p) => {
+    if (batchProductIds.has(p.id)) return s // Already counted in batch valuation
+    return s + (Number(p.current_stock || 0) * Number(p.avg_buy_price || 0))
+  }, 0)
+  const stockValue = batchStockValue + nonBatchStockValue
 
   // Hutang Dagang Supplier (Liabilitas - Seluruh Hutang ke Supplier dari Dulu s/d Sekarang)
   const totalPurchased = allBatches.reduce((s, b) => {
@@ -312,8 +326,8 @@ export function calculateRealizedProfit(sales, totalExpenses, totalPayroll) {
     }
   })
 
-  // Laba bersih terkonversi kas estimasi
-  const cashMarginEstimate = Math.max(0, realizedGrossProfit - totalExpenses - totalPayroll)
+  // Laba bersih terkonversi kas estimasi (allow negative for loss visibility)
+  const cashMarginEstimate = realizedGrossProfit - totalExpenses - totalPayroll
 
   return {
     cashMarginEstimate,

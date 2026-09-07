@@ -16,19 +16,66 @@ export const useSembakoRawMaterials = () => {
     staleTime: STALE_5M,
     queryFn: async () => {
       try {
-        const { data, error } = await supabase
-          .from('sembako_raw_materials')
-          .select('*')
-          .eq('tenant_id', tenant.id)
-          .eq('is_deleted', false)
-          .order('category')
-          .order('material_name')
+        const [rawRes, mutRes] = await Promise.all([
+          supabase
+            .from('sembako_raw_materials')
+            .select('*')
+            .eq('tenant_id', tenant.id)
+            .eq('is_deleted', false)
+            .order('category')
+            .order('material_name'),
+          supabase
+            .from('sembako_inventory_mutations')
+            .select('material_id, material_name, unit_cost, quantity, created_at')
+            .eq('tenant_id', tenant.id)
+            .eq('mutation_type', 'IN')
+            .gt('quantity', 0)
+            .order('created_at', { ascending: true })
+        ])
 
-        if (error) {
-          console.warn('[useSembakoRawMaterials]', error.message)
+        if (rawRes.error) {
+          logSupabaseError(rawRes.error, { table: 'sembako_raw_materials', operation: 'select', component: 'useSembakoRawMaterials' })
           return []
         }
-        return data || []
+        if (mutRes.error) {
+          logSupabaseError(mutRes.error, { table: 'sembako_inventory_mutations', operation: 'select', component: 'useSembakoRawMaterials' })
+        }
+
+        const rawList = rawRes.data || []
+        const activeLots = mutRes.data || []
+
+        // Map oldest active lot per material (pure FIFO queue head)
+        const fifoActiveCostMap = {}
+        const fifoAssetValueMap = {}
+        activeLots.forEach(lot => {
+          const sisa = Number(lot.quantity || 0)
+          const cost = Number(lot.unit_cost || 0)
+          const idKey = lot.material_id
+          const nameKey = lot.material_name
+
+          if (idKey) fifoAssetValueMap[idKey] = (fifoAssetValueMap[idKey] || 0) + (sisa * cost)
+          if (nameKey) fifoAssetValueMap[nameKey] = (fifoAssetValueMap[nameKey] || 0) + (sisa * cost)
+
+          // First lot encountered is oldest active lot (FIFO queue head)
+          if (idKey && fifoActiveCostMap[idKey] === undefined && sisa > 0 && cost > 0) {
+            fifoActiveCostMap[idKey] = cost
+          }
+          if (nameKey && fifoActiveCostMap[nameKey] === undefined && sisa > 0 && cost > 0) {
+            fifoActiveCostMap[nameKey] = cost
+          }
+        })
+
+        return rawList.map(m => {
+          const fifoCost = fifoActiveCostMap[m.id] ?? fifoActiveCostMap[m.material_name] ?? Number(m.unit_cost || 0)
+          const fifoAsset = fifoAssetValueMap[m.id] ?? fifoAssetValueMap[m.material_name] ?? (Number(m.current_stock || 0) * fifoCost)
+
+          return {
+            ...m,
+            active_fifo_cost: fifoCost,
+            unit_cost: fifoCost, // Active FIFO acquisition cost
+            fifo_asset_value: fifoAsset,
+          }
+        })
       } catch (e) {
         console.warn('[useSembakoRawMaterials]', e)
         return []
@@ -113,14 +160,17 @@ export const useCreateSembakoRawMaterial = () => {
             .limit(1)
 
           if (!existing || existing.length === 0) {
-            await supabase.from('sembako_suppliers').insert({
+            const { error: insErr } = await supabase.from('sembako_suppliers').insert({
               tenant_id,
               supplier_name: sName,
               notes: `Suplier terdaftar otomatis dari ${payload.category === 'bahan_baku' ? 'Bahan Baku' : 'Kemasan'}`
             })
+            if (insErr) console.warn('[useCreateSembakoRawMaterial] Auto-register supplier warning:', insErr.message)
             queryClient.invalidateQueries({ queryKey: ['sembako-suppliers'] })
           }
-        } catch { /* ignore non-blocking supplier check */ }
+        } catch (suppErr) {
+          console.warn('[useCreateSembakoRawMaterial] Supplier check warning:', suppErr.message)
+        }
       }
 
       return data
@@ -272,7 +322,6 @@ export const useRestockSembakoRawMaterial = () => {
           mutation_type: 'IN',
           action_type: 'RESTOCK',
           quantity: nAddQty,
-          qty_sisa: nAddQty,
           unit: data?.unit || 'pcs',
           unit_cost: nBuyPrice,
           total_cost: nBatchSpent,
@@ -305,7 +354,9 @@ export const useRestockSembakoRawMaterial = () => {
             supplier_name
           }
         })
-      } catch { /* ignore audit error */ }
+      } catch (auditErr) {
+        console.warn('[useRestockSembakoRawMaterial] Audit log warning:', auditErr.message)
+      }
 
       // Auto-register supplier to sembako_suppliers if not already present
       if (supplier_name && supplier_name.trim()) {
@@ -320,14 +371,17 @@ export const useRestockSembakoRawMaterial = () => {
             .limit(1)
 
           if (!existing || existing.length === 0) {
-            await supabase.from('sembako_suppliers').insert({
+            const { error: insErr } = await supabase.from('sembako_suppliers').insert({
               tenant_id,
               supplier_name: sName,
               notes: 'Suplier terdaftar otomatis dari Riwayat Restok Bahan Baku'
             })
+            if (insErr) console.warn('[useRestockSembakoRawMaterial] Auto-register supplier warning:', insErr.message)
             queryClient.invalidateQueries({ queryKey: ['sembako-suppliers'] })
           }
-        } catch { /* ignore non-blocking supplier check */ }
+        } catch (suppErr) {
+          console.warn('[useRestockSembakoRawMaterial] Supplier check warning:', suppErr.message)
+        }
       }
 
       return data || { material_name, addQty: nAddQty, newStock, newUnitCost }
@@ -353,11 +407,16 @@ export const useResetAllSembakoStocks = () => {
       const tenant_id = await getTenantId()
 
       // 1. Reset all raw materials current_stock & total_spent to 0
-      const { data: rawList } = await supabase
+      const { data: rawList, error: errFetchRaw } = await supabase
         .from('sembako_raw_materials')
         .select('id')
         .eq('tenant_id', tenant_id)
         .eq('is_deleted', false)
+
+      if (errFetchRaw) {
+        console.error('[useResetAllSembakoStocks] Gagal fetch raw materials:', errFetchRaw.message)
+        throw normalizeSupabaseError(errFetchRaw)
+      }
 
       if (rawList && rawList.length > 0) {
         const rawIds = rawList.map(r => r.id)
@@ -369,11 +428,16 @@ export const useResetAllSembakoStocks = () => {
       }
 
       // 2. Reset all products current_stock & avg_buy_price to 0
-      const { data: prodList } = await supabase
+      const { data: prodList, error: errFetchProd } = await supabase
         .from('sembako_products')
         .select('id')
         .eq('tenant_id', tenant_id)
         .eq('is_deleted', false)
+
+      if (errFetchProd) {
+        console.error('[useResetAllSembakoStocks] Gagal fetch products:', errFetchProd.message)
+        throw normalizeSupabaseError(errFetchProd)
+      }
 
       if (prodList && prodList.length > 0) {
         const prodIds = prodList.map(p => p.id)
@@ -385,24 +449,37 @@ export const useResetAllSembakoStocks = () => {
       }
 
       // 3. Clear all finished batches
-      await supabase
+      const { error: errBatches } = await supabase
         .from('sembako_stock_batches')
         .delete()
         .eq('tenant_id', tenant_id)
 
+      if (errBatches) {
+        console.error('[useResetAllSembakoStocks] Gagal hapus batches:', errBatches.message)
+        throw normalizeSupabaseError(errBatches)
+      }
+
       // 4. Clear audit logs for RESTOCK_BAHAN
-      await supabase
+      const { error: errAudit } = await supabase
         .from('sembako_audit_logs')
         .delete()
         .eq('tenant_id', tenant_id)
 
+      if (errAudit) {
+        console.error('[useResetAllSembakoStocks] Gagal hapus audit logs:', errAudit.message)
+        throw normalizeSupabaseError(errAudit)
+      }
+
       // 5. Clear inventory mutations
       try {
-        await supabase
+        const { error: errMut } = await supabase
           .from('sembako_inventory_mutations')
           .delete()
           .eq('tenant_id', tenant_id)
-      } catch { /* optional table fallback */ }
+        if (errMut) console.warn('[useResetAllSembakoStocks] Clear mutations warning:', errMut.message)
+      } catch (mutErr) {
+        console.warn('[useResetAllSembakoStocks] Mutation delete optional fallback:', mutErr.message)
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sembako-raw-materials'] })

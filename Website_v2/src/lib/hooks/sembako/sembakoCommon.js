@@ -63,9 +63,27 @@ export const ALLOWED_COLUMNS = {
   ],
   sembako_inventory_mutations: [
     'tenant_id', 'material_id', 'material_name', 'material_category',
-    'mutation_type', 'action_type', 'quantity', 'qty_sisa', 'unit', 'unit_cost',
+    'mutation_type', 'action_type', 'quantity', 'unit', 'unit_cost',
     'total_cost', 'prev_stock', 'new_stock', 'ref_type', 'ref_id',
     'ref_number', 'party_name', 'notes', 'created_by', 'created_at'
+  ],
+  sembako_stock_custody: [
+    'tenant_id', 'holder_type', 'employee_id', 'product_id', 'product_name',
+    'quantity', 'unit', 'notes', 'updated_at'
+  ],
+  sembako_packaging_logs: [
+    'tenant_id', 'pack_number', 'product_id', 'product_name', 'output_qty',
+    'unit', 'cogs_per_unit', 'total_cogs', 'materials_deducted', 'notes',
+    'created_by', 'created_at'
+  ],
+  sembako_stock_transfers: [
+    'tenant_id', 'transfer_number', 'transfer_type', 'from_holder_type',
+    'from_employee_id', 'to_holder_type', 'to_employee_id', 'employee_name',
+    'product_id', 'product_name', 'quantity', 'unit', 'notes', 'created_by', 'created_at'
+  ],
+  sembako_supplier_payments: [
+    'tenant_id', 'supplier_id', 'amount', 'payment_date', 'payment_method',
+    'reference_number', 'notes', 'is_deleted'
   ]
 }
 
@@ -100,7 +118,7 @@ export async function getTenantId() {
       }
     }
   } catch (e) {
-    // ignore
+    console.warn('[getTenantId] Profile tenant resolution warning:', e.message)
   }
 
   try {
@@ -109,7 +127,7 @@ export async function getTenantId() {
       return tenants[0].id
     }
   } catch (e) {
-    // ignore
+    console.warn('[getTenantId] Generic tenant query warning:', e.message)
   }
 
   const fallbackId = '00000000-0000-0000-0000-000000000002'
@@ -120,7 +138,7 @@ export async function getTenantId() {
       business_vertical: 'distributor_sembako'
     }, { onConflict: 'id' })
   } catch (e) {
-    // ignore
+    console.warn('[getTenantId] Fallback tenant upsert warning:', e.message)
   }
 
   return fallbackId

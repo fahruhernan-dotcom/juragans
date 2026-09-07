@@ -80,7 +80,7 @@ export const useSembakoDashboardStats = () => {
 
         const revenueThisMonth = salesThisMonth.reduce((s, i) => s + (Number(i.total_amount) || 0), 0)
         const saleNetProfitThisMonth = salesThisMonth.reduce((s, i) => s + (Number(i.net_profit) || 0), 0)
-        const netProfitThisMonth = Math.max(0, saleNetProfitThisMonth - expenseThisMonth - payrollThisMonth)
+        const netProfitThisMonth = saleNetProfitThisMonth - expenseThisMonth - payrollThisMonth
         const grossProfitThisMonth = salesThisMonth.reduce((s, i) => s + (Number(i.gross_profit) || 0), 0)
 
         const deliveryCostThisMonth = salesThisMonth.reduce((s, i) => s + (Number(i.delivery_cost) || 0), 0)
@@ -93,9 +93,16 @@ export const useSembakoDashboardStats = () => {
             lowStock: products.filter(p =>
               p.min_stock_alert > 0 && p.current_stock <= p.min_stock_alert
             ),
-            nilaiStok: activeBatches.length > 0
-              ? activeBatches.reduce((s, b) => s + (Number(b.qty_sisa || 0) * Number(b.buy_price || 0)), 0)
-              : products.reduce((s, p) => s + (p.current_stock * p.avg_buy_price), 0),
+            // Combine batch-based and non-batch product valuations (Bug #9 fix)
+            nilaiStok: (() => {
+              const batchProductIds = new Set(activeBatches.map(b => b.product_id))
+              const batchValue = activeBatches.reduce((s, b) => s + (Number(b.qty_sisa || 0) * Number(b.buy_price || 0)), 0)
+              const nonBatchValue = products.reduce((s, p) => {
+                if (batchProductIds.has(p.id)) return s
+                return s + (Number(p.current_stock || 0) * Number(p.avg_buy_price || 0))
+              }, 0)
+              return batchValue + nonBatchValue
+            })(),
           },
           penjualan: {
             totalRevenue: sales.reduce((s, i) => s + (Number(i.total_amount) || 0), 0),
@@ -160,7 +167,8 @@ export const useSembakoLaporan = (startDate, endDate) => {
           allExpensesRes,
           allPayrollRes,
           allSalesRes,
-          allSuppliersRes
+          allSuppliersRes,
+          allProductsRes
         ] = await Promise.all([
           // Period Sales
           supabase.from('sembako_sales')
@@ -226,6 +234,12 @@ export const useSembakoLaporan = (startDate, endDate) => {
             .select('id, supplier_name')
             .eq('tenant_id', tenant.id)
             .eq('is_deleted', false),
+          // All Products (for non-batch stock valuation)
+          supabase.from('sembako_products')
+            .select('id, product_name, current_stock, avg_buy_price')
+            .eq('tenant_id', tenant.id)
+            .eq('is_deleted', false)
+            .eq('is_active', true),
         ])
 
         if (salesRes.error) console.error('Sembako Report (Sales):', salesRes.error)
@@ -260,10 +274,11 @@ export const useSembakoLaporan = (startDate, endDate) => {
         const allExpenses = allExpensesRes.data || []
         const allPayroll = allPayrollRes.data || []
         const allSales = allSalesRes.data || []
+        const allProducts = allProductsRes?.data || []
 
         const pl = reportUtils.calculatePL(sales, expenses, payroll, batches, supplierPayments, startDay, endDay)
         const cf = reportUtils.calculateCashFlow(sales, allPayments, allSupplierPayments, allExpenses, allPayroll, startDay, endDay, allSales)
-        const wc = reportUtils.calculateWorkingCapital(allSales, batches, allSupplierPayments)
+        const wc = reportUtils.calculateWorkingCapital(allSales, batches, allSupplierPayments, allProducts)
         const rp = reportUtils.calculateRealizedProfit(sales, pl.totalExpenses, pl.totalPayroll)
 
         const byProduct = {}

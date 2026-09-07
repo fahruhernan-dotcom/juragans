@@ -17,6 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
   useSembakoProducts,
   useCreateSembakoProduct,
@@ -936,7 +937,9 @@ function ProductSheet({ product, onClose, onDelete }) {
           borderTop: '2px solid var(--brand-500)',
           boxShadow: 'var(--shadow-tko-lg)',
           maxHeight: '92vh',
-          overflowY: 'auto'
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          boxSizing: 'border-box'
         }}
         onClick={e => e.stopPropagation()}
       >
@@ -1076,7 +1079,7 @@ function ProductSheet({ product, onClose, onDelete }) {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} style={{ padding: '16px 20px 0', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <form onSubmit={handleSubmit} style={{ padding: '16px 20px 0', display: 'flex', flexDirection: 'column', gap: 14, width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
           {/* Nama produk */}
           <Field label="Nama Produk *">
             <input
@@ -1279,7 +1282,7 @@ function ProductSheet({ product, onClose, onDelete }) {
               </div>
             )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full min-w-0">
               {/* Harga Jual */}
               <Field label={hasGrosirUnit && priceInputUnit === 'secondary' ? `Harga Jual (per ${form.secondary_unit})` : `Harga Jual (per ${form.unit || 'Satuan'})`}>
                 <div style={{ position: 'relative' }}>
@@ -1389,6 +1392,10 @@ function ProductSheet({ product, onClose, onDelete }) {
             border: '1px solid var(--border-soft)',
             borderRadius: 14,
             padding: '12px 14px',
+            width: '100%',
+            maxWidth: '100%',
+            boxSizing: 'border-box',
+            overflow: 'hidden'
           }}>
             <button
               type="button"
@@ -1456,36 +1463,42 @@ function ProductSheet({ product, onClose, onDelete }) {
                   </div>
 
                   {rawMaterials.length > 0 && (
-                    <select
-                      value={bomSelections.bawangId || ''}
-                      onChange={e => {
-                        const val = e.target.value
-                        setBomSelections(prev => ({ ...prev, bawangId: val }))
-                        const mat = rawMaterials.find(r => String(r.id) === val)
-                        if (mat) {
-                          const unitCost = Number(mat.unit_cost) || 0
-                          const isKg = (mat.unit || '').toLowerCase() === 'kg'
-                          let gram = 250
-                          if (form.product_name.includes('100')) gram = 100
-                          else if (form.product_name.includes('150')) gram = 150
-                          else if (form.product_name.includes('200')) gram = 200
-                          else if (form.product_name.includes('1 kg') || form.product_name.includes('1kg')) gram = 1000
-                          else if (form.product_name.includes('2 kg') || form.product_name.includes('2kg')) gram = 2000
-                          const cost = isKg ? Math.round(unitCost * gram / 1000) : Math.round(unitCost * gram)
-                          updateBomCost('raw_ingredient_cost', String(cost))
+                    <Select
+                      value={bomSelections.bawangId || 'none'}
+                      onValueChange={val => {
+                        const actualVal = val === 'none' ? '' : val
+                        setBomSelections(prev => ({ ...prev, bawangId: actualVal }))
+                        if (actualVal) {
+                          const mat = rawMaterials.find(r => String(r.id) === actualVal)
+                          if (mat) {
+                            const unitCost = Number(mat.unit_cost) || 0
+                            const isKg = (mat.unit || '').toLowerCase() === 'kg'
+                            let gram = 250
+                            if (form.product_name.includes('100')) gram = 100
+                            else if (form.product_name.includes('150')) gram = 150
+                            else if (form.product_name.includes('200')) gram = 200
+                            else if (form.product_name.includes('1 kg') || form.product_name.includes('1kg')) gram = 1000
+                            else if (form.product_name.includes('2 kg') || form.product_name.includes('2kg')) gram = 2000
+                            const cost = isKg ? Math.round(unitCost * gram / 1000) : Math.round(unitCost * gram)
+                            updateBomCost('raw_ingredient_cost', String(cost))
+                          }
                         }
                       }}
-                      style={{ ...inputStyle, padding: '6px 8px', fontSize: 11, cursor: 'pointer' }}
                     >
-                      <option value="">-- Pilih dari Stok Bawang Curah ({rawMaterials.filter(r => ['bawang_mentah', 'bawang_curah', 'mentah', 'bawang'].includes((r.category || '').toLowerCase()) || (r.material_name || '').toLowerCase().includes('bawang')).length} item) --</option>
-                      {rawMaterials
-                        .filter(r => ['bawang_mentah', 'bawang_curah', 'mentah', 'bawang'].includes((r.category || '').toLowerCase()) || (r.material_name || '').toLowerCase().includes('bawang'))
-                        .map(r => (
-                          <option key={r.id} value={r.id}>
-                            {r.material_name} (Stok: {r.current_stock || 0} {r.unit}) — Rp {fmt(r.unit_cost)} / {r.unit}
-                          </option>
-                        ))}
-                    </select>
+                      <SelectTrigger className="h-9 w-full bg-card border-border/80 text-xs font-semibold rounded-xl">
+                        <SelectValue placeholder="-- Pilih dari Stok Bawang Curah --" />
+                      </SelectTrigger>
+                      <SelectContent className="z-[9999]">
+                        <SelectItem value="none">-- Pilih dari Stok Bawang Curah --</SelectItem>
+                        {rawMaterials
+                          .filter(r => ['bawang_mentah', 'bawang_curah', 'mentah', 'bawang'].includes((r.category || '').toLowerCase()) || (r.material_name || '').toLowerCase().includes('bawang'))
+                          .map(r => (
+                            <SelectItem key={r.id} value={String(r.id)}>
+                              {r.material_name} (Stok: {r.current_stock || 0} {r.unit}) — Rp {fmt(r.unit_cost)} / {r.unit}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
                   )}
 
                   {/* Grammage quick buttons */}
@@ -1551,25 +1564,29 @@ function ProductSheet({ product, onClose, onDelete }) {
                   </div>
 
                   {rawMaterials.length > 0 && (
-                    <select
-                      value={bomSelections.pouchId || ''}
-                      onChange={e => {
-                        const val = e.target.value
-                        setBomSelections(prev => ({ ...prev, pouchId: val }))
-                        const mat = rawMaterials.find(r => String(r.id) === val)
+                    <Select
+                      value={bomSelections.pouchId || 'none'}
+                      onValueChange={val => {
+                        const actualVal = val === 'none' ? '' : val
+                        setBomSelections(prev => ({ ...prev, pouchId: actualVal }))
+                        const mat = rawMaterials.find(r => String(r.id) === actualVal)
                         updateBomCost('pouch_cost', mat ? String(Math.round(Number(mat.unit_cost) || 0)) : '')
                       }}
-                      style={{ ...inputStyle, padding: '6px 8px', fontSize: 11, cursor: 'pointer' }}
                     >
-                      <option value="">-- Pilih dari Kemasan Pouch / Toples ({rawMaterials.filter(r => ['pouch', 'toples', 'kemasan', 'plastik'].includes((r.category || '').toLowerCase()) || (r.material_name || '').toLowerCase().includes('pouch') || (r.material_name || '').toLowerCase().includes('toples')).length} item) --</option>
-                      {rawMaterials
-                        .filter(r => ['pouch', 'toples', 'kemasan', 'plastik'].includes((r.category || '').toLowerCase()) || (r.material_name || '').toLowerCase().includes('pouch') || (r.material_name || '').toLowerCase().includes('toples'))
-                        .map(r => (
-                          <option key={r.id} value={r.id}>
-                            {r.material_name} (Stok: {r.current_stock || 0} {r.unit}) — Rp {fmt(r.unit_cost)} / {r.unit}
-                          </option>
-                        ))}
-                    </select>
+                      <SelectTrigger className="h-9 w-full bg-card border-border/80 text-xs font-semibold rounded-xl">
+                        <SelectValue placeholder="-- Pilih Kemasan Pouch / Toples --" />
+                      </SelectTrigger>
+                      <SelectContent className="z-[9999]">
+                        <SelectItem value="none">-- Pilih Kemasan Pouch / Toples --</SelectItem>
+                        {rawMaterials
+                          .filter(r => ['pouch', 'toples', 'kemasan', 'plastik'].includes((r.category || '').toLowerCase()) || (r.material_name || '').toLowerCase().includes('pouch') || (r.material_name || '').toLowerCase().includes('toples'))
+                          .map(r => (
+                            <SelectItem key={r.id} value={String(r.id)}>
+                              {r.material_name} (Stok: {r.current_stock || 0} {r.unit}) — Rp {fmt(r.unit_cost)} / {r.unit}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
                   )}
 
                   <div style={{ position: 'relative' }}>
@@ -1586,9 +1603,9 @@ function ProductSheet({ product, onClose, onDelete }) {
                 </div>
 
                 {/* 3 & 4. Stiker Depan & Belakang */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full min-w-0">
                   {/* Stiker Depan */}
-                  <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-soft)', borderRadius: 12, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-soft)', borderRadius: 12, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0, width: '100%', boxSizing: 'border-box', overflow: 'hidden' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <label style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 4 }}>
                         <span>🏷️</span> Stiker Depan
@@ -1599,25 +1616,29 @@ function ProductSheet({ product, onClose, onDelete }) {
                     </div>
 
                     {rawMaterials.length > 0 && (
-                      <select
-                        value={bomSelections.stickerFrontId || ''}
-                        onChange={e => {
-                          const val = e.target.value
-                          setBomSelections(prev => ({ ...prev, stickerFrontId: val }))
-                          const mat = rawMaterials.find(r => String(r.id) === val)
+                      <Select
+                        value={bomSelections.stickerFrontId || 'none'}
+                        onValueChange={val => {
+                          const actualVal = val === 'none' ? '' : val
+                          setBomSelections(prev => ({ ...prev, stickerFrontId: actualVal }))
+                          const mat = rawMaterials.find(r => String(r.id) === actualVal)
                           updateBomCost('sticker_front_cost', mat ? String(Math.round(Number(mat.unit_cost) || 0)) : '')
                         }}
-                        style={{ ...inputStyle, padding: '5px 6px', fontSize: 10.5, cursor: 'pointer' }}
                       >
-                        <option value="">-- Pilih Stiker Depan --</option>
-                        {rawMaterials
-                          .filter(r => ['sticker_depan', 'stiker', 'kemasan'].includes((r.category || '').toLowerCase()) || (r.material_name || '').toLowerCase().includes('depan') || (r.material_name || '').toLowerCase().includes('front') || (r.material_name || '').toLowerCase().includes('label'))
-                          .map(r => (
-                            <option key={r.id} value={r.id}>
-                              {r.material_name} (Rp {fmt(r.unit_cost)})
-                            </option>
-                          ))}
-                      </select>
+                        <SelectTrigger className="h-8 w-full min-w-0 max-w-full bg-card border-border/80 text-[11px] font-semibold rounded-lg">
+                          <SelectValue placeholder="-- Pilih Stiker Depan --" />
+                        </SelectTrigger>
+                        <SelectContent className="z-[9999]">
+                          <SelectItem value="none">-- Pilih Stiker Depan --</SelectItem>
+                          {rawMaterials
+                            .filter(r => ['sticker_depan', 'stiker', 'kemasan'].includes((r.category || '').toLowerCase()) || (r.material_name || '').toLowerCase().includes('depan') || (r.material_name || '').toLowerCase().includes('front') || (r.material_name || '').toLowerCase().includes('label'))
+                            .map(r => (
+                              <SelectItem key={r.id} value={String(r.id)}>
+                                {r.material_name} (Rp {fmt(r.unit_cost)})
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
                     )}
 
                     <div style={{ position: 'relative' }}>
@@ -1634,7 +1655,7 @@ function ProductSheet({ product, onClose, onDelete }) {
                   </div>
 
                   {/* Stiker Belakang */}
-                  <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-soft)', borderRadius: 12, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-soft)', borderRadius: 12, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0, width: '100%', boxSizing: 'border-box', overflow: 'hidden' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <label style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 4 }}>
                         <span>🏷️</span> Stiker Belakang
@@ -1645,25 +1666,29 @@ function ProductSheet({ product, onClose, onDelete }) {
                     </div>
 
                     {rawMaterials.length > 0 && (
-                      <select
-                        value={bomSelections.stickerBackId || ''}
-                        onChange={e => {
-                          const val = e.target.value
-                          setBomSelections(prev => ({ ...prev, stickerBackId: val }))
-                          const mat = rawMaterials.find(r => String(r.id) === val)
+                      <Select
+                        value={bomSelections.stickerBackId || 'none'}
+                        onValueChange={val => {
+                          const actualVal = val === 'none' ? '' : val
+                          setBomSelections(prev => ({ ...prev, stickerBackId: actualVal }))
+                          const mat = rawMaterials.find(r => String(r.id) === actualVal)
                           updateBomCost('sticker_back_cost', mat ? String(Math.round(Number(mat.unit_cost) || 0)) : '')
                         }}
-                        style={{ ...inputStyle, padding: '5px 6px', fontSize: 10.5, cursor: 'pointer' }}
                       >
-                        <option value="">-- Pilih Stiker Belakang --</option>
-                        {rawMaterials
-                          .filter(r => ['sticker_belakang', 'stiker', 'kemasan'].includes((r.category || '').toLowerCase()) || (r.material_name || '').toLowerCase().includes('belakang') || (r.material_name || '').toLowerCase().includes('back'))
-                          .map(r => (
-                            <option key={r.id} value={r.id}>
-                              {r.material_name} (Rp {fmt(r.unit_cost)})
-                            </option>
-                          ))}
-                      </select>
+                        <SelectTrigger className="h-8 w-full min-w-0 max-w-full bg-card border-border/80 text-[11px] font-semibold rounded-lg">
+                          <SelectValue placeholder="-- Pilih Stiker Belakang --" />
+                        </SelectTrigger>
+                        <SelectContent className="z-[9999]">
+                          <SelectItem value="none">-- Pilih Stiker Belakang --</SelectItem>
+                          {rawMaterials
+                            .filter(r => ['sticker_belakang', 'stiker', 'kemasan'].includes((r.category || '').toLowerCase()) || (r.material_name || '').toLowerCase().includes('belakang') || (r.material_name || '').toLowerCase().includes('back'))
+                            .map(r => (
+                              <SelectItem key={r.id} value={String(r.id)}>
+                                {r.material_name} (Rp {fmt(r.unit_cost)})
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
                     )}
 
                     <div style={{ position: 'relative' }}>
@@ -1692,25 +1717,29 @@ function ProductSheet({ product, onClose, onDelete }) {
                   </div>
 
                   {rawMaterials.length > 0 && (
-                    <select
-                      value={bomSelections.packagingId || ''}
-                      onChange={e => {
-                        const val = e.target.value
-                        setBomSelections(prev => ({ ...prev, packagingId: val }))
-                        const mat = rawMaterials.find(r => String(r.id) === val)
+                    <Select
+                      value={bomSelections.packagingId || 'none'}
+                      onValueChange={val => {
+                        const actualVal = val === 'none' ? '' : val
+                        setBomSelections(prev => ({ ...prev, packagingId: actualVal }))
+                        const mat = rawMaterials.find(r => String(r.id) === actualVal)
                         updateBomCost('other_packaging_cost', mat ? String(Math.round(Number(mat.unit_cost) || 0)) : '')
                       }}
-                      style={{ ...inputStyle, padding: '6px 8px', fontSize: 11, cursor: 'pointer' }}
                     >
-                      <option value="">-- Pilih Kardus / Polymailer / Bubblewrap ({rawMaterials.filter(r => ['kardus', 'polymailer', 'packing', 'kemasan'].includes((r.category || '').toLowerCase()) || (r.material_name || '').toLowerCase().includes('kardus') || (r.material_name || '').toLowerCase().includes('polymailer')).length} item) --</option>
-                      {rawMaterials
-                        .filter(r => ['kardus', 'polymailer', 'packing', 'kemasan'].includes((r.category || '').toLowerCase()) || (r.material_name || '').toLowerCase().includes('kardus') || (r.material_name || '').toLowerCase().includes('polymailer'))
-                        .map(r => (
-                          <option key={r.id} value={r.id}>
-                            {r.material_name} (Stok: {r.current_stock || 0} {r.unit}) — Rp {fmt(r.unit_cost)} / {r.unit}
-                          </option>
-                        ))}
-                    </select>
+                      <SelectTrigger className="h-9 w-full bg-card border-border/80 text-xs font-semibold rounded-xl">
+                        <SelectValue placeholder="-- Pilih Kardus / Polymailer / Bubblewrap --" />
+                      </SelectTrigger>
+                      <SelectContent className="z-[9999]">
+                        <SelectItem value="none">-- Pilih Kardus / Polymailer / Bubblewrap --</SelectItem>
+                        {rawMaterials
+                          .filter(r => ['kardus', 'polymailer', 'packing', 'kemasan'].includes((r.category || '').toLowerCase()) || (r.material_name || '').toLowerCase().includes('kardus') || (r.material_name || '').toLowerCase().includes('polymailer'))
+                          .map(r => (
+                            <SelectItem key={r.id} value={String(r.id)}>
+                              {r.material_name} (Stok: {r.current_stock || 0} {r.unit}) — Rp {fmt(r.unit_cost)} / {r.unit}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
                   )}
 
                   <div style={{ position: 'relative' }}>
@@ -2328,21 +2357,21 @@ export default function Produk() {
   const stats = useMemo(() => {
     const active = products.filter(p => p.is_active && !p.is_deleted)
     const lowStock = active.filter(p => p.min_stock_alert > 0 && p.current_stock <= p.min_stock_alert)
-    const nilaiStok = active.reduce((s, p) => s + (p.current_stock * (p.avg_buy_price || 0)), 0)
+    const nilaiStok = active.reduce((s, p) => s + (p.fifo_asset_value !== undefined && p.fifo_asset_value > 0 ? p.fifo_asset_value : (p.current_stock * (p.avg_buy_price || 0))), 0)
     return { total: active.length, lowStock: lowStock.length, nilaiStok }
   }, [products])
 
   const bahanStats = useMemo(() => {
     const totalJenis = bahanBakuList.length
     const lowStock = bahanBakuList.filter(r => r.min_stock_alert > 0 && r.current_stock <= r.min_stock_alert).length
-    const totalInvestasi = bahanBakuList.reduce((s, r) => s + (Number(r.total_spent) || (Number(r.current_stock) * Number(r.unit_cost || 0))), 0)
+    const totalInvestasi = bahanBakuList.reduce((s, r) => s + (r.fifo_asset_value !== undefined && r.fifo_asset_value > 0 ? r.fifo_asset_value : (Number(r.total_spent) || (Number(r.current_stock) * Number(r.unit_cost || 0)))), 0)
     return { totalJenis, lowStock, totalInvestasi }
   }, [bahanBakuList])
 
   const kemasanStats = useMemo(() => {
     const totalJenis = kemasanList.length
     const lowStock = kemasanList.filter(r => r.min_stock_alert > 0 && r.current_stock <= r.min_stock_alert).length
-    const totalInvestasi = kemasanList.reduce((s, r) => s + (Number(r.total_spent) || (Number(r.current_stock) * Number(r.unit_cost || 0))), 0)
+    const totalInvestasi = kemasanList.reduce((s, r) => s + (r.fifo_asset_value !== undefined && r.fifo_asset_value > 0 ? r.fifo_asset_value : (Number(r.total_spent) || (Number(r.current_stock) * Number(r.unit_cost || 0)))), 0)
     return { totalJenis, lowStock, totalInvestasi }
   }, [kemasanList])
 
@@ -2539,17 +2568,18 @@ export default function Produk() {
               <div className="flex items-center gap-2 ml-auto">
                 <SlidersHorizontal size={13} className="text-muted-foreground" />
                 <span className="text-[11px] font-bold text-muted-foreground">Urutkan:</span>
-                <select
-                  value={productSortBy}
-                  onChange={e => setProductSortBy(e.target.value)}
-                  className="bg-card border border-border/80 rounded-xl px-2.5 py-1.5 text-xs font-bold text-foreground focus:outline-none focus:ring-1 focus:ring-slate-500 cursor-pointer shadow-sm"
-                >
-                  <option value="gram_asc">⚖️ Gramasi: 100g → 2kg (Terkecil)</option>
-                  <option value="gram_desc">⚖️ Gramasi: 2kg → 100g (Terbesar)</option>
-                  <option value="price_asc">💰 Harga Terendah</option>
-                  <option value="price_desc">💰 Harga Tertinggi</option>
-                  <option value="name_asc">🔤 Nama Produk (A-Z)</option>
-                </select>
+                <Select value={productSortBy} onValueChange={setProductSortBy}>
+                  <SelectTrigger className="h-8 bg-card border border-border/80 rounded-xl px-2.5 text-xs font-bold text-foreground focus:ring-1 focus:ring-slate-500 shadow-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="z-[9999]">
+                    <SelectItem value="gram_asc">⚖️ Gramasi: 100g → 2kg (Terkecil)</SelectItem>
+                    <SelectItem value="gram_desc">⚖️ Gramasi: 2kg → 100g (Terbesar)</SelectItem>
+                    <SelectItem value="price_asc">💰 Harga Terendah</SelectItem>
+                    <SelectItem value="price_desc">💰 Harga Tertinggi</SelectItem>
+                    <SelectItem value="name_asc">🔤 Nama Produk (A-Z)</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 

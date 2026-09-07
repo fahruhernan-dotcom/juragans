@@ -14,6 +14,13 @@ import {
 } from '@/lib/hooks/useSembakoData'
 import { formatRupiah, formatIDR } from '@/lib/format'
 import { CustomSelect } from './sembakoSaleUtils'
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from '@/components/ui/select'
 import { Package, Calculator, Store, CheckCircle2, Building2, Plus, X, Scissors, Sparkles, Phone, MapPin } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -329,69 +336,75 @@ export function SembakoBahanBakuSheet({ open, onOpenChange, onClose, initialData
             <div>
               <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">Kategori</label>
               {isBahanBakuMode ? (
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-semibold focus:bg-white focus:border-amber-500"
-                >
-                  <option value="bawang_mentah">🧅 Bawang Merah Mentah / Curah</option>
-                  <option value="bawang_putih">🧄 Bawang Putih Mentah</option>
-                  <option value="minyak_goreng">🛢️ Minyak Goreng Curah / Jerigen</option>
-                  <option value="tepung_bumbu">🌾 Tepung & Bumbu Penyedap</option>
-                  <option value="bahan_lain">📦 Bahan Baku Mentah Lainnya</option>
-                </select>
+                <Select value={category} onValueChange={setCategory}>
+                  <SelectTrigger className="h-10 bg-slate-50 border-slate-200 text-xs font-semibold text-slate-900">
+                    <SelectValue placeholder="Pilih Kategori" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="bawang_mentah">🧅 Bawang Merah Mentah / Curah</SelectItem>
+                    <SelectItem value="bawang_putih">🧄 Bawang Putih Mentah</SelectItem>
+                    <SelectItem value="minyak_goreng">🛢️ Minyak Goreng Curah / Jerigen</SelectItem>
+                    <SelectItem value="tepung_bumbu">🌾 Tepung & Bumbu Penyedap</SelectItem>
+                    <SelectItem value="bahan_lain">📦 Bahan Baku Mentah Lainnya</SelectItem>
+                  </SelectContent>
+                </Select>
               ) : (
-                <select
+                <Select
                   value={category}
-                  onChange={(e) => {
-                    const val = e.target.value
+                  onValueChange={(val) => {
                     setCategory(val)
                     if (val === 'sticker_depan' || val === 'sticker_belakang') {
                       setIsStickerMode(true)
                       setUnit('pcs')
                     }
                   }}
-                  className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-semibold focus:bg-white focus:border-amber-500"
                 >
-                  <option value="pouch">🛍️ Standing Pouch Ziplock</option>
-                  <option value="toples">🫙 Toples PET Plastik</option>
-                  <option value="sticker_depan">🏷️ Stiker Label Depan (Cutting A3+)</option>
-                  <option value="sticker_belakang">🏷️ Stiker Label Belakang (Halal/Gizi)</option>
-                  <option value="kardus">📦 Kardus Master Box / Dus Karton</option>
-                  <option value="polymailer">✉️ Plastik Polymailer Ekspedisi</option>
-                  <option value="bubblewrap_safety">🛡️ Bubblewrap / Lakban Fragile</option>
-                  <option value="kemasan_lain">📦 Kemasan Lainnya</option>
-                </select>
+                  <SelectTrigger className="h-10 bg-slate-50 border-slate-200 text-xs font-semibold text-slate-900">
+                    <SelectValue placeholder="Pilih Kategori" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pouch">🛍️ Standing Pouch Ziplock</SelectItem>
+                    <SelectItem value="toples">🫙 Toples PET Plastik</SelectItem>
+                    <SelectItem value="sticker_depan">🏷️ Stiker Label Depan (Cutting A3+)</SelectItem>
+                    <SelectItem value="sticker_belakang">🏷️ Stiker Label Belakang (Halal/Gizi)</SelectItem>
+                    <SelectItem value="kardus">📦 Kardus Master Box / Dus Karton</SelectItem>
+                    <SelectItem value="polymailer">✉️ Plastik Polymailer Ekspedisi</SelectItem>
+                    <SelectItem value="bubblewrap_safety">🛡️ Bubblewrap / Lakban Fragile</SelectItem>
+                    <SelectItem value="kemasan_lain">📦 Kemasan Lainnya</SelectItem>
+                  </SelectContent>
+                </Select>
               )}
             </div>
             <div>
               <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">Satuan Stok</label>
               {isBahanBakuMode ? (
-                <select
-                  value={unit}
-                  onChange={(e) => setUnit(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-semibold focus:bg-white focus:border-amber-500"
-                >
-                  <option value="kg">kg (kilogram)</option>
-                  <option value="karung">karung</option>
-                  <option value="liter">liter</option>
-                  <option value="sak">sak</option>
-                  <option value="ton">ton</option>
-                  <option value="gram">gram</option>
-                </select>
+                <Select value={unit} onValueChange={setUnit}>
+                  <SelectTrigger className="h-10 bg-slate-50 border-slate-200 text-xs font-semibold text-slate-900">
+                    <SelectValue placeholder="Pilih Satuan" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="kg">kg (kilogram)</SelectItem>
+                    <SelectItem value="karung">karung</SelectItem>
+                    <SelectItem value="liter">liter</SelectItem>
+                    <SelectItem value="sak">sak</SelectItem>
+                    <SelectItem value="ton">ton</SelectItem>
+                    <SelectItem value="gram">gram</SelectItem>
+                  </SelectContent>
+                </Select>
               ) : (
-                <select
-                  value={unit}
-                  onChange={(e) => setUnit(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-semibold focus:bg-white focus:border-amber-500"
-                >
-                  <option value="pcs">pcs (buah / label stiker)</option>
-                  <option value="lembar">lembar</option>
-                  <option value="roll">roll</option>
-                  <option value="pack">pack (isi pack)</option>
-                  <option value="dus">dus / karton</option>
-                  <option value="box">box</option>
-                </select>
+                <Select value={unit} onValueChange={setUnit}>
+                  <SelectTrigger className="h-10 bg-slate-50 border-slate-200 text-xs font-semibold text-slate-900">
+                    <SelectValue placeholder="Pilih Satuan" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pcs">pcs (buah / label stiker)</SelectItem>
+                    <SelectItem value="lembar">lembar</SelectItem>
+                    <SelectItem value="roll">roll</SelectItem>
+                    <SelectItem value="pack">pack (isi pack)</SelectItem>
+                    <SelectItem value="dus">dus / karton</SelectItem>
+                    <SelectItem value="box">box</SelectItem>
+                  </SelectContent>
+                </Select>
               )}
             </div>
           </div>

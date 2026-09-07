@@ -90,21 +90,20 @@ export default function SembakoBeranda() {
         // 0. Accrual Sales & Profits (Invoice-date based)
         const daySales = isFuture ? [] : sales.filter(s => s.transaction_date?.slice(0, 10) === dStr)
         const grossProfit = isFuture ? 0 : daySales.reduce((s, sale) => {
-          const net = Number(sale.net_profit) || 0
-          const ops = Number(sale.delivery_cost || 0) + Number(sale.other_cost || 0)
-          return s + (net + ops)
+          // Use gross_profit from processSaleRow directly (subtotal - cogs) instead of reconstructing from net+ops
+          return s + (Number(sale.gross_profit) || (Number(sale.subtotal || 0) - Number(sale.total_cogs || 0)))
         }, 0)
         const netProfit = isFuture ? 0 : daySales.reduce((s, sale) => {
           return s + (Number(sale.net_profit) || 0)
         }, 0)
 
-        // 1. Customer Payments (Cash In)
+        // 1. Customer Payments (Cash In) — exclude non-cash retur markers
         const dayPayments = []
         if (!isFuture) {
           sales.forEach(s => {
             const customerName = s.sembako_customers?.customer_name || s.customer_name || 'Umum'
             ;(s.sembako_payments || []).forEach(p => {
-              if (!p.is_deleted && p.payment_date?.slice(0, 10) === dStr) {
+              if (!p.is_deleted && p.payment_date?.slice(0, 10) === dStr && p.payment_method !== 'potong_piutang_retur') {
                 dayPayments.push({
                   id: p.id,
                   customerName,

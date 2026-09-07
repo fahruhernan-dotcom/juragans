@@ -172,13 +172,19 @@ export function matchKemasanMaterial(product, rawMaterials = []) {
  */
 export function matchStickerFrontMaterial(product, rawMaterials = []) {
   if (!rawMaterials || rawMaterials.length === 0) return null
-  const name = (product.product_name || '').toLowerCase()
-  if (name.includes('curah') || name.includes('bal')) return null // Curah tidak pakai stiker depan satuan
+  if (product?.default_sticker_front_id) {
+    const direct = rawMaterials.find(r => String(r.id) === String(product.default_sticker_front_id))
+    if (direct) return direct
+  }
 
   return rawMaterials.find(r => {
     const rCat = (r.category || '').toLowerCase()
     const rName = (r.material_name || '').toLowerCase()
-    return rCat === 'sticker_depan' || rName.includes('stiker depan') || rName.includes('label depan') || (rCat === 'stiker' && rName.includes('depan'))
+    return rCat === 'sticker_depan' || rName.includes('stiker depan') || rName.includes('label depan') || (rCat === 'stiker' && (rName.includes('depan') || rName.includes('front') || rName.includes('gold')))
+  }) || rawMaterials.find(r => {
+    const rCat = (r.category || '').toLowerCase()
+    const rName = (r.material_name || '').toLowerCase()
+    return (rCat === 'stiker' || rCat.includes('sticker') || rName.includes('label')) && !rName.includes('belakang') && !rName.includes('back')
   }) || null
 }
 
@@ -187,13 +193,19 @@ export function matchStickerFrontMaterial(product, rawMaterials = []) {
  */
 export function matchStickerBackMaterial(product, rawMaterials = []) {
   if (!rawMaterials || rawMaterials.length === 0) return null
-  const name = (product.product_name || '').toLowerCase()
-  if (name.includes('curah') || name.includes('bal')) return null // Curah tidak pakai stiker belakang satuan
+  if (product?.default_sticker_back_id) {
+    const direct = rawMaterials.find(r => String(r.id) === String(product.default_sticker_back_id))
+    if (direct) return direct
+  }
 
   return rawMaterials.find(r => {
     const rCat = (r.category || '').toLowerCase()
     const rName = (r.material_name || '').toLowerCase()
-    return rCat === 'sticker_belakang' || rName.includes('stiker belakang') || rName.includes('label belakang') || (rCat === 'stiker' && rName.includes('belakang'))
+    return rCat === 'sticker_belakang' || rName.includes('stiker belakang') || rName.includes('label belakang') || (rCat === 'stiker' && (rName.includes('belakang') || rName.includes('back') || rName.includes('nutrition') || rName.includes('p-irt')))
+  }) || rawMaterials.find(r => {
+    const rCat = (r.category || '').toLowerCase()
+    const rName = (r.material_name || '').toLowerCase()
+    return (rCat === 'stiker' || rCat.includes('sticker')) && (rName.includes('belakang') || rName.includes('back') || rName.includes('nutrition'))
   }) || null
 }
 
@@ -202,9 +214,10 @@ export function matchStickerBackMaterial(product, rawMaterials = []) {
  * @param {object} product
  * @param {Array} rawMaterials
  * @param {object|string|null} customKemasan - Override kemasan kustom jika ada
+ * @param {object} options - { allowMissingStickers, noFrontSticker, noBackSticker }
  * @returns {object} { totalStock, bottleneck, components: [...] }
  */
-export function calculateBomProductStock(product, rawMaterials = [], customKemasan = null) {
+export function calculateBomProductStock(product, rawMaterials = [], customKemasan = null, options = {}) {
   if (!product || !rawMaterials || rawMaterials.length === 0) {
     return {
       totalStock: Number(product?.current_stock) || 0,
@@ -309,7 +322,11 @@ export function calculateBomProductStock(product, rawMaterials = [], customKemas
     }
 
     const minCap = Math.min(...components.map(c => c.capacity))
-    const totalStock = Math.max(0, minCap)
+    const coreComponents = components.filter(c => c.type === 'bawang' || c.type === 'kemasan')
+    const coreCap = coreComponents.length > 0 ? Math.min(...coreComponents.map(c => c.capacity)) : 0
+    const totalStock = (minCap === 0 && coreCap > 0 && options.allowMissingStickers !== false)
+      ? coreCap
+      : Math.max(0, minCap)
     const bottleneckComp = components.find(c => c.capacity === minCap)
 
     return {
@@ -406,7 +423,11 @@ export function calculateBomProductStock(product, rawMaterials = [], customKemas
 
   // Cari kapasitas terkecil sebagai bottleneck
   const minCap = Math.min(...components.map(c => c.capacity))
-  const totalStock = Math.max(0, minCap)
+  const coreComponents = components.filter(c => c.type === 'bawang' || c.type === 'kemasan')
+  const coreCap = coreComponents.length > 0 ? Math.min(...coreComponents.map(c => c.capacity)) : 0
+  const totalStock = (minCap === 0 && coreCap > 0 && options.allowMissingStickers !== false)
+    ? coreCap
+    : Math.max(0, minCap)
   const bottleneckComp = components.find(c => c.capacity === minCap)
 
   return {

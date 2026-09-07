@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, X, ChevronLeft, Loader2, Search, Check, ChevronDown, Truck, Bike, Package2, Car, Fuel, Coffee, Utensils, CircleParking, Package, AlertCircle } from 'lucide-react'
+import { Plus, X, ChevronLeft, Loader2, Search, Check, ChevronDown, ChevronUp, Truck, Bike, Package2, Car, Fuel, Coffee, Utensils, CircleParking, Package, AlertCircle, Building2, Zap } from 'lucide-react'
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from '@/components/ui/sheet'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { DatePicker } from '@/components/ui/DatePicker'
 import { PhoneInput } from '@/components/ui/PhoneInput'
 import { format } from 'date-fns'
@@ -12,7 +13,7 @@ import {
   useSembakoProducts, useSembakoCustomers, useSembakoSales, useSembakoEmployees, useSembakoDeliveries,
   useCreateSembakoProduct, useUpdateSembakoProduct, useCreateSembakoSale, useCreateSembakoDelivery,
   useRecordSembakoPayment, useUpdateSembakoSale, useCreateSembakoCustomer, useCreateSembakoEmployee,
-  useSembakoAllBatches, useSembakoRawMaterials,
+  useSembakoAllBatches, useSembakoRawMaterials, useSembakoStockCustody,
 } from '@/lib/hooks/useSembakoData'
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery'
 import { useBackHandler } from '@/lib/hooks/useBackHandler'
@@ -264,6 +265,7 @@ function QuickAddProduct({ form, onChange, onSave, onCancel, saving }) {
 function ProductItemRow({
   item, idx, products: _products, productOptions, total: _total,
   overStock, isPouchOverstock, customPouchStock, customPouchName,
+  availableStockQty, stockSourceLabel,
   onChangeItem, onRemove, onAddNew, isOnly,
   allBatches = [], packagingMaterials = [], rawMaterialsList = [],
   getEffectivePouchStock
@@ -344,6 +346,39 @@ function ProductItemRow({
   const deltaPolymailer = item.noPolymailer ? -otherPkgCost : 0
   const deltaAllSavings = deltaStickers + deltaPolymailer
 
+  const isPolos = Boolean(item.noFrontSticker && item.noBackSticker)
+  const hasCustomSticker = Boolean(item.customStickerName || Number(item.customStickerCost) > 0)
+  const hasCustomPackaging = Boolean(item.useCustomPackaging || item.customPackagingId || item.customPackagingName || Number(item.customPackagingCost) > 0)
+  const hasCustomNotes = Boolean(item.customPackagingNote)
+  const hasSpecialRequest = Boolean(isPolos || hasCustomSticker || hasCustomPackaging || hasCustomNotes || item.noPolymailer || item.noFrontSticker || item.noBackSticker)
+
+  const packagingSummaryLabel = useMemo(() => {
+    if (!hasSpecialRequest) {
+      return 'Standar Lengkap (Pouch + Stiker Depan & Belakang)'
+    }
+    const parts = []
+    if (hasCustomPackaging) {
+      parts.push(item.customPackagingName || 'Wadah Khusus')
+    } else {
+      parts.push('Pouch Standar')
+    }
+    if (isPolos) {
+      parts.push('🚫 Polosan (Tanpa Stiker)')
+    } else if (hasCustomSticker) {
+      parts.push(`➕ ${item.customStickerName || 'Stiker Tambahan'}`)
+    } else if (item.noFrontSticker) {
+      parts.push('Tanpa Stiker Depan')
+    } else if (item.noBackSticker) {
+      parts.push('Tanpa Stiker Belakang')
+    } else {
+      parts.push('Stiker Standar')
+    }
+    if (item.noPolymailer) {
+      parts.push('Tanpa Polymailer')
+    }
+    return parts.join(' · ')
+  }, [hasSpecialRequest, hasCustomPackaging, item.customPackagingName, isPolos, hasCustomSticker, item.customStickerName, item.noFrontSticker, item.noBackSticker, item.noPolymailer])
+
   // Calculate local FIFO breakdown for UI suggestion
   const prodBatches = useMemo(() => {
     if (!item.product_id || !allBatches.length) return []
@@ -367,7 +402,8 @@ function ProductItemRow({
         if (foundMat) customCost = Number(foundMat.unit_cost) || 0
       }
     }
-    const deltaPackaging = (item.useCustomPackaging ? (customCost - stdKemasanCost) : 0) + deltaStickers + deltaPolymailer
+    const extraStickerCost = Number(item.customStickerCost) || 0
+    const deltaPackaging = (item.useCustomPackaging ? (customCost - stdKemasanCost) : 0) + deltaStickers + deltaPolymailer + extraStickerCost
 
     let remaining = qty
     const breakdown = []
@@ -395,7 +431,7 @@ function ProductItemRow({
     }
     
     return breakdown
-  }, [item.quantity, item.useCustomPackaging, item.customPackagingCost, item.customPackagingId, item.noFrontSticker, item.noBackSticker, item.noPolymailer, deltaStickers, deltaPolymailer, prodBatches, prod, factor, rawMaterialsList])
+  }, [item.quantity, item.useCustomPackaging, item.customPackagingCost, item.customPackagingId, item.customStickerCost, item.noFrontSticker, item.noBackSticker, item.noPolymailer, deltaStickers, deltaPolymailer, prodBatches, prod, factor, rawMaterialsList])
 
   return (
     <div
@@ -408,7 +444,7 @@ function ProductItemRow({
     >
       {/* Row: product selector + remove */}
       <div className="flex gap-2">
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <label className={labelCn}>Produk</label>
           <CustomSelect
             value={item.product_id}
@@ -429,6 +465,24 @@ function ProductItemRow({
           </button>
         )}
       </div>
+
+      {/* Full-width Stock Availability Strip */}
+      {prod && (
+        <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-50 border border-slate-200/80 text-xs">
+          <span className="font-bold text-slate-600 flex items-center gap-1.5 min-w-0 truncate">
+            <span>📦</span>
+            <span className="truncate">Stok Fisik ({stockSourceLabel || 'Gudang'}):</span>
+          </span>
+          <span className={cn(
+            "px-2.5 py-0.5 rounded-lg font-mono font-black text-xs shrink-0 ml-2",
+            (availableStockQty !== undefined ? availableStockQty : prod.current_stock) <= 0
+              ? "bg-rose-100 text-rose-700 border border-rose-200"
+              : "bg-emerald-100 text-emerald-800 border border-emerald-200"
+          )}>
+            {availableStockQty !== undefined ? availableStockQty : prod.current_stock} {baseUnit}
+          </span>
+        </div>
+      )}
       
       {unitOptions.length > 1 && (
         <div className="mt-2.5">
@@ -505,7 +559,9 @@ function ProductItemRow({
           ) : overStock ? (
             <p className="text-[10.5px] font-bold text-rose-600 mt-1 flex items-center gap-1">
               <span>⚠️</span>
-              <span>Stok produk tidak cukup — tersedia {prod?.current_stock || 0} {baseUnit}</span>
+              <span>
+                Stok {stockSourceLabel || 'tersedia'} tidak cukup — sisa {availableStockQty !== undefined ? availableStockQty : (prod?.current_stock || 0)} {baseUnit}
+              </span>
             </p>
           ) : null}
           {isBelowHpp && (
@@ -712,49 +768,43 @@ function ProductItemRow({
             </div>
           )}
 
-          {/* Expandable Custom Packaging / Pouch, Sticker & Polymailer Accordion */}
+          {/* Status Kemasan & Panel Permintaan Khusus */}
           <div className="pt-2 border-t border-[#E2E8F0] mt-1">
             <button
               type="button"
               onClick={() => setIsPackagingExpanded(!isPackagingExpanded)}
-              className={`w-full flex items-center justify-between py-1.5 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                item.useCustomPackaging || item.noFrontSticker || item.noBackSticker || item.noPolymailer
-                  ? 'bg-amber-500/10 border-amber-500/30 text-amber-900'
-                  : 'bg-[#F8FAFC] border-[#E2E8F0] text-slate-600 hover:bg-slate-100/70'
+              className={`w-full flex items-center justify-between py-2 px-3 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
+                hasSpecialRequest
+                  ? 'bg-amber-500/10 border-amber-500/30 text-amber-900 shadow-xs'
+                  : 'bg-[#F8FAFC] border-[#E2E8F0] text-slate-700 hover:bg-slate-100/80'
               }`}
             >
               <div className="flex items-center gap-2 min-w-0">
-                <Package size={14} className={item.useCustomPackaging || item.noFrontSticker || item.noBackSticker || item.noPolymailer ? 'text-amber-600' : 'text-slate-400'} />
-                <span className="truncate">
-                  Kemasan: <strong className={item.useCustomPackaging || item.noFrontSticker || item.noBackSticker || item.noPolymailer ? 'text-amber-700' : 'text-slate-700'}>
-                    {item.useCustomPackaging ? (item.customPackagingName || 'Kemasan / Pouch Khusus') : 'Plastik Pouch (Standar)'}
-                    {item.noFrontSticker && item.noBackSticker && item.noPolymailer
-                      ? ' · ⚡ Polosan Total (Pouch Saja)'
-                      : item.noFrontSticker && item.noBackSticker
-                      ? ' · 🚫 Polos (Tanpa Stiker)'
-                      : item.noFrontSticker
-                      ? ' · ❌ Tanpa Stiker Depan'
-                      : item.noBackSticker
-                      ? ' · ❌ Tanpa Stiker Belakang'
-                      : item.noPolymailer
-                      ? ' · ❌ Tanpa Polymailer'
-                      : ''}
-                  </strong>
-                </span>
+                <Package size={15} className={hasSpecialRequest ? 'text-amber-600 shrink-0' : 'text-slate-400 shrink-0'} />
+                <div className="flex items-center gap-1.5 min-w-0 truncate text-xs">
+                  <span className="text-slate-500 font-medium">Kemasan:</span>
+                  <span className={`font-bold truncate ${hasSpecialRequest ? 'text-amber-800' : 'text-slate-800'}`}>
+                    {packagingSummaryLabel}
+                  </span>
+                </div>
               </div>
-              <div className="flex items-center gap-1 shrink-0 text-[10px] text-amber-700 font-bold">
-                <span>{item.useCustomPackaging || item.noFrontSticker || item.noBackSticker || item.noPolymailer ? '✏️ Ubah Kemasan/Stiker' : '+ Detail Pouch & Stiker'}</span>
-                <ChevronDown size={13} style={{ transform: isPackagingExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+              <div className="flex items-center gap-1 shrink-0 text-[11px] font-bold text-amber-700">
+                <span>{hasSpecialRequest ? '✏️ Ubah Request' : '⚙️ Permintaan Khusus'}</span>
+                <ChevronDown size={14} style={{ transform: isPackagingExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
               </div>
             </button>
 
             {isPackagingExpanded && (
-              <div className="mt-2 p-3 rounded-xl bg-amber-50/70 border border-amber-200/80 space-y-3 animate-in fade-in duration-150">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-amber-900 flex items-center gap-1">
-                    <span>🛍️</span> Kustomisasi Kemasan & Pouch Produk:
-                  </span>
-                  {(item.useCustomPackaging || item.noFrontSticker || item.noBackSticker || item.noPolymailer) && (
+              <div className="mt-2.5 p-3.5 rounded-2xl bg-gradient-to-b from-amber-50/90 to-amber-50/40 border border-amber-200/80 space-y-3.5 animate-in fade-in duration-150">
+                {/* Header Panel */}
+                <div className="flex items-center justify-between pb-2 border-b border-amber-200/60">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm">⚙️</span>
+                    <span className="text-xs font-black uppercase tracking-wider text-amber-950">
+                      Permintaan Khusus Kemasan & Stiker
+                    </span>
+                  </div>
+                  {hasSpecialRequest && (
                     <button
                       type="button"
                       onClick={() => {
@@ -766,264 +816,307 @@ function ProductItemRow({
                           customPackagingNote: '',
                           noFrontSticker: false,
                           noBackSticker: false,
-                          noPolymailer: false
+                          noPolymailer: false,
+                          customStickerName: '',
+                          customStickerCost: 0
                         })
                       }}
-                      className="text-[9.5px] font-bold text-rose-600 hover:underline cursor-pointer"
+                      className="text-[10px] font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100/80 px-2 py-0.5 rounded-lg border border-rose-200 transition-all cursor-pointer"
                     >
-                      Reset ke Standar Lengkap
+                      ↺ Reset ke Standar Lengkap
                     </button>
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  <div>
-                    <label className="text-[9.5px] font-bold text-slate-600 block mb-1">
-                      Pilih Pouch dari Stok:
-                    </label>
-                    <select
-                      value={item.customPackagingId || ''}
-                      onChange={(e) => {
-                        const val = e.target.value
-                        if (val) {
-                          const selectedMat = packagingMaterials.find(m => m.id === val)
-                          if (selectedMat) {
-                            const cost = Number(selectedMat.unit_cost) || 0
-                            onChangeItem(idx, {
-                              useCustomPackaging: true,
-                              customPackagingId: selectedMat.id,
-                              customPackagingName: selectedMat.material_name,
-                              customPackagingCost: cost
-                            })
-                          }
-                        } else {
-                          onChangeItem(idx, {
-                            useCustomPackaging: false,
-                            customPackagingId: '',
-                            customPackagingName: '',
-                            customPackagingCost: 0
-                          })
-                        }
-                      }}
-                      className="w-full px-2.5 py-2 rounded-lg bg-white border border-amber-200 text-xs font-semibold text-slate-800 focus:outline-none focus:border-amber-500 cursor-pointer"
-                    >
-                      <option value="">-- Plastik Pouch Standar (Default) --</option>
-                      {packagingMaterials.map(m => {
-                        const effectiveStock = getEffectivePouchStock ? getEffectivePouchStock(m.id) : m.current_stock
-                        return (
-                          <option key={m.id} value={m.id}>
-                            {m.material_name} ({effectiveStock} {m.unit || 'pcs'} - HPP {formatIDR(m.unit_cost || 0)})
-                          </option>
-                        )
-                      })}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="text-[9.5px] font-bold text-slate-600 block mb-1">
-                      Nama Pouch / Kustom:
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Misal: Pouch Silver Matte 100g / Toples"
-                      value={item.customPackagingName || ''}
-                      onChange={(e) => {
-                        const val = e.target.value
-                        onChangeItem(idx, {
-                          useCustomPackaging: Boolean(val.trim() || item.customPackagingId || Number(item.customPackagingCost) > 0),
-                          customPackagingName: val
-                        })
-                      }}
-                      className="w-full px-2.5 py-2 rounded-lg bg-white border border-amber-200 text-xs font-semibold text-slate-800 focus:outline-none focus:border-amber-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-[9.5px] font-bold text-slate-600 block mb-1">
-                      Biaya Pouch (Rp/pcs):
-                    </label>
-                    <InputRupiah
-                      value={item.customPackagingCost || 0}
-                      onChange={(val) => {
-                        onChangeItem(idx, {
-                          useCustomPackaging: true,
-                          customPackagingCost: val
-                        })
-                      }}
-                      className="w-full px-2.5 py-2 rounded-lg bg-white border border-amber-200 text-xs font-bold text-slate-800 focus:outline-none focus:border-amber-500"
-                    />
-                  </div>
-                </div>
-
-                {/* Kustomisasi Stiker & Plastik Packing / Polymailer */}
-                <div className="pt-2 border-t border-amber-200/80 space-y-2">
+                {/* Section 1: Stiker Produk */}
+                <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-amber-900 flex items-center gap-1">
-                      <span>🏷️</span> Opsi Stiker & Plastik Packing:
-                    </span>
-                    {(item.noFrontSticker || item.noBackSticker || item.noPolymailer) && (
-                      <span className="text-[10px] font-black text-emerald-800 bg-emerald-100/90 border border-emerald-300 px-2 py-0.5 rounded-full">
-                        💰 Hemat HPP: -{formatIDR(Math.abs(deltaAllSavings))}/pcs
-                      </span>
-                    )}
+                    <label className="text-[11px] font-extrabold text-slate-700 flex items-center gap-1">
+                      <span>🏷️</span> Opsi Stiker Kemasan:
+                    </label>
+                    <span className="text-[10px] text-muted-foreground font-medium">Bawaan: Stiker Depan & Belakang</span>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    {/* Checkbox Stiker Depan */}
-                    <label className={`flex items-center gap-2.5 p-2.5 rounded-xl border transition-all cursor-pointer select-none ${
-                      !item.noFrontSticker
-                        ? 'bg-white border-amber-300 text-slate-800 shadow-xs'
-                        : 'bg-amber-100/40 border-amber-200/80 text-slate-400'
-                    }`}>
-                      <input
-                        type="checkbox"
-                        checked={!item.noFrontSticker}
-                        onChange={(e) => {
-                          onChangeItem(idx, { noFrontSticker: !e.target.checked })
-                        }}
-                        className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-amber-300 cursor-pointer"
-                      />
-                      <div className="flex flex-col min-w-0">
-                        <span className={`text-xs font-bold leading-tight flex items-center gap-1 ${item.noFrontSticker ? 'line-through text-slate-400' : 'text-slate-800'}`}>
-                          <span>🏷️ Stiker Depan</span>
-                          {!item.noFrontSticker && sFrontCost > 0 && (
-                            <span className="text-[10px] text-amber-700 font-mono">({formatIDR(sFrontCost)})</span>
-                          )}
-                        </span>
-                        <span className="text-[9.5px] text-muted-foreground">
-                          {!item.noFrontSticker ? 'Ditempel' : '❌ Tanpa Depan'}
-                        </span>
-                      </div>
-                    </label>
-
-                    {/* Checkbox Stiker Belakang */}
-                    <label className={`flex items-center gap-2.5 p-2.5 rounded-xl border transition-all cursor-pointer select-none ${
-                      !item.noBackSticker
-                        ? 'bg-white border-amber-300 text-slate-800 shadow-xs'
-                        : 'bg-amber-100/40 border-amber-200/80 text-slate-400'
-                    }`}>
-                      <input
-                        type="checkbox"
-                        checked={!item.noBackSticker}
-                        onChange={(e) => {
-                          onChangeItem(idx, { noBackSticker: !e.target.checked })
-                        }}
-                        className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-amber-300 cursor-pointer"
-                      />
-                      <div className="flex flex-col min-w-0">
-                        <span className={`text-xs font-bold leading-tight flex items-center gap-1 ${item.noBackSticker ? 'line-through text-slate-400' : 'text-slate-800'}`}>
-                          <span>🏷️ Stiker Belakang</span>
-                          {!item.noBackSticker && sBackCost > 0 && (
-                            <span className="text-[10px] text-amber-700 font-mono">({formatIDR(sBackCost)})</span>
-                          )}
-                        </span>
-                        <span className="text-[9.5px] text-muted-foreground">
-                          {!item.noBackSticker ? 'Ditempel' : '❌ Tanpa Belakang'}
-                        </span>
-                      </div>
-                    </label>
-
-                    {/* Checkbox Plastik Polymailer */}
-                    <label className={`flex items-center gap-2.5 p-2.5 rounded-xl border transition-all cursor-pointer select-none ${
-                      !item.noPolymailer
-                        ? 'bg-white border-amber-300 text-slate-800 shadow-xs'
-                        : 'bg-amber-100/40 border-amber-200/80 text-slate-400'
-                    }`}>
-                      <input
-                        type="checkbox"
-                        checked={!item.noPolymailer}
-                        onChange={(e) => {
-                          onChangeItem(idx, { noPolymailer: !e.target.checked })
-                        }}
-                        className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-amber-300 cursor-pointer"
-                      />
-                      <div className="flex flex-col min-w-0">
-                        <span className={`text-xs font-bold leading-tight flex items-center gap-1 ${item.noPolymailer ? 'line-through text-slate-400' : 'text-slate-800'}`}>
-                          <span>📦 Plastik Polymailer</span>
-                          {!item.noPolymailer && otherPkgCost > 0 && (
-                            <span className="text-[10px] text-amber-700 font-mono">({formatIDR(otherPkgCost)})</span>
-                          )}
-                        </span>
-                        <span className="text-[9.5px] text-muted-foreground">
-                          {!item.noPolymailer ? 'Plastik packing' : '❌ Tanpa Poly'}
-                        </span>
-                      </div>
-                    </label>
-                  </div>
-
-                  {/* Tombol Cepat Pilihan Polos */}
-                  <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                    {/* Option 1: Standar */}
                     <button
                       type="button"
                       onClick={() => {
-                        const isCurrentlyNoStickers = Boolean(item.noFrontSticker && item.noBackSticker)
                         onChangeItem(idx, {
-                          noFrontSticker: !isCurrentlyNoStickers,
-                          noBackSticker: !isCurrentlyNoStickers
+                          noFrontSticker: false,
+                          noBackSticker: false,
+                          customStickerName: '',
+                          customStickerCost: 0
                         })
                       }}
-                      className={`text-[10px] font-extrabold px-3 py-1.5 rounded-lg border transition-all cursor-pointer flex items-center gap-1.5 ${
-                        item.noFrontSticker && item.noBackSticker && !item.noPolymailer
-                          ? 'bg-amber-700 text-white border-amber-700 shadow-xs'
-                          : 'bg-white hover:bg-amber-100/70 text-amber-900 border-amber-300'
+                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                        !isPolos && !hasCustomSticker
+                          ? 'bg-white border-amber-500 ring-2 ring-amber-500/20 shadow-xs'
+                          : 'bg-white/70 border-slate-200 hover:bg-white text-slate-600'
                       }`}
                     >
-                      <span>{item.noFrontSticker && item.noBackSticker && !item.noPolymailer ? '✓ Mode: Tanpa Stiker' : '🚫 Set: Tanpa Stiker Saja'}</span>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                          <span>✨</span> Standar Lengkap
+                        </span>
+                        {!isPolos && !hasCustomSticker && (
+                          <span className="w-2 h-2 rounded-full bg-amber-500" />
+                        )}
+                      </div>
+                      <p className="text-[10px] text-slate-500 leading-tight">
+                        Stiker Depan & Belakang Juragan tertempel rapi.
+                      </p>
                     </button>
 
+                    {/* Option 2: Polosan / White-Label */}
                     <button
                       type="button"
                       onClick={() => {
-                        const isAllPlain = Boolean(item.noFrontSticker && item.noBackSticker && item.noPolymailer)
                         onChangeItem(idx, {
-                          noFrontSticker: !isAllPlain,
-                          noBackSticker: !isAllPlain,
-                          noPolymailer: !isAllPlain
+                          noFrontSticker: true,
+                          noBackSticker: true,
+                          customStickerName: '',
+                          customStickerCost: 0
                         })
                       }}
-                      className={`text-[10px] font-extrabold px-3 py-1.5 rounded-lg border transition-all cursor-pointer flex items-center gap-1.5 ${
-                        item.noFrontSticker && item.noBackSticker && item.noPolymailer
-                          ? 'bg-amber-800 text-white border-amber-800 shadow-xs'
-                          : 'bg-amber-100/80 hover:bg-amber-200 text-amber-950 border-amber-400'
+                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                        isPolos
+                          ? 'bg-white border-amber-600 ring-2 ring-amber-600/20 shadow-xs'
+                          : 'bg-white/70 border-slate-200 hover:bg-white text-slate-600'
                       }`}
                     >
-                      <span>{item.noFrontSticker && item.noBackSticker && item.noPolymailer ? '✓ Polosan Total (Pouch Saja)' : '⚡ Set: Polosan Total (Pouch Saja)'}</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Catatan Kemasan */}
-                <div>
-                  <label className="text-[9.5px] font-bold text-slate-600 block mb-1">
-                    Catatan Khusus Kemasan (Opsional):
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Misal: Pouch transparan biasa habis, pakai pouch matte"
-                    value={item.customPackagingNote || ''}
-                    onChange={(e) => onChangeItem(idx, { customPackagingNote: e.target.value })}
-                    className="w-full px-2.5 py-2 rounded-lg bg-white border border-amber-200 text-xs font-medium text-slate-800 focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-
-                {(item.useCustomPackaging || item.noFrontSticker || item.noBackSticker || item.noPolymailer) && (
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-300/50 text-[11px]">
-                    <div className="flex flex-col gap-0.5 text-amber-900 font-bold">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span>⚡</span>
-                        <span>HPP Terupdate: <strong className="font-mono text-amber-950 font-black">{formatIDR(baseCogsPerBase)} / {baseUnit}</strong></span>
-                        {Number(item.customPackagingCost) > 0 && (
-                          <span className="text-amber-800/80 font-semibold">(Biaya Kemasan: {formatIDR(item.customPackagingCost)}/pcs)</span>
-                        )}
-                        {deltaAllSavings !== 0 && (
-                          <span className="text-emerald-800 font-semibold">(Potongan HPP: {formatIDR(Math.abs(deltaAllSavings))}/pcs)</span>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                          <span>🚫</span> Polosan (Tanpa Stiker)
+                        </span>
+                        {isPolos && (
+                          <span className="w-2 h-2 rounded-full bg-amber-600" />
                         )}
                       </div>
+                      <p className="text-[10px] text-slate-500 leading-tight">
+                        White-label untuk reseller. Tidak ditempel stiker merk.
+                      </p>
+                    </button>
+
+                    {/* Option 3: Tambahan Stiker Khusus */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onChangeItem(idx, {
+                          noFrontSticker: false,
+                          noBackSticker: false,
+                          customStickerName: item.customStickerName || 'Stiker Toko / Custom',
+                          customStickerCost: Number(item.customStickerCost) || 0
+                        })
+                      }}
+                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                        hasCustomSticker
+                          ? 'bg-white border-amber-600 ring-2 ring-amber-600/20 shadow-xs'
+                          : 'bg-white/70 border-slate-200 hover:bg-white text-slate-600'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                          <span>➕</span> Tambahan Stiker Khusus
+                        </span>
+                        {hasCustomSticker && (
+                          <span className="w-2 h-2 rounded-full bg-amber-600" />
+                        )}
+                      </div>
+                      <p className="text-[10px] text-slate-500 leading-tight">
+                        Stiker logo reseller, fragile, halal, dsb.
+                      </p>
+                    </button>
+                  </div>
+
+                  {/* Input Stiker Khusus jika opsi Tambahan aktif */}
+                  {hasCustomSticker && (
+                    <div className="p-3 rounded-xl bg-white border border-amber-300 space-y-2 mt-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-700 block mb-1">
+                            Nama / Keterangan Stiker Tambahan:
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Misal: Stiker Reseller Toko Berkah / Logo Custom"
+                            value={item.customStickerName || ''}
+                            onChange={(e) => onChangeItem(idx, { customStickerName: e.target.value })}
+                            className="w-full px-2.5 py-1.5 rounded-lg bg-amber-50/40 border border-amber-200 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-700 block mb-1">
+                            Biaya Tambahan Stiker (Rp/pcs):
+                          </label>
+                          <InputRupiah
+                            value={item.customStickerCost || 0}
+                            onChange={(val) => onChangeItem(idx, { customStickerCost: val })}
+                            className="w-full px-2.5 py-1.5 rounded-lg bg-amber-50/40 border border-amber-200 text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                          />
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-amber-800 font-medium">
+                        💡 Tim gudang akan menyiapkan dan menempel stiker ini sesuai instruksi pada surat jalan / SPK.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Section 2: Wadah / Pouch */}
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-extrabold text-slate-700 flex items-center gap-1">
+                      <span>🛍️</span> Pilihan Wadah / Kemasan:
+                    </label>
+                    <span className="text-[10px] text-muted-foreground font-medium">Bawaan: Pouch Standar Produk</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {/* Pouch Standar */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onChangeItem(idx, {
+                          useCustomPackaging: false,
+                          customPackagingId: '',
+                          customPackagingName: '',
+                          customPackagingCost: 0
+                        })
+                      }}
+                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                        !hasCustomPackaging
+                          ? 'bg-white border-amber-500 ring-2 ring-amber-500/20 shadow-xs'
+                          : 'bg-white/70 border-slate-200 hover:bg-white text-slate-600'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                          <span>📦</span> Pouch Standar Bawaan
+                        </span>
+                        {!hasCustomPackaging && (
+                          <span className="w-2 h-2 rounded-full bg-amber-500" />
+                        )}
+                      </div>
+                      <p className="text-[10px] text-slate-500 leading-tight">
+                        Menggunakan kemasan standar produk hasil combine gudang.
+                      </p>
+                    </button>
+
+                    {/* Wadah / Pouch Khusus */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onChangeItem(idx, {
+                          useCustomPackaging: true,
+                          customPackagingName: item.customPackagingName || 'Toples / Wadah Khusus',
+                          customPackagingCost: Number(item.customPackagingCost) || 0
+                        })
+                      }}
+                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                        hasCustomPackaging
+                          ? 'bg-white border-amber-600 ring-2 ring-amber-600/20 shadow-xs'
+                          : 'bg-white/70 border-slate-200 hover:bg-white text-slate-600'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                          <span>🥫</span> Ganti Wadah Khusus (Toples / Foil)
+                        </span>
+                        {hasCustomPackaging && (
+                          <span className="w-2 h-2 rounded-full bg-amber-600" />
+                        )}
+                      </div>
+                      <p className="text-[10px] text-slate-500 leading-tight">
+                        Pindah ke toples, standing pouch matte, atau wadah custom.
+                      </p>
+                    </button>
+                  </div>
+
+                  {/* Input Wadah Khusus */}
+                  {hasCustomPackaging && (
+                    <div className="p-3 rounded-xl bg-white border border-amber-300 space-y-2 mt-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-700 block mb-1">
+                            Pilih dari Stok Kemasan:
+                          </label>
+                          <Select
+                            value={item.customPackagingId || 'custom'}
+                            onValueChange={(val) => {
+                              if (val && val !== 'custom') {
+                                const selectedMat = packagingMaterials.find(m => m.id === val)
+                                if (selectedMat) {
+                                  onChangeItem(idx, {
+                                    useCustomPackaging: true,
+                                    customPackagingId: selectedMat.id,
+                                    customPackagingName: selectedMat.material_name,
+                                    customPackagingCost: Number(selectedMat.unit_cost) || 0
+                                  })
+                                }
+                              } else {
+                                onChangeItem(idx, {
+                                  useCustomPackaging: true,
+                                  customPackagingId: '',
+                                  customPackagingName: item.customPackagingName || '',
+                                  customPackagingCost: Number(item.customPackagingCost) || 0
+                                })
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="w-full h-8 px-2.5 rounded-lg bg-amber-50/40 border border-amber-200 text-xs font-semibold text-slate-800">
+                              <SelectValue placeholder="-- Pilih Wadah / Custom --" />
+                            </SelectTrigger>
+                            <SelectContent className="z-[9999]">
+                              <SelectItem value="custom">-- Input Manual / Wadah Luar --</SelectItem>
+                              {packagingMaterials.map(m => {
+                                const effectiveStock = getEffectivePouchStock ? getEffectivePouchStock(m.id) : m.current_stock
+                                return (
+                                  <SelectItem key={m.id} value={m.id}>
+                                    {m.material_name} (Sisa: {effectiveStock} {m.unit || 'pcs'})
+                                  </SelectItem>
+                                )
+                              })}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-700 block mb-1">
+                            Nama Wadah / Kustom:
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Misal: Toples 250ml / Pouch Silver"
+                            value={item.customPackagingName || ''}
+                            onChange={(e) => onChangeItem(idx, {
+                              useCustomPackaging: true,
+                              customPackagingName: e.target.value
+                            })}
+                            className="w-full px-2.5 py-1.5 rounded-lg bg-amber-50/40 border border-amber-200 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-700 block mb-1">
+                            Biaya Wadah (Rp/pcs):
+                          </label>
+                          <InputRupiah
+                            value={item.customPackagingCost || 0}
+                            onChange={(val) => onChangeItem(idx, {
+                              useCustomPackaging: true,
+                              customPackagingCost: val
+                            })}
+                            className="w-full px-2.5 py-1.5 rounded-lg bg-amber-50/40 border border-amber-200 text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                          />
+                        </div>
+                      </div>
+
                       {customPouchStock !== null && (
-                        <div className="text-[10.5px] text-amber-900 font-bold flex items-center gap-1 mt-0.5">
+                        <div className="text-[10.5px] text-amber-900 font-bold flex items-center gap-1 pt-1">
                           <span>📦</span>
                           <span>
-                            Kapasitas Pouch: <strong className={customPouchStock < (Number(item.quantity) || 0) * factor ? "text-rose-600 font-black" : "text-emerald-700 font-black"}>
+                            Stok Wadah Terpilih: <strong className={customPouchStock < (Number(item.quantity) || 0) * factor ? "text-rose-600 font-black" : "text-emerald-700 font-black"}>
                               {customPouchStock} pcs tersedia
                             </strong>
                             {customPouchStock < (Number(item.quantity) || 0) * factor && (
@@ -1033,13 +1126,41 @@ function ProductItemRow({
                         </div>
                       )}
                     </div>
-                    {marginPerUnit !== null && (
-                      <span className={cn("font-bold text-[10.5px]", marginPerUnit >= 0 ? "text-emerald-700 font-black" : "text-rose-600 font-black")}>
-                        Margin: {marginPerUnit >= 0 ? `+${formatIDR(marginPerUnit)}` : formatIDR(marginPerUnit)} / {baseUnit}
-                      </span>
-                    )}
+                  )}
+                </div>
+
+                {/* Section 3: Catatan Khusus Packing Gudang */}
+                <div className="pt-1">
+                  <label className="text-[11px] font-extrabold text-slate-700 block mb-1">
+                    📝 Catatan Khusus untuk Tim Packing Gudang (Opsional):
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Misal: Lakban keliling rapat, jangan cantumkan label harga, kardus tebal"
+                    value={item.customPackagingNote || ''}
+                    onChange={(e) => onChangeItem(idx, { customPackagingNote: e.target.value })}
+                    className="w-full px-2.5 py-2 rounded-xl bg-white border border-amber-200 text-xs font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  />
+                </div>
+
+                {/* Section 4: Live Preview Tag & Summary */}
+                <div className="p-2.5 rounded-xl bg-amber-500/15 border border-amber-300/60 flex items-center justify-between gap-2 flex-wrap text-xs">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[10px] font-black uppercase text-amber-950 bg-amber-200/80 px-1.5 py-0.5 rounded">
+                      Instruksi Gudang:
+                    </span>
+                    <span className="font-mono text-xs font-bold text-amber-950">
+                      {isPolos ? '[Request: Polosan / Tanpa Stiker]' : hasCustomSticker ? `[Tambahan Stiker: ${item.customStickerName || 'Khusus'}]` : '[Kemasan: Standar Lengkap]'}
+                      {hasCustomPackaging ? ` [Wadah: ${item.customPackagingName || 'Khusus'}]` : ''}
+                      {item.customPackagingNote ? ` [Catatan: ${item.customPackagingNote}]` : ''}
+                    </span>
                   </div>
-                )}
+                  {(Number(item.customPackagingCost) > 0 || Number(item.customStickerCost) > 0) && (
+                    <span className="font-bold text-amber-900 text-xs">
+                      Biaya Tambahan: +{formatIDR((Number(item.customPackagingCost) || 0) + (Number(item.customStickerCost) || 0))}/pcs
+                    </span>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -1107,6 +1228,7 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
   const recordPayment  = useRecordSembakoPayment()
   const createEmployee = useCreateSembakoEmployee()
   const { data: rawMaterialsList = [] } = useSembakoRawMaterials()
+  const { data: custodyList = [] } = useSembakoStockCustody()
 
   function getSavedInvoiceDraft() {
     try {
@@ -1144,6 +1266,10 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
   const [payAmount, setPayAmount] = useState(() => getSavedInvoiceDraft()?.payAmount ?? 0)
   const [payMethod, setPayMethod] = useState(() => getSavedInvoiceDraft()?.payMethod ?? 'cash')
   const [notes, setNotes]         = useState(() => getSavedInvoiceDraft()?.notes ?? '')
+
+  // ── Stock Source & Custody Tracking ─────────────────────────────────────────
+  const [stockSource, setStockSource] = useState(() => getSavedInvoiceDraft()?.stockSource ?? 'warehouse') // 'warehouse' | 'employee'
+  const [stockEmployeeId, setStockEmployeeId] = useState(() => getSavedInvoiceDraft()?.stockEmployeeId ?? '')
 
   // ── Packaging & Polymailer Calculation ──────────────────────────────────────
   const [packingType, setPackingType] = useState(() => getSavedInvoiceDraft()?.packingType ?? 'polymailer_hitam')
@@ -1197,6 +1323,7 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
   const [fuelCost, setFuelCost]                 = useState(() => getSavedInvoiceDraft()?.fuelCost ?? 0)
   const [addKurir, setAddKurir]                 = useState(false)
   const [newKurirForm, setNewKurirForm]         = useState({ full_name: '', phone: '' })
+  const [showVehicleDetails, setShowVehicleDetails] = useState(() => Boolean(getSavedInvoiceDraft()?.deliveryVehicle || getSavedInvoiceDraft()?.deliveryPlate))
 
   // Auto-prefill kendaraan & plat saat pilih sopir
   const handleSelectDriver = useCallback((driverId) => {
@@ -1243,6 +1370,7 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
     setUseDelivery(false); setDeliveryDriver(''); setDeliveryVehicle(''); setDeliveryPlate(''); setDeliveryArea(''); setFuelCost(0)
     setAddKurir(false); setNewKurirForm({ full_name: '', phone: '' })
     setQuickAddCust(false); setQuickAddProd(false); setShowCustSearch(false)
+    setStockSource('warehouse'); setStockEmployeeId('')
   }, [EDIT_DRAFT_KEY])
 
   // ── Derived data ────────────────────────────────────────────────────────────
@@ -1250,10 +1378,37 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
     customers.map(c => ({ value: c.id, label: c.customer_name })),
     [customers]
   )
-  const productOptions = useMemo(() =>
-    products.map(p => ({ value: p.id, label: `${p.product_name} (${p.current_stock} ${p.unit})` })),
-    [products]
-  )
+  const productOptions = useMemo(() => {
+    const selectedProductIds = new Set((items || []).map(it => it.product_id).filter(Boolean))
+
+    if (stockSource === 'employee' && stockEmployeeId) {
+      const empObj = employees.find(e => e.id === stockEmployeeId)
+      const empLabel = empObj?.full_name ? empObj.full_name.split(' ')[0] : 'Tim'
+      return products
+        .map(p => {
+          const empHold = custodyList.find(c => c.employee_id === stockEmployeeId && c.product_id === p.id)
+          const qty = Number(empHold?.quantity) || 0
+          return {
+            value: p.id,
+            label: `${p.product_name} (${qty} ${p.unit} di ${empLabel})`,
+            stock: qty
+          }
+        })
+        .filter(opt => opt.stock > 0 || selectedProductIds.has(opt.value))
+    }
+
+    return products
+      .map(p => {
+        const whHold = custodyList.find(c => (c.holder_type === 'warehouse' || !c.employee_id) && c.product_id === p.id)
+        const qty = whHold ? (Number(whHold.quantity) || 0) : (Number(p.current_stock) || 0)
+        return {
+          value: p.id,
+          label: `${p.product_name} (${qty} ${p.unit} di Gudang)`,
+          stock: qty
+        }
+      })
+      .filter(opt => opt.stock > 0 || selectedProductIds.has(opt.value))
+  }, [products, stockSource, stockEmployeeId, custodyList, employees, items])
   const packagingMaterials = useMemo(() => {
     return rawMaterialsList.filter(m => {
       const cat = String(m.category || '').toLowerCase()
@@ -1324,7 +1479,7 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
     return s + Math.round(sub)
   }, 0)
 
-  const isSellerShipping = deliveryMethod === 'ekspedisi' && shippingBorneBy === 'seller'
+  const isSellerShipping = (deliveryMethod === 'ekspedisi' || deliveryMethod === 'kurir_toko') && shippingBorneBy === 'seller'
   const effectiveCustomerDelivery = (isSellerShipping || deliveryMethod === 'pickup' || !useDelivery)
     ? 0
     : Number(deliveryCost || 0)
@@ -1338,10 +1493,16 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
     const factor = getFactor(i.selectedUnit || i.unit || 'pcs', prod)
     return s + Math.round((Number(i.quantity) || 0) * factor * (Number(i.cogs_per_unit) || 0))
   }, 0)
-  const grossProfit  = productSubtotal - totalCogs
+
+  // Keuntungan pengiriman kurir toko masuk sebagai keuntungan toko langsung
+  const deliveryProfit = (deliveryMethod === 'kurir_toko' && useDelivery && shippingBorneBy === 'buyer')
+    ? effectiveCustomerDelivery
+    : 0
+
+  const grossProfit  = (productSubtotal - totalCogs) + deliveryProfit
   const effectiveOtherCost = Number(otherCost || 0) + effectiveSellerShippingExpense
   const netProfit    = grossProfit - effectiveOtherCost
-  const netMarginPct = productSubtotal > 0 ? Math.round((netProfit / productSubtotal) * 100) : 0
+  const netMarginPct = (productSubtotal + deliveryProfit) > 0 ? Math.round((netProfit / (productSubtotal + deliveryProfit)) * 100) : 0
 
   // Auto-sync payAmount to full totalAmount for cash customers if not manually set to partial in create mode
   const prevTotalRef = useRef(totalAmount)
@@ -1491,6 +1652,11 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
         const noBackSticker = Boolean(it.no_back_sticker || itNotesStr.includes('tanpa stiker') || itNotesStr.includes('tanpa stiker belakang') || itNotesStr.includes('polos') || itNotesStr.includes('polosan'))
         const noPolymailer = Boolean(it.no_polymailer || itNotesStr.includes('tanpa polymailer') || itNotesStr.includes('tanpa poly') || itNotesStr.includes('polosan:'))
 
+        const customStickerMatch = (it.notes && it.notes.match(/\[Tambahan Stiker:\s*([^\]\+]+)(?:\s*\(\+([^\)]+)\))?\]/i)) ||
+          (editSale.notes && editSale.notes.match(/\[Tambahan Stiker:\s*([^\]\+]+)(?:\s*\(\+([^\)]+)\))?\]/i))
+        const customStickerName = it.customStickerName || it.custom_sticker_name || (customStickerMatch ? customStickerMatch[1].trim() : '')
+        const customStickerCost = Number(it.customStickerCost || it.custom_sticker_cost || 0)
+
         return {
           product_id: it.product_id,
           product_name: cleanName,
@@ -1505,6 +1671,8 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
           customPackagingName,
           customPackagingCost,
           customPackagingNote,
+          customStickerName,
+          customStickerCost,
           noFrontSticker,
           noBackSticker,
           noPolymailer,
@@ -1514,7 +1682,7 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
       setStep(1)
     } else {
       // Items kosong (data lama) — buka di step 1 juga, customer sudah prefill, tinggal isi barang
-      setItems([{ product_id: '', product_name: '', unit: '', selectedUnit: '', priceMode: 'per_base', quantity: 0, price_per_unit: 0, cogs_per_unit: 0, useCustomPackaging: false, customPackagingId: '', customPackagingName: '', customPackagingCost: 0, customPackagingNote: '', noFrontSticker: false, noBackSticker: false, noPolymailer: false }])
+      setItems([{ product_id: '', product_name: '', unit: '', selectedUnit: '', priceMode: 'per_base', quantity: 0, price_per_unit: 0, cogs_per_unit: 0, useCustomPackaging: false, customPackagingId: '', customPackagingName: '', customPackagingCost: 0, customPackagingNote: '', customStickerName: '', customStickerCost: 0, noFrontSticker: false, noBackSticker: false, noPolymailer: false }])
       setStep(1)
     }
   }, [open, editSale, rawMaterialsList])
@@ -1676,7 +1844,8 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
         const stdKemasan = matchKemasanMaterial(p, rawMaterialsList)
         const stdKemasanCost = Number(stdKemasan?.unit_cost) || 0
         const newKemasanCost = customKemasan ? (Number(customKemasan.unit_cost) || 0) : stdKemasanCost
-        const deltaPackaging = (current.useCustomPackaging ? (newKemasanCost - stdKemasanCost) : 0) + deltaStickers + deltaPolymailer
+        const extraStickerCost = Number(current.customStickerCost) || 0
+        const deltaPackaging = (current.useCustomPackaging ? (newKemasanCost - stdKemasanCost) : 0) + deltaStickers + deltaPolymailer + extraStickerCost
 
         const factor = getFactor(current.selectedUnit || p.unit || 'pcs', p)
         const qtyInBase = (Number(current.quantity) || 0) * factor
@@ -1739,15 +1908,21 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
         if (i.noFrontSticker && i.noBackSticker && i.noPolymailer) {
           stickerTag = '[Polosan: Tanpa Stiker & Tanpa Polymailer]'
         } else if (i.noFrontSticker && i.noBackSticker) {
-          stickerTag = '[Tanpa Stiker / Polos]'
+          stickerTag = '[Request: Polosan / Tanpa Stiker]'
         } else if (i.noFrontSticker) {
           stickerTag = '[Tanpa Stiker Depan]'
         } else if (i.noBackSticker) {
           stickerTag = '[Tanpa Stiker Belakang]'
         }
+        const extraStickerTag = i.customStickerName
+          ? `[Tambahan Stiker: ${i.customStickerName}${Number(i.customStickerCost) > 0 ? ` (+${formatIDR(i.customStickerCost)}/pcs)` : ''}]`
+          : ''
         const polyTag = i.noPolymailer && !stickerTag.includes('Polymailer') ? '[Tanpa Polymailer]' : ''
+        const warehouseNoteTag = (!i.useCustomPackaging && i.customPackagingNote)
+          ? `[Catatan Gudang: ${i.customPackagingNote}]`
+          : ''
         const baseNotes = prod?.notes || i.notes || ''
-        const itemFinalNotes = [baseNotes, customPackagingTag, stickerTag, polyTag].filter(Boolean).join(' ')
+        const itemFinalNotes = [baseNotes, customPackagingTag, stickerTag, extraStickerTag, polyTag, warehouseNoteTag].filter(Boolean).join(' ')
 
         return {
           ...i,
@@ -1762,6 +1937,8 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
           custom_packaging_id: i.customPackagingId || null,
           custom_packaging_name: i.customPackagingName || null,
           custom_packaging_note: i.customPackagingNote || null,
+          custom_sticker_name: i.customStickerName || null,
+          custom_sticker_cost: Number(i.customStickerCost) || 0,
           no_front_sticker: Boolean(i.noFrontSticker),
           no_back_sticker: Boolean(i.noBackSticker),
           no_polymailer: Boolean(i.noPolymailer),
@@ -1780,15 +1957,27 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
         finalNotes = finalNotes ? `${finalNotes}\n${costTag}` : costTag
       }
 
-      if (deliveryMethod === 'ekspedisi' && useDelivery) {
-        if (shippingBorneBy === 'seller' && sellerShippingFee > 0) {
-          const shipTag = `[Ongkir Ditanggung Penjual: Rp ${formatIDR(sellerShippingFee)}]`
-          finalNotes = finalNotes.replace(/\[Ongkir Ditanggung[^\]]+\]/g, '').trim()
-          finalNotes = finalNotes ? `${finalNotes}\n${shipTag}` : shipTag
-        } else if (shippingBorneBy === 'buyer' && effectiveCustomerDelivery > 0) {
-          const shipTag = `[Ongkir Ditanggung Pembeli: Rp ${formatIDR(effectiveCustomerDelivery)}]`
-          finalNotes = finalNotes.replace(/\[Ongkir Ditanggung[^\]]+\]/g, '').trim()
-          finalNotes = finalNotes ? `${finalNotes}\n${shipTag}` : shipTag
+      if (useDelivery) {
+        if (deliveryMethod === 'ekspedisi') {
+          if (shippingBorneBy === 'seller' && sellerShippingFee > 0) {
+            const shipTag = `[Ongkir Ditanggung Penjual: Rp ${formatIDR(sellerShippingFee)}]`
+            finalNotes = finalNotes.replace(/\[Ongkir Ditanggung[^\]]+\]/g, '').trim()
+            finalNotes = finalNotes ? `${finalNotes}\n${shipTag}` : shipTag
+          } else if (shippingBorneBy === 'buyer' && effectiveCustomerDelivery > 0) {
+            const shipTag = `[Ongkir Ditanggung Pembeli: Rp ${formatIDR(effectiveCustomerDelivery)}]`
+            finalNotes = finalNotes.replace(/\[Ongkir Ditanggung[^\]]+\]/g, '').trim()
+            finalNotes = finalNotes ? `${finalNotes}\n${shipTag}` : shipTag
+          }
+        } else if (deliveryMethod === 'kurir_toko') {
+          if (shippingBorneBy === 'seller') {
+            const shipTag = `[Kurir Toko (Free Ongkir): Beban Toko Rp ${formatIDR(sellerShippingFee)}]`
+            finalNotes = finalNotes.replace(/\[Kurir Toko[^\]]+\]/g, '').trim()
+            finalNotes = finalNotes ? `${finalNotes}\n${shipTag}` : shipTag
+          } else if (shippingBorneBy === 'buyer' && effectiveCustomerDelivery > 0) {
+            const shipTag = `[Kurir Toko (Profit Toko): Rp ${formatIDR(effectiveCustomerDelivery)}]`
+            finalNotes = finalNotes.replace(/\[Kurir Toko[^\]]+\]/g, '').trim()
+            finalNotes = finalNotes ? `${finalNotes}\n${shipTag}` : shipTag
+          }
         }
       }
 
@@ -1821,10 +2010,19 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
         return
       }
 
+      if (stockSource === 'employee' && stockEmployeeId) {
+        const emp = employees.find(e => e.id === stockEmployeeId)
+        const empName = emp?.full_name || 'Tim Lapangan'
+        const stockTag = `[Pengambilan Stok: Dibawa ${empName}]`
+        finalNotes = finalNotes ? `${finalNotes}\n${stockTag}` : stockTag
+      }
+
       const sale = await createSale.mutateAsync({
         customer_id: custId || null, customer_name: custName,
         transaction_date: txnDate, due_date: dueDate || null,
         items: validItems, delivery_cost: effectiveCustomerDelivery, other_cost: effectiveOtherCost, notes: finalNotes,
+        stock_source: stockSource,
+        employee_id: stockSource === 'employee' ? stockEmployeeId : null,
         packing_details: {
           packing_type: packingType,
           material_name: packingType === 'kardus' ? 'Kardus & Safety' : 'Plastik Packing Polymailer Hitam',
@@ -1844,19 +2042,22 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
       if (useDelivery && sale?.id) {
         const deliveryNotes = deliveryMethod === 'ekspedisi'
           ? (courierName ? `Ekspedisi: ${courierName}` : 'Ekspedisi / Cargo Luar Kota')
-          : (otherCost > 0 && selectedCostChips.length > 0
-              ? `Biaya Tambahan: ${selectedCostChips.join(', ')}${otherCostNotes ? ` (${otherCostNotes})` : ''}`
-              : (deliveryStatus === 'terkirim' ? 'Pengiriman kurir/armada toko' : 'Jadwal pengiriman armada toko'))
+          : (shippingBorneBy === 'seller'
+              ? `Kurir Toko (Free Ongkir - Biaya Toko ${formatIDR(sellerShippingFee)})`
+              : (effectiveCustomerDelivery > 0
+                  ? `Kurir Toko (Ongkir ${formatIDR(effectiveCustomerDelivery)} - Profit Toko)`
+                  : 'Kurir Toko (Bebas Ongkir)'))
 
         await createDelivery.mutateAsync({
           sale_id: sale.id,
           employee_id: deliveryDriver || null,
-          driver_name: deliveryMethod === 'ekspedisi' ? (courierName || 'Ekspedisi Eksternal') : (employees.find(e => e.id === deliveryDriver)?.full_name || null),
-          vehicle_type: deliveryMethod === 'ekspedisi' ? 'cargo' : deliveryVehicle, 
-          vehicle_plate: deliveryPlate.toUpperCase(),
+          driver_name: deliveryMethod === 'ekspedisi' ? (courierName || 'Ekspedisi Eksternal') : (employees.find(e => e.id === deliveryDriver)?.full_name || 'Kurir Toko'),
+          vehicle_type: deliveryMethod === 'ekspedisi' ? 'cargo' : (deliveryVehicle || 'motor'), 
+          vehicle_plate: deliveryPlate ? deliveryPlate.toUpperCase() : null,
           delivery_date: txnDate,
           status: deliveryStatus || 'terkirim',
-          delivered_at: deliveryStatus === 'terkirim' ? new Date().toISOString() : null,
+          completed_at: deliveryStatus === 'terkirim' ? new Date().toISOString() : null,
+          delivery_area: deliveryArea || null,
           notes: deliveryNotes,
         })
       }
@@ -1925,6 +2126,7 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
           if (d.dueDate) setDueDate(d.dueDate)
           if (Array.isArray(d.items) && d.items.length > 0) setItems(d.items)
           if (d.deliveryCost !== undefined) setDeliveryCost(d.deliveryCost)
+          if (d.deliveryMethod) setDeliveryMethod(d.deliveryMethod)
           if (d.shippingBorneBy) setShippingBorneBy(d.shippingBorneBy)
           if (d.sellerShippingFee !== undefined) setSellerShippingFee(d.sellerShippingFee)
           if (d.otherCost !== undefined) setOtherCost(d.otherCost)
@@ -1939,6 +2141,8 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
           if (d.deliveryPlate) setDeliveryPlate(d.deliveryPlate)
           if (d.deliveryArea) setDeliveryArea(d.deliveryArea)
           if (d.fuelCost !== undefined) setFuelCost(d.fuelCost)
+          if (d.stockSource) setStockSource(d.stockSource)
+          if (d.stockEmployeeId) setStockEmployeeId(d.stockEmployeeId)
           if (d.step !== undefined && d.custId) {
             setStep(d.step)
           } else {
@@ -1990,8 +2194,10 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
         const draftData = {
           custId, txnDate, dueDate, items, deliveryCost, otherCost,
           selectedCostChips, otherCostNotes,
-          payAmount, payMethod, notes, useDelivery, deliveryDriver,
-          deliveryVehicle, deliveryPlate, deliveryArea, fuelCost, step
+          payAmount, payMethod, notes, useDelivery, deliveryMethod,
+          shippingBorneBy, sellerShippingFee, deliveryDriver,
+          deliveryVehicle, deliveryPlate, deliveryArea, fuelCost, step,
+          stockSource, stockEmployeeId
         }
         localStorage.setItem(INVOICE_DRAFT_KEY, JSON.stringify(draftData))
       } else {
@@ -2008,7 +2214,7 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
       }
       localStorage.setItem(EDIT_DRAFT_KEY, JSON.stringify(editDraftData))
     }
-  }, [open, editId, EDIT_DRAFT_KEY, custId, txnDate, dueDate, items, deliveryCost, otherCost, selectedCostChips, otherCostNotes, payAmount, payMethod, notes, useDelivery, deliveryDriver, deliveryVehicle, deliveryPlate, deliveryArea, fuelCost, step])
+  }, [open, editId, EDIT_DRAFT_KEY, custId, txnDate, dueDate, items, deliveryCost, otherCost, selectedCostChips, otherCostNotes, payAmount, payMethod, notes, useDelivery, deliveryMethod, shippingBorneBy, sellerShippingFee, deliveryDriver, deliveryVehicle, deliveryPlate, deliveryArea, fuelCost, step, stockSource, stockEmployeeId])
 
   const handleClose = useCallback(() => {
     if (isSavedRef.current) {
@@ -2061,6 +2267,11 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
 
     // 2. Validasi Step 1 (Input Produk)
     if (step === 1) {
+      if (stockSource === 'employee' && !stockEmployeeId) {
+        toast.error('Pilih staf atau tim yang membawa stok terlebih dahulu')
+        return
+      }
+
       const validItems = items
         .filter(i => i.product_id && Number(i.quantity) > 0)
         .map(i => ({ ...i, quantity: Number(i.quantity) }))
@@ -2074,6 +2285,10 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
       // In edit mode, this sale's original qty will be restored before re-deduction,
       // so effective available = current_stock + original qty for that product in this sale
       const getEffectiveStock = (productId) => {
+        if (stockSource === 'employee' && stockEmployeeId) {
+          const empCustody = custodyList.find(c => c.employee_id === stockEmployeeId && c.product_id === productId)
+          return Number(empCustody?.quantity) || 0
+        }
         const prod = products.find(p => p.id === productId)
         if (!prod) return 0
         const originalQty = editId
@@ -2102,11 +2317,19 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
           }
         }
 
-        // 2. Check general product / BOM stock
+        // 2. Check general product / employee custody stock
         const available = getEffectiveStock(item.product_id)
-        if (available > 0 && qtyInBase > available) {
-          toast.error(`Stok ${prod.product_name} tidak cukup — tersedia ${available} ${prod.unit ?? 'unit'}, diminta ${qtyInBase} ${prod.unit ?? 'unit'}`)
-          return
+        if (stockSource === 'employee') {
+          if (qtyInBase > available) {
+            const empName = employees.find(e => e.id === stockEmployeeId)?.full_name || 'Staf'
+            toast.error(`Stok ${prod.product_name} pada ${empName} tidak cukup (tersedia ${available} ${prod.unit ?? 'unit'}, diminta ${qtyInBase}). Lakukan serah terima stok di menu Gudang jika perlu menambah bawaan.`)
+            return
+          }
+        } else {
+          if (available > 0 && qtyInBase > available) {
+            toast.error(`Stok ${prod.product_name} di Gudang tidak cukup — tersedia ${available} ${prod.unit ?? 'unit'}, diminta ${qtyInBase} ${prod.unit ?? 'unit'}`)
+            return
+          }
         }
       }
     }
@@ -2388,6 +2611,115 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
                       </button>
                     </div>
 
+                    {/* ─── Sumber Pengambilan Stok (Gudang vs. Tim Lapangan) ─── */}
+                    <div className="rounded-2xl p-4 space-y-3 bg-white border border-slate-200/90 shadow-xs">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className={cn(
+                            "w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 transition-colors",
+                            stockSource === 'warehouse' 
+                              ? "bg-amber-50 text-amber-700 border border-amber-200" 
+                              : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                          )}>
+                            {stockSource === 'warehouse' ? <Building2 size={18} /> : <Truck size={18} />}
+                          </div>
+                          <div className="min-w-0">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 block">
+                              Sumber / Lokasi Stok Fisik
+                            </span>
+                            <p className="text-xs font-black text-slate-900 truncate">
+                              {stockSource === 'warehouse' ? 'Gudang Utama (Stok Rak/Pabrik)' : 'Dibawa Tim Lapangan / Kanvas'}
+                            </p>
+                          </div>
+                        </div>
+                        <span className={cn(
+                          "text-[10px] font-black px-2.5 py-1 rounded-full border shrink-0 tracking-wide",
+                          stockSource === 'warehouse'
+                            ? "bg-amber-50 text-amber-800 border-amber-200/80"
+                            : "bg-emerald-50 text-emerald-800 border-emerald-200/80"
+                        )}>
+                          {stockSource === 'warehouse' ? '🏢 Gudang' : '👥 Bawaan Tim'}
+                        </span>
+                      </div>
+
+                      {/* Segmented Control Buttons (Clean, High Contrast & No Overlap) */}
+                      <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100/90 rounded-xl border border-slate-200">
+                        <button
+                          type="button"
+                          onClick={() => setStockSource('warehouse')}
+                          className={cn(
+                            "py-2.5 px-3 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer",
+                            stockSource === 'warehouse'
+                              ? "bg-white text-slate-950 shadow-xs border border-slate-200/90"
+                              : "text-slate-600 hover:text-slate-950 hover:bg-slate-200/50 border border-transparent"
+                          )}
+                        >
+                          <Building2 size={15} className="shrink-0 text-amber-600" />
+                          <span className="truncate">Gudang Utama</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setStockSource('employee')}
+                          className={cn(
+                            "py-2.5 px-3 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer",
+                            stockSource === 'employee'
+                              ? "bg-white text-slate-950 shadow-xs border border-slate-200/90"
+                              : "text-slate-600 hover:text-slate-950 hover:bg-slate-200/50 border border-transparent"
+                          )}
+                        >
+                          <Truck size={15} className="shrink-0 text-emerald-600" />
+                          <span className="truncate">Dibawa Tim / Staff</span>
+                        </button>
+                      </div>
+
+                      {/* Employee selector when stockSource === 'employee' */}
+                      {stockSource === 'employee' && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="pt-2 space-y-2 border-t border-slate-100"
+                        >
+                          <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider block">
+                            Pilih Staf yang Membawa Stok:
+                          </label>
+                          <Select
+                            value={stockEmployeeId || 'none'}
+                            onValueChange={(val) => setStockEmployeeId(val === 'none' ? '' : val)}
+                          >
+                            <SelectTrigger className="w-full h-11 bg-white border border-slate-300 rounded-xl px-3 text-slate-900 text-xs font-bold focus:outline-none focus:border-slate-800 shadow-xs">
+                              <SelectValue placeholder="-- Pilih Tim / Pegawai Lapangan --" />
+                            </SelectTrigger>
+                            <SelectContent className="z-[9999]">
+                              <SelectItem value="none">-- Pilih Tim / Pegawai Lapangan --</SelectItem>
+                              {employees.map(emp => {
+                                const totalHeld = custodyList
+                                  .filter(c => c.employee_id === emp.id)
+                                  .reduce((sum, c) => sum + (Number(c.quantity) || 0), 0)
+                                return (
+                                  <SelectItem key={emp.id} value={emp.id}>
+                                    {emp.full_name} ({emp.role || 'Staff'}) — Membawa {totalHeld} pcs stok
+                                  </SelectItem>
+                                )
+                              })}
+                            </SelectContent>
+                          </Select>
+                          {!stockEmployeeId ? (
+                            <p className="text-[11px] font-semibold text-amber-700 bg-amber-50 p-2 rounded-lg border border-amber-200/70 flex items-center gap-1.5">
+                              <span>⚠️</span>
+                              <span>Pilih staf yang membawa barang agar stok bawaannya terpotong otomatis saat nota dibuat.</span>
+                            </p>
+                          ) : (
+                            <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/60 text-xs">
+                              <span className="text-[11px] text-slate-500 font-medium">
+                                Penjualan ini akan memotong saldo stok yang dipegang oleh <strong>{employees.find(e => e.id === stockEmployeeId)?.full_name}</strong>.
+                              </span>
+                            </div>
+                          )}
+                        </motion.div>
+                      )}
+                    </div>
+
                     <div className="flex items-center justify-between">
                       <label className={labelCn}>Item Produk</label>
                       {productsLoading
@@ -2441,8 +2773,22 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
                           }
                         }
 
+                        // Determine available stock depending on stockSource
+                        let availableStock = 0
+                        let stockSourceLabel = 'Gudang'
+                        if (stockSource === 'employee' && stockEmployeeId) {
+                          const empHold = custodyList.find(c => c.employee_id === stockEmployeeId && c.product_id === item.product_id)
+                          availableStock = (Number(empHold?.quantity) || 0) + originalQty
+                          const empObj = employees.find(e => e.id === stockEmployeeId)
+                          stockSourceLabel = empObj?.full_name ? empObj.full_name.split(' ')[0] : 'Staf'
+                        } else {
+                          const whHold = custodyList.find(c => (c.holder_type === 'warehouse' || !c.employee_id) && c.product_id === item.product_id)
+                          const whQty = whHold ? (Number(whHold.quantity) || 0) : (Number(prod?.current_stock) || 0)
+                          availableStock = whQty + originalQty
+                        }
+
                         const isPouchOverstock = customPouchStock !== null && qtyInBase > customPouchStock
-                        const isGeneralOverstock = prod && qtyInBase > ((prod.current_stock || 0) + originalQty)
+                        const isGeneralOverstock = prod && qtyInBase > availableStock
                         const overStock = isPouchOverstock || isGeneralOverstock
 
                         return (
@@ -2456,6 +2802,8 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
                             isPouchOverstock={isPouchOverstock}
                             customPouchStock={customPouchStock}
                             customPouchName={customPouchName}
+                            availableStockQty={availableStock}
+                            stockSourceLabel={stockSourceLabel}
                             onChangeItem={handleItemChange}
                             onRemove={idx => setItems(items.filter((_, i) => i !== idx))}
                             onAddNew={() => setQuickAddProd(true)}
@@ -2694,7 +3042,7 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
                                 ))}
                               </div>
                               <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 font-medium italic">
-                                * Ditambahkan ke total nota tagihan pelanggan ({deliveryCost === 0 ? 'Tercatat Bebas Ongkir' : 'menambah total invoice'}).
+                                * Ditambahkan ke total nota tagihan pelanggan {deliveryCost > 0 ? '(diteruskan ke kurir ekspedisi, bukan keuntungan toko).' : '(Tercatat Bebas Ongkir).'}
                               </p>
                             </div>
                           ) : (
@@ -2740,109 +3088,44 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
                           exit={{ opacity: 0, height: 0 }}
                           className="space-y-4 overflow-hidden pt-1"
                         >
-                          <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs font-medium text-blue-800 dark:text-blue-300 flex items-center gap-2">
-                            <span>💡</span>
-                            <span>Rincian kurir & kendaraan di bawah ini <strong>opsional</strong>. Boleh langsung klik <strong>"Lanjut"</strong>.</span>
-                          </div>
-
-                          {/* Jenis Kendaraan chips */}
-                          <div>
-                            <label className={labelCn}>Jenis Kendaraan <span className="normal-case opacity-60 font-normal">(Opsional)</span></label>
-                            <div className="flex flex-wrap gap-2 mt-1">
-                              {VEHICLE_TYPES.map(({ value, label, Icon }) => {
-                                const active = deliveryVehicle === value
-                                return (
+                          {/* 1. Sopir / Kurir & Area Pengiriman (Grid 2 Kolom Ringkas) */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                              <div className="flex items-center justify-between mb-1">
+                                <label className={labelCn}>Sopir / Kurir Toko <span className="normal-case opacity-60 font-normal">(Opsional)</span></label>
+                                {!addKurir && (
                                   <button
-                                    key={value}
                                     type="button"
-                                    onClick={() => setDeliveryVehicle(active ? '' : value)}
-                                    className="flex items-center gap-1.5 px-3 h-9 rounded-xl text-xs font-bold transition-all"
-                                    style={{
-                                      background: active ? '#F1F5F9' : '#FFFFFF',
-                                      border: `${active ? 2 : 1}px solid ${active ? '#0F172A' : BORDER}`,
-                                      color: active ? '#0F172A' : '#64748B',
-                                    }}
+                                    onClick={() => setAddKurir(true)}
+                                    className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5 cursor-pointer"
                                   >
-                                    <Icon size={13} strokeWidth={2.5} />
-                                    {label}
+                                    <Plus size={12} /> Kurir Baru
                                   </button>
-                                )
-                              })}
-                            </div>
-                          </div>
-
-                          {/* No. Plat */}
-                          <div>
-                            <label className={labelCn}>No. Plat <span className="normal-case opacity-60 font-normal">(Opsional)</span></label>
-                            <input
-                              className={inputCn}
-                              value={deliveryPlate}
-                              onChange={e => setDeliveryPlate(e.target.value.toUpperCase())}
-                              placeholder="B 1234 XY (opsional)"
-                            />
-                          </div>
-
-                          {/* Sopir / Kurir */}
-                          <div>
-                            <label className={labelCn}>Sopir / Kurir <span className="normal-case opacity-60 font-normal">(Opsional)</span></label>
-                            <div className="space-y-2">
-                              {/* Belum Ditentukan */}
-                              <button
-                                type="button"
-                                onClick={() => setDeliveryDriver('')}
-                                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all"
-                                style={{
-                                  background: !deliveryDriver ? '#F1F5F9' : SURFACE,
-                                  border: `1px solid ${!deliveryDriver ? '#0F172A' : BORDER}`,
-                                }}
-                              >
-                                <div style={{ width: 32, height: 32, borderRadius: 10, background: !deliveryDriver ? '#E2E8F0' : '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 16, color: MUTED }}>–</div>
-                                <span className="font-bold text-sm" style={{ color: !deliveryDriver ? '#0F172A' : MUTED }}>Belum Ditentukan (Kosongkan)</span>
-                                {!deliveryDriver && <Check size={14} color="#0F172A" strokeWidth={3} className="ml-auto" />}
-                              </button>
-
-                              {/* Employee cards */}
-                              {employees.filter(e => e.status === 'aktif').map(e => (
-                                <button
-                                  key={e.id}
-                                  type="button"
-                                  onClick={() => handleSelectDriver(e.id)}
-                                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all"
-                                  style={{
-                                    background: deliveryDriver === e.id ? '#F1F5F9' : SURFACE,
-                                    border: `1px solid ${deliveryDriver === e.id ? '#0F172A' : BORDER}`,
-                                  }}
-                                >
-                                  <div style={{ width: 32, height: 32, borderRadius: 10, background: deliveryDriver === e.id ? '#E2E8F0' : '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 14 }}>👤</div>
-                                  <div className="flex-1 min-w-0">
-                                    <p className="font-bold text-sm truncate" style={{ color: deliveryDriver === e.id ? '#0F172A' : TEXT }}>{e.full_name}</p>
-                                    <p className="text-[11px] font-medium capitalize" style={{ color: MUTED }}>{e.role}</p>
-                                  </div>
-                                  {deliveryDriver === e.id && <Check size={14} color="#0F172A" strokeWidth={3} />}
-                                </button>
-                              ))}
-
-                              {/* Tambah Kurir Baru */}
+                                )}
+                              </div>
                               {!addKurir ? (
-                                <button
-                                  type="button"
-                                  onClick={() => setAddKurir(true)}
-                                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm transition-all"
-                                  style={{ background: 'rgba(15,23,42,0.06)', border: `1px dashed ${ACCENT}`, color: ACCENT }}
+                                <select
+                                  className={`${inputCn} cursor-pointer font-medium`}
+                                  value={deliveryDriver}
+                                  onChange={e => handleSelectDriver(e.target.value)}
                                 >
-                                  <Plus size={15} /> Tambah Kurir Baru
-                                </button>
+                                  <option value="">– Belum Ditentukan (Kosongkan) –</option>
+                                  {employees.filter(e => e.status === 'aktif').map(e => (
+                                    <option key={e.id} value={e.id}>
+                                      👤 {e.full_name} ({e.role || 'Kurir'})
+                                    </option>
+                                  ))}
+                                </select>
                               ) : (
                                 <motion.div
-                                  initial={{ opacity: 0, height: 0 }}
-                                  animate={{ opacity: 1, height: 'auto' }}
-                                  className="space-y-3 overflow-hidden p-4 rounded-2xl"
-                                  style={{ background: SURFACE, border: `1px solid ${BORDER}` }}
+                                  initial={{ opacity: 0, scale: 0.95 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  className="p-3 rounded-xl border border-blue-200 dark:border-blue-900/50 bg-blue-50/50 dark:bg-blue-950/20 space-y-2"
                                 >
-                                  <p className="text-[9px] font-black uppercase tracking-widest" style={{ color: MUTED }}>Data Kurir Baru</p>
+                                  <p className="text-[10px] font-black uppercase tracking-wider text-blue-800 dark:text-blue-300">Tambah Kurir Cepat</p>
                                   <input
                                     className={inputCn}
-                                    placeholder="Nama lengkap *"
+                                    placeholder="Nama lengkap kurir *"
                                     value={newKurirForm.full_name}
                                     onChange={e => setNewKurirForm(f => ({ ...f, full_name: e.target.value }))}
                                   />
@@ -2852,12 +3135,11 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
                                     value={newKurirForm.phone}
                                     onChange={e => setNewKurirForm(f => ({ ...f, phone: e.target.value }))}
                                   />
-                                  <div className="flex gap-2">
+                                  <div className="flex gap-2 pt-1">
                                     <button
                                       type="button"
                                       onClick={() => { setAddKurir(false); setNewKurirForm({ full_name: '', phone: '' }) }}
-                                      className="flex-1 h-10 rounded-xl text-xs font-bold"
-                                      style={{ background: 'rgba(255,255,255,0.05)', color: MUTED, border: `1px solid ${BORDER}` }}
+                                      className="flex-1 h-8 rounded-lg text-xs font-bold border border-slate-300 dark:border-white/10 text-slate-600 dark:text-slate-300 cursor-pointer"
                                     >
                                       Batal
                                     </button>
@@ -2865,80 +3147,202 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
                                       type="button"
                                       onClick={handleSaveKurir}
                                       disabled={createEmployee.isPending}
-                                      className="flex-1 h-10 rounded-xl text-xs font-bold"
-                                      style={{ background: '#3B82F6', color: '#fff', opacity: createEmployee.isPending ? 0.6 : 1 }}
+                                      className="flex-1 h-8 rounded-lg text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 cursor-pointer"
                                     >
-                                      {createEmployee.isPending ? 'Menyimpan...' : 'Simpan Kurir'}
+                                      {createEmployee.isPending ? '...' : 'Simpan'}
                                     </button>
                                   </div>
                                 </motion.div>
                               )}
                             </div>
-                          </div>
 
-                          {/* Area Pengiriman */}
-                          <div>
-                            <label className={labelCn}>Area Pengiriman <span className="normal-case opacity-60 font-normal">(Opsional)</span></label>
-                            <input
-                              className={inputCn}
-                              value={deliveryArea}
-                              onChange={e => setDeliveryArea(e.target.value)}
-                              placeholder="Contoh: Kec. Setiabudi (opsional)"
-                            />
-                          </div>
-
-                          {/* Ongkos Kirim (Ke Pelanggan) */}
-                          <div className="space-y-1.5 pt-2 border-t border-slate-200 dark:border-white/10">
-                            <div className="flex items-center justify-between">
-                              <label className={labelCn}>Ongkos Kirim (Ke Pelanggan)</label>
-                              <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
-                                deliveryCost === 0 ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300' : 'bg-indigo-100 dark:bg-indigo-950/60 text-indigo-800 dark:text-indigo-300'
-                              }`}>
-                                {deliveryCost === 0 ? '🎁 Bebas Ongkir' : `+${formatIDR(deliveryCost)}`}
-                              </span>
+                            <div>
+                              <label className={labelCn}>Area Pengiriman <span className="normal-case opacity-60 font-normal">(Opsional)</span></label>
+                              <input
+                                className={inputCn}
+                                value={deliveryArea}
+                                onChange={e => setDeliveryArea(e.target.value)}
+                                placeholder="Contoh: Kec. Setiabudi (opsional)"
+                              />
                             </div>
-                            <InputRupiah id="delivery-cost-input" value={deliveryCost} onChange={setDeliveryCost} />
-                            
-                            {/* Quick Ongkir Presets */}
-                            <div className="flex flex-wrap items-center gap-1 pt-1">
+                          </div>
+
+                          {/* 2. Siapa yang Menanggung Ongkos Kirim? (Identik dengan Ekspedisi) */}
+                          <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-white/10">
+                            <label className={labelCn}>Siapa yang Menanggung Ongkos Kirim?</label>
+                            <div className="grid grid-cols-2 gap-2">
                               <button
                                 type="button"
-                                onClick={() => setDeliveryCost(0)}
-                                className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
-                                  deliveryCost === 0
-                                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
-                                    : 'bg-white dark:bg-white/5 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-white/10 hover:border-emerald-400'
+                                onClick={() => setShippingBorneBy('buyer')}
+                                className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                                  shippingBorneBy === 'buyer'
+                                    ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white shadow-xs'
+                                    : 'bg-white dark:bg-white/5 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-white/10 hover:border-slate-400'
                                 }`}
                               >
-                                🎁 Bebas Ongkir (Rp 0)
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-black">👤 Ditanggung Pembeli</span>
+                                  {shippingBorneBy === 'buyer' && <Check size={14} strokeWidth={3} />}
+                                </div>
+                                <p className="text-[10px] opacity-75 mt-0.5">Ongkir masuk nota tagihan pelanggan</p>
                               </button>
-                              {[10000, 15000, 20000, 25000].map(amt => (
-                                <button
-                                  key={amt}
-                                  type="button"
-                                  onClick={() => setDeliveryCost(amt)}
-                                  className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
-                                    deliveryCost === amt
-                                      ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white shadow-xs'
-                                      : 'bg-white dark:bg-white/5 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-white/10 hover:border-slate-400'
-                                  }`}
-                                >
-                                  {amt / 1000}k
-                                </button>
-                              ))}
+
+                              <button
+                                type="button"
+                                onClick={() => setShippingBorneBy('seller')}
+                                className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                                  shippingBorneBy === 'seller'
+                                    ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white shadow-xs'
+                                    : 'bg-white dark:bg-white/5 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-white/10 hover:border-slate-400'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-black">🏪 Ditanggung Penjual</span>
+                                  {shippingBorneBy === 'seller' && <Check size={14} strokeWidth={3} />}
+                                </div>
+                                <p className="text-[10px] opacity-75 mt-0.5">Free Ongkir pembeli, beban toko</p>
+                              </button>
                             </div>
-                            <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 font-medium italic">
-                              * Ditagihkan ke nota pelanggan ({deliveryCost === 0 ? 'Tercatat GRATIS / Bebas Ongkir' : 'menambah total invoice'}).
-                            </p>
                           </div>
 
-                          {/* Biaya BBM / Operasional Internal */}
+                          {/* 3. Mode 1: Ongkir Ditanggung Pembeli */}
+                          {shippingBorneBy === 'buyer' ? (
+                            <div className="space-y-1.5 pt-1">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-1.5">
+                                  <label className={labelCn}>Ongkos Kirim Ditagihkan ke Pelanggan</label>
+                                  {deliveryCost > 0 && (
+                                    <span className="text-[9px] font-black px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300/60 dark:border-emerald-700/50">
+                                      💰 100% Keuntungan Toko
+                                    </span>
+                                  )}
+                                </div>
+                                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                                  deliveryCost === 0 ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300' : 'bg-indigo-100 dark:bg-indigo-950/60 text-indigo-800 dark:text-indigo-300'
+                                }`}>
+                                  {deliveryCost === 0 ? '🎁 Bebas Ongkir' : `+${formatIDR(deliveryCost)}`}
+                                </span>
+                              </div>
+                              <InputRupiah id="delivery-cost-input-kurir" value={deliveryCost} onChange={setDeliveryCost} />
+                              
+                              {/* Quick Ongkir Presets */}
+                              <div className="flex flex-wrap items-center gap-1 pt-1">
+                                {[0, 6000, 10000, 15000, 20000, 25000, 35000, 50000].map(amt => (
+                                  <button
+                                    key={amt}
+                                    type="button"
+                                    onClick={() => setDeliveryCost(amt)}
+                                    className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
+                                      deliveryCost === amt
+                                        ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white shadow-xs'
+                                        : 'bg-white dark:bg-white/5 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-white/10 hover:border-slate-400'
+                                    }`}
+                                  >
+                                    {amt === 0 ? '🎁 Rp 0' : `${amt >= 1000 ? amt / 1000 + 'k' : amt}`}
+                                  </button>
+                                ))}
+                              </div>
+                              <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 font-medium italic">
+                                * Ditambahkan ke total nota tagihan pelanggan {deliveryCost > 0 ? '(& langsung masuk sebagai keuntungan/profit toko).' : '(Tercatat Bebas Ongkir).'}
+                              </p>
+                            </div>
+                          ) : (
+                            /* Mode 2: Ongkir Ditanggung Penjual (Free Ongkir) */
+                            <div className="space-y-1.5 pt-1">
+                              <div className="flex items-center justify-between">
+                                <label className={labelCn}>Biaya Pengiriman Toko / BBM (Beban Penjual)</label>
+                                <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300">
+                                  Beban Toko: {formatIDR(sellerShippingFee)}
+                                </span>
+                              </div>
+                              <InputRupiah id="seller-shipping-fee-kurir" value={sellerShippingFee} onChange={setSellerShippingFee} />
+                              
+                              {/* Quick Presets */}
+                              <div className="flex flex-wrap items-center gap-1 pt-1">
+                                {[0, 6000, 10000, 15000, 20000, 25000, 35000, 50000].map(amt => (
+                                  <button
+                                    key={amt}
+                                    type="button"
+                                    onClick={() => setSellerShippingFee(amt)}
+                                    className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
+                                      sellerShippingFee === amt
+                                        ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white shadow-xs'
+                                        : 'bg-white dark:bg-white/5 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-white/10 hover:border-slate-400'
+                                    }`}
+                                  >
+                                    {amt === 0 ? 'Rp 0' : `${amt >= 1000 ? amt / 1000 + 'k' : amt}`}
+                                  </button>
+                                ))}
+                              </div>
+                              <p className="text-[10px] text-emerald-700 dark:text-emerald-400 mt-1 font-medium italic">
+                                * Pelanggan mendapat <strong>Bebas Ongkir (Rp 0 di nota)</strong>. Biaya bensin/kurir memotong laba operasional toko.
+                              </p>
+                            </div>
+                          )}
+
+                          {/* 4. Collapsible Accordion Kendaraan & Plat (Opsional) */}
                           <div className="pt-2 border-t border-slate-200 dark:border-white/10">
-                            <label className={labelCn}>Biaya BBM / Operasional Toko <span className="normal-case opacity-60 font-normal">(Internal Toko)</span></label>
-                            <InputRupiah value={otherCost} onChange={setOtherCost} />
-                            <p className="text-[10px] text-emerald-700 dark:text-emerald-400 mt-1 font-medium italic">
-                              * Beban operasional toko (memotong laba bersih, <strong>tidak masuk nota pelanggan</strong>).
-                            </p>
+                            <button
+                              type="button"
+                              onClick={() => setShowVehicleDetails(v => !v)}
+                              className="flex items-center justify-between w-full py-1.5 px-3 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition-all cursor-pointer"
+                            >
+                              <span className="flex items-center gap-1.5">
+                                <span>🚗</span> Rincian Kendaraan & Plat <span className="text-[10px] font-normal opacity-70">(Opsional)</span>
+                                {(deliveryVehicle || deliveryPlate) && (
+                                  <span className="text-[10px] bg-slate-200 dark:bg-white/10 text-slate-800 dark:text-slate-200 px-1.5 py-0.5 rounded font-mono font-bold">
+                                    {[deliveryVehicle, deliveryPlate].filter(Boolean).join(' • ')}
+                                  </span>
+                                )}
+                              </span>
+                              {showVehicleDetails ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                            </button>
+
+                            <AnimatePresence>
+                              {showVehicleDetails && (
+                                <motion.div
+                                  initial={{ opacity: 0, height: 0 }}
+                                  animate={{ opacity: 1, height: 'auto' }}
+                                  exit={{ opacity: 0, height: 0 }}
+                                  className="space-y-3 overflow-hidden pt-3"
+                                >
+                                  <div>
+                                    <label className={labelCn}>Jenis Kendaraan</label>
+                                    <div className="flex flex-wrap gap-2 mt-1">
+                                      {VEHICLE_TYPES.map(({ value, label, Icon }) => {
+                                        const active = deliveryVehicle === value
+                                        return (
+                                          <button
+                                            key={value}
+                                            type="button"
+                                            onClick={() => setDeliveryVehicle(active ? '' : value)}
+                                            className="flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                                            style={{
+                                              background: active ? '#0F172A' : '#FFFFFF',
+                                              border: `1px solid ${active ? '#0F172A' : BORDER}`,
+                                              color: active ? '#FFFFFF' : '#64748B',
+                                            }}
+                                          >
+                                            <Icon size={13} strokeWidth={2.5} />
+                                            {label}
+                                          </button>
+                                        )
+                                      })}
+                                    </div>
+                                  </div>
+
+                                  <div>
+                                    <label className={labelCn}>No. Plat Kendaraan</label>
+                                    <input
+                                      className={inputCn}
+                                      value={deliveryPlate}
+                                      onChange={e => setDeliveryPlate(e.target.value.toUpperCase())}
+                                      placeholder="Contoh: B 1234 XY (opsional)"
+                                    />
+                                  </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
                           </div>
                         </motion.div>
                       )}
@@ -3091,7 +3495,7 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
                               : 'text-emerald-600 dark:text-emerald-400'
                           }`}>
                             {shippingBorneBy === 'buyer' && effectiveCustomerDelivery > 0 
-                              ? `+${formatIDR(effectiveCustomerDelivery)} (Ditanggung Pembeli)` 
+                              ? `+${formatIDR(effectiveCustomerDelivery)} (${deliveryMethod === 'kurir_toko' ? 'Kurir Toko • Profit Toko' : 'Ekspedisi • Titipan Ongkir'})` 
                               : '🎁 Bebas Ongkir (Ditanggung Penjual)'}
                           </span>
                         </div>
@@ -3150,7 +3554,7 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
                         </button>
                       </div>
 
-                      {/* Meta Pills (Customer, Qty, Packaging, Method) */}
+                      {/* Meta Pills (Customer, Qty, Packaging, Method, Stock Source) */}
                       <div className="grid grid-cols-2 gap-2 text-xs">
                         <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200/60 dark:border-white/5 space-y-0.5">
                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pelanggan</p>
@@ -3167,6 +3571,21 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
                         </div>
 
                         <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200/60 dark:border-white/5 space-y-0.5">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Sumber Stok Fisik</p>
+                          <p className="font-black text-slate-900 dark:text-white truncate flex items-center gap-1.5">
+                            {stockSource === 'warehouse' ? (
+                              <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1 truncate">
+                                <Building2 size={13} className="shrink-0" /> <span className="truncate">Gudang Utama</span>
+                              </span>
+                            ) : (
+                              <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1 truncate">
+                                <Truck size={13} className="shrink-0" /> <span className="truncate">Dibawa {employees.find(e => e.id === stockEmployeeId)?.full_name || 'Tim Lapangan'}</span>
+                              </span>
+                            )}
+                          </p>
+                        </div>
+
+                        <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200/60 dark:border-white/5 space-y-0.5">
                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Kemasan Ekspedisi</p>
                           <p className="font-black text-slate-900 dark:text-white truncate">
                             {effectivePackingQty > 0 
@@ -3175,7 +3594,7 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
                           </p>
                         </div>
 
-                        <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200/60 dark:border-white/5 space-y-0.5">
+                        <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200/60 dark:border-white/5 space-y-0.5 col-span-2">
                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Metode Pengiriman</p>
                           <p className="font-black text-slate-900 dark:text-white truncate">
                             {deliveryMethod === 'ekspedisi' ? '📦 Ekspedisi / Cargo' : deliveryMethod === 'kurir_toko' ? '🛵 Kurir Toko' : '🏪 Ambil Sendiri'}
@@ -3194,7 +3613,7 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
                           <span>Ongkos Kirim</span>
                           {shippingBorneBy === 'buyer' && effectiveCustomerDelivery > 0 ? (
                             <span className="font-bold text-slate-900 dark:text-white">
-                              +{formatIDR(effectiveCustomerDelivery)} <span className="text-[10px] font-normal text-slate-400 dark:text-slate-500">(Ditanggung Pembeli)</span>
+                              +{formatIDR(effectiveCustomerDelivery)} <span className="text-[10px] font-normal text-slate-400 dark:text-slate-500">({deliveryMethod === 'kurir_toko' ? 'Kurir Toko • Profit' : 'Ditanggung Pembeli'})</span>
                             </span>
                           ) : (
                             <span className="font-black text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-md border border-emerald-200/70 dark:border-emerald-800/40">
@@ -3278,9 +3697,17 @@ export function SembakoCreateInvoiceSheet({ open, onOpenChange, editId }) {
 
                       <div className="grid grid-cols-2 gap-2 text-[11px] pt-1 border-t border-emerald-500/20">
                         <div>
-                          <span style={{ color: MUTED }}>Gross Profit (Subtotal - HPP)</span>
+                          <span style={{ color: MUTED }}>
+                            {deliveryProfit > 0 ? 'Gross Profit (+Ongkir Kurir)' : 'Gross Profit (Subtotal - HPP)'}
+                          </span>
                           <p className="font-black mt-0.5" style={{ color: grossProfit >= 0 ? '#10B981' : '#EF4444' }}>
-                            {formatIDR(grossProfit)} {totalCogs === 0 && <span className="text-[9px] font-normal text-amber-400/80">(HPP Rp 0)</span>}
+                            {formatIDR(grossProfit)} {deliveryProfit > 0 ? (
+                              <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400">
+                                (+{formatIDR(deliveryProfit)} Ongkir)
+                              </span>
+                            ) : totalCogs === 0 && (
+                              <span className="text-[9px] font-normal text-amber-400/80">(HPP Rp 0)</span>
+                            )}
                           </p>
                         </div>
 

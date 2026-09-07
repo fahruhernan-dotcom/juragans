@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react'
-import { Truck, Store, FileText, CreditCard, Smartphone, ArrowRightLeft, Pencil, Trash2, CheckCircle2, Loader2, AlertCircle, ChevronDown, ChevronUp, Layers, PieChart } from 'lucide-react'
+import { Truck, Store, FileText, CreditCard, Smartphone, ArrowRightLeft, Pencil, Trash2, CheckCircle2, Loader2, AlertCircle, ChevronDown, ChevronUp, Layers, PieChart, Package, TrendingUp, MapPin, Hash } from 'lucide-react'
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet'
 import {
@@ -25,12 +25,32 @@ import {
   useSembakoProducts,
   useSembakoReturns,
   useRefundSembakoSaleOverpay,
+  useSembakoRawMaterials,
 } from '@/lib/hooks/useSembakoData'
+import {
+  matchBawangMaterial,
+  matchKemasanMaterial,
+  matchStickerFrontMaterial,
+  matchStickerBackMaterial,
+  matchOtherPackagingMaterial,
+  extractProductGrammage,
+} from '@/lib/inventory/bomStockCalculator'
 import InvoicePreviewModal from '@/components/invoice/InvoicePreviewModal'
 import { C, sBtn, sLabel, DetailRow, fmtDate, generateWAMessage, toWaLink, InputRupiah, CustomSelect, calculateSaleFinancials, formatUniversalPackaging } from './sembakoSaleUtils'
 import { SembakoPaymentSheet } from './SembakoPaymentSheet'
 import { DeliveryCompletionModal } from './DeliveryCompletionModal'
 import { useBackHandler } from '@/lib/hooks/useBackHandler'
+
+export const cleanProductNameForMatch = (name) => {
+  if (!name) return ''
+  return String(name)
+    .replace(/\[HERO\]/gi, '')
+    .replace(/\[\d+(?:\.\d+)?\s*[^\]]+\]/g, '')
+    .replace(/\[.*?\]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim()
+}
 
 export function SembakoSaleDetailSheet({ isOpen, onOpenChange, sale, onEdit }) {
   useBackHandler(isOpen, () => onOpenChange(false))
@@ -42,6 +62,7 @@ export function SembakoSaleDetailSheet({ isOpen, onOpenChange, sale, onEdit }) {
   const refundOverpay = useRefundSembakoSaleOverpay()
   const { data: products = [] } = useSembakoProducts()
   const { data: returnsList = [] } = useSembakoReturns()
+  const { data: rawMaterials = [] } = useSembakoRawMaterials()
 
   const sortedPayments = useMemo(() => {
     if (!sale) return []
@@ -104,7 +125,6 @@ export function SembakoSaleDetailSheet({ isOpen, onOpenChange, sale, onEdit }) {
   const [isSubmittingReturn, setIsSubmittingReturn] = useState(false)
   const [expandedHpp, setExpandedHpp] = useState({})
   const [showAllHpp, setShowAllHpp] = useState(false)
-  const [expandedTotalBom, setExpandedTotalBom] = useState(false)
 
   const fin = useMemo(() => {
     if (!sale) return null
@@ -118,6 +138,17 @@ export function SembakoSaleDetailSheet({ isOpen, onOpenChange, sale, onEdit }) {
     let totalStickerFront = 0
     let totalStickerBack = 0
     let totalOtherPkg = 0
+    let customPouchName = null
+    const matchedRawMaterialNames = {
+      bawang: null,
+      pouch: null,
+      stickerFront: null,
+      stickerBack: null,
+      otherPkg: null,
+      frontStock: null,
+      backStock: null,
+      backVendor: null,
+    }
 
     const items = fin.items
     const saleReturns = fin.saleReturns || []
@@ -129,26 +160,71 @@ export function SembakoSaleDetailSheet({ isOpen, onOpenChange, sale, onEdit }) {
       if (netQty <= 0) return
 
       const itNotes = (it.notes || '') + ' ' + (sale.notes || '')
-      const itNoFrontSticker = Boolean(it.no_front_sticker || itNotes.includes('[Tanpa Stiker') || itNotes.includes('[Polos') || itNotes.includes('[Polosan'))
-      const itNoBackSticker = Boolean(it.no_back_sticker || itNotes.includes('[Tanpa Stiker') || itNotes.includes('[Polos') || itNotes.includes('[Polosan'))
-      const itNoPolymailer = Boolean(it.no_polymailer || itNotes.includes('[Tanpa Polymailer') || itNotes.includes('Tanpa Polymailer') || itNotes.includes('[Polosan:'))
+      const itNoFrontSticker = Boolean(
+        it.no_front_sticker ||
+        /tanpa\s*stiker|polos|polosan|tanpa\s*label/i.test(itNotes) ||
+        /tanpa\s*stiker\s*depan/i.test(itNotes)
+      )
+      const itNoBackSticker = Boolean(
+        it.no_back_sticker ||
+        /tanpa\s*stiker|polos|polosan|tanpa\s*label/i.test(itNotes) ||
+        /tanpa\s*stiker\s*belakang/i.test(itNotes)
+      )
+      const itNoPolymailer = Boolean(
+        it.no_polymailer ||
+        fin.isPickup ||
+        /tanpa\s*polymailer|tanpa\s*kemasan|ambil\s*langsung|pickup/i.test(itNotes)
+      )
 
-      const matched = products.find(p => p.id === it.product_id || (p.product_name && it.product_name && p.product_name.toLowerCase().trim() === it.product_name.toLowerCase().trim()))
-      if (matched && (matched.raw_ingredient_cost > 0 || matched.pouch_cost > 0 || matched.sticker_front_cost > 0 || matched.sticker_back_cost > 0 || matched.other_packaging_cost > 0)) {
-        const rawCost = Number(matched.raw_ingredient_cost || 0)
-        const pouchCost = Number(matched.pouch_cost || 0)
-        const stdFront = Number(matched.sticker_front_cost || 0)
-        const stdBack = Number(matched.sticker_back_cost || 0)
-        const stdOther = Number(matched.other_packaging_cost || 0)
+      const cName = it.custom_packaging_name ||
+        (it.notes && (it.notes.match(/\[Kemasan:\s*([^\]]+)\]/i)?.[1] || it.notes.match(/\[Kemasan Khusus:\s*([^\]]+)\]/i)?.[1])) ||
+        (sale.notes && (sale.notes.match(/\[Kemasan:\s*([^\]]+)\]/i)?.[1] || sale.notes.match(/\[Kemasan Khusus:\s*([^\]]+)\]/i)?.[1]))
+      if (cName) customPouchName = cName
+
+      const itClean = cleanProductNameForMatch(it.product_name)
+      const matched = products.find(p => {
+        if (it.product_id && p.id === it.product_id) return true
+        if (!p.product_name || !it.product_name) return false
+        const pClean = cleanProductNameForMatch(p.product_name)
+        return pClean === itClean || (itClean && pClean.includes(itClean)) || (pClean && itClean.includes(pClean))
+      })
+
+      if (matched) {
+        const bMat = matchBawangMaterial(matched, rawMaterials)
+        const kMat = matchKemasanMaterial(matched, rawMaterials)
+        const sfMat = matchStickerFrontMaterial(matched, rawMaterials)
+        const sbMat = matchStickerBackMaterial(matched, rawMaterials)
+        const pmMat = matchOtherPackagingMaterial(matched, rawMaterials)
+
+        if (bMat?.material_name) matchedRawMaterialNames.bawang = bMat.material_name
+        if (kMat?.material_name) matchedRawMaterialNames.pouch = kMat.material_name
+        if (sfMat?.material_name) {
+          matchedRawMaterialNames.stickerFront = sfMat.material_name
+          matchedRawMaterialNames.frontStock = sfMat.current_stock
+        }
+        if (sbMat?.material_name) {
+          matchedRawMaterialNames.stickerBack = sbMat.material_name
+          matchedRawMaterialNames.backStock = sbMat.current_stock
+          matchedRawMaterialNames.backVendor = sbMat.supplier_name
+        }
+        if (pmMat?.material_name) matchedRawMaterialNames.otherPkg = pmMat.material_name
+
+        const gram = extractProductGrammage(matched.product_name, matched.notes)
+        const bUnitCost = bMat ? (bMat.unit === 'kg' ? Math.round((Number(bMat.unit_cost) / 1000) * gram) : Number(bMat.unit_cost)) : Number(matched.raw_ingredient_cost || 0)
+        const kUnitCost = kMat ? Number(kMat.unit_cost) : Number(matched.pouch_cost || 0)
+        const sfUnitCost = sfMat ? Number(sfMat.unit_cost) : Number(matched.sticker_front_cost || 1300)
+        const sbUnitCost = sbMat ? Number(sbMat.unit_cost) : Number(matched.sticker_back_cost || 867)
+        const pmUnitCost = pmMat ? Number(pmMat.unit_cost) : Number(matched.other_packaging_cost || 244)
 
         const itCogs = Number(it.cogs_per_unit || 0)
-        let itemRaw = rawCost
-        let itemPouch = pouchCost
-        let itemFront = itNoFrontSticker ? 0 : stdFront
-        let itemBack = itNoBackSticker ? 0 : stdBack
-        let itemOther = itNoPolymailer ? 0 : stdOther
+        let itemRaw = bUnitCost
+        let itemPouch = kUnitCost
+        let itemFront = itNoFrontSticker ? 0 : sfUnitCost
+        let itemBack = itNoBackSticker ? 0 : sbUnitCost
+        let itemOther = itNoPolymailer ? 0 : pmUnitCost
 
         // Auto-deduce omitted components if cogs_per_unit is lower than full standard BOM
+        // E.g., if combine or sale had no stickers or no polymailer
         if (itCogs > 0) {
           const rem = itCogs - itemRaw - itemPouch
           if (rem <= 50) {
@@ -156,9 +232,9 @@ export function SembakoSaleDetailSheet({ isOpen, onOpenChange, sale, onEdit }) {
             itemBack = 0
             itemOther = 0
           } else if (rem < (itemFront + itemBack + itemOther) - 50) {
-            if (rem < stdFront + stdBack + stdOther - 50) itemOther = 0
-            if (rem < stdFront + stdBack - 50) itemBack = 0
-            if (rem < stdFront - 50) itemFront = 0
+            if (rem < sfUnitCost + sbUnitCost + pmUnitCost - 50) itemOther = 0
+            if (rem < sfUnitCost + sbUnitCost - 50) itemBack = 0
+            if (rem < sfUnitCost - 50) itemFront = 0
           }
         }
 
@@ -172,16 +248,23 @@ export function SembakoSaleDetailSheet({ isOpen, onOpenChange, sale, onEdit }) {
       }
     })
 
-    const hasAny = (totalRaw > 0 || totalPouch > 0 || totalStickerFront > 0 || totalStickerBack > 0 || totalOtherPkg > 0)
+    const componentSum = totalRaw + totalPouch + totalStickerFront + totalStickerBack + totalOtherPkg
+    if (fin.effectiveCogs > 0 && componentSum === 0) {
+      totalRaw = fin.effectiveCogs
+    }
+
+    const hasAny = (totalRaw > 0 || totalPouch > 0 || totalStickerFront > 0 || totalStickerBack > 0 || totalOtherPkg > 0 || fin.effectiveCogs > 0)
     return {
       totalRaw,
       totalPouch,
       totalStickerFront,
       totalStickerBack,
       totalOtherPkg,
+      customPouchName,
+      matchedRawMaterialNames,
       hasAny
     }
-  }, [sale, fin, products])
+  }, [sale, fin, products, rawMaterials])
 
   if (!sale || !fin) return null
 
@@ -205,7 +288,8 @@ export function SembakoSaleDetailSheet({ isOpen, onOpenChange, sale, onEdit }) {
   const grossProfit = fin.grossProfit
   const profit = fin.profit
   const netMarginPct = fin.netMarginPct
-  const isOwner = profile?.role === 'owner' || isSuperadmin(profile)
+  const isDev = profile?.role === 'dev' || profile?.role === 'developer' || profile?.app_role === 'dev' || Boolean(profile?.is_superadmin) || isSuperadmin(profile)
+  const isOwner = true // Selalu tampilkan seluruh analisis HPP, BOM, dan Laba di lembar Detail Penjualan backoffice
 
   const getDueDateStatus = () => {
     if (remainingAmount <= 0) return null
@@ -466,7 +550,8 @@ export function SembakoSaleDetailSheet({ isOpen, onOpenChange, sale, onEdit }) {
                       const rawName = it.product_name || '—'
                       const matchPkg = rawName.match(/\[(\d+(?:\.\d+)?\s*[^\]]+)\]/)
                       const pkgTag = matchPkg ? matchPkg[1] : null
-                      const cleanProdName = rawName.replace(/\s*\[\d+[^\]]+\]/g, '').trim()
+                      const hasHero = /\[HERO\]/i.test(rawName)
+                      const cleanProdName = rawName.replace(/\[HERO\]/gi, '').replace(/\s*\[\d+[^\]]+\]/g, '').trim()
                       const itCustomPkg = it.custom_packaging_name ||
                         (it.notes && (it.notes.match(/\[Kemasan:\s*([^\]]+)\]/i)?.[1] || it.notes.match(/\[Kemasan Khusus:\s*([^\]]+)\]/i)?.[1])) ||
                         (sale.notes && (sale.notes.match(/\[Kemasan:\s*([^\]]+)\]/i)?.[1] || sale.notes.match(/\[Kemasan Khusus:\s*([^\]]+)\]/i)?.[1]))
@@ -476,12 +561,26 @@ export function SembakoSaleDetailSheet({ isOpen, onOpenChange, sale, onEdit }) {
                       const itNoBackSticker = Boolean(it.no_back_sticker || itNotes.includes('[Tanpa Stiker') || itNotes.includes('[Polos') || itNotes.includes('[Polosan'))
                       const itNoPolymailer = Boolean(it.no_polymailer || itNotes.includes('[Tanpa Polymailer') || itNotes.includes('Tanpa Polymailer') || itNotes.includes('[Polosan:'))
 
-                      const matchedProd = products.find(p => p.id === it.product_id || (p.product_name && it.product_name && p.product_name.toLowerCase().trim() === it.product_name.toLowerCase().trim())) || {}
-                      const rawCost = Number(matchedProd.raw_ingredient_cost || 0)
-                      const pouchCost = Number(matchedProd.pouch_cost || 0)
-                      const stdFront = Number(matchedProd.sticker_front_cost || 0)
-                      const stdBack = Number(matchedProd.sticker_back_cost || 0)
-                      const stdOther = Number(matchedProd.other_packaging_cost || 0)
+                      const itClean = cleanProductNameForMatch(it.product_name)
+                      const matchedProd = products.find(p => {
+                        if (it.product_id && p.id === it.product_id) return true
+                        if (!p.product_name || !it.product_name) return false
+                        const pClean = cleanProductNameForMatch(p.product_name)
+                        return pClean === itClean || (itClean && pClean.includes(itClean)) || (pClean && itClean.includes(pClean))
+                      }) || {}
+
+                      const bMat = matchBawangMaterial(matchedProd, rawMaterials)
+                      const kMat = matchKemasanMaterial(matchedProd, rawMaterials)
+                      const sfMat = matchStickerFrontMaterial(matchedProd, rawMaterials)
+                      const sbMat = matchStickerBackMaterial(matchedProd, rawMaterials)
+                      const pmMat = matchOtherPackagingMaterial(matchedProd, rawMaterials)
+
+                      const gram = extractProductGrammage(matchedProd.product_name, matchedProd.notes)
+                      const rawCost = bMat ? (bMat.unit === 'kg' ? Math.round((Number(bMat.unit_cost) / 1000) * gram) : Number(bMat.unit_cost)) : Number(matchedProd.raw_ingredient_cost || 0)
+                      const pouchCost = kMat ? Number(kMat.unit_cost) : Number(matchedProd.pouch_cost || 0)
+                      const stdFront = sfMat ? Number(sfMat.unit_cost) : Number(matchedProd.sticker_front_cost || 1300)
+                      const stdBack = sbMat ? Number(sbMat.unit_cost) : Number(matchedProd.sticker_back_cost || 867)
+                      const stdOther = pmMat ? Number(pmMat.unit_cost) : Number(matchedProd.other_packaging_cost || 244)
 
                       const itCogs = Number(it.cogs_per_unit || 0)
                       let sFrontCost = itNoFrontSticker ? 0 : stdFront
@@ -502,7 +601,7 @@ export function SembakoSaleDetailSheet({ isOpen, onOpenChange, sale, onEdit }) {
                         }
                       }
 
-                      const hasDetailedBom = (rawCost > 0 || pouchCost > 0 || matchedProd.sticker_front_cost > 0 || matchedProd.sticker_back_cost > 0 || matchedProd.other_packaging_cost > 0)
+                      const hasDetailedBom = (rawCost > 0 || pouchCost > 0 || stdFront > 0 || stdBack > 0 || stdOther > 0)
                       const isItemExpanded = showAllHpp ? (expandedHpp[idx] === undefined ? true : !expandedHpp[idx]) : Boolean(expandedHpp[idx])
                       const marginAmount = itemPrice - Number(it.cogs_per_unit || 0)
                       const marginPct = itemPrice > 0 ? ((marginAmount / itemPrice) * 100).toFixed(1) : '0'
@@ -511,6 +610,11 @@ export function SembakoSaleDetailSheet({ isOpen, onOpenChange, sale, onEdit }) {
                         <tr key={idx} style={{ borderTop: `1px solid ${C.border}` }}>
                           <td style={{ padding: '12px', color: C.text, fontWeight: 600 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                              {hasHero && (
+                                <span style={{ fontSize: '10px', fontWeight: 800, padding: '1.5px 6px', borderRadius: '6px', background: '#FEF3C7', color: '#B45309', border: '1px solid #FDE68A' }}>
+                                  ⭐ HERO
+                                </span>
+                              )}
                               <span>{cleanProdName}</span>
                               {pkgTag && (
                                 <span style={{ fontSize: '10px', fontWeight: 800, padding: '1.5px 6px', borderRadius: '6px', background: '#EEF2FF', color: '#4F46E5', textTransform: 'uppercase' }}>
@@ -577,50 +681,91 @@ export function SembakoSaleDetailSheet({ isOpen, onOpenChange, sale, onEdit }) {
                                     borderRadius: '12px',
                                     display: 'flex',
                                     flexDirection: 'column',
-                                    gap: '4.5px',
+                                    gap: '5.5px',
                                     fontSize: '11px',
                                     boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)'
                                   }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #E2E8F0', paddingBottom: '4px', marginBottom: '2px', fontSize: '9.5px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#64748B' }}>
-                                      <span>🔍 Rincian Modal BOM</span>
+                                      <span>🔍 Rincian Modal BOM (Bahan Baku)</span>
                                       <span>Biaya / Satuan</span>
                                     </div>
 
                                     {hasDetailedBom ? (
                                       <>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#334155' }}>
-                                          <span>🧅 Bawang Curah / Mentah:</span>
-                                          <strong style={{ color: '#0F172A' }}>{formatIDR(rawCost > 0 ? rawCost : (it.cogs_per_unit || 0))}</strong>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', color: '#334155' }}>
+                                          <div>
+                                            <span>🧅 Bawang Curah / Mentah:</span>
+                                            {bMat?.material_name && (
+                                              <span style={{ display: 'block', fontSize: '10px', color: '#64748B' }}>
+                                                {bMat.material_name} ({gram}g)
+                                              </span>
+                                            )}
+                                          </div>
+                                          <strong style={{ color: '#0F172A', fontFamily: 'monospace' }}>{formatIDR(rawCost > 0 ? rawCost : (it.cogs_per_unit || 0))}</strong>
                                         </div>
                                         {(pouchCost > 0 || itCustomPkg) && (
-                                          <div style={{ display: 'flex', justifyContent: 'space-between', color: '#334155' }}>
-                                            <span>🛍️ Kemasan / Pouch {itCustomPkg ? `(${itCustomPkg})` : ''}:</span>
-                                            <strong style={{ color: '#0F172A' }}>{formatIDR(pouchCost)}</strong>
+                                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', color: '#334155' }}>
+                                            <div>
+                                              <span>🛍️ Kemasan / Pouch {itCustomPkg ? `(${itCustomPkg})` : ''}:</span>
+                                              {kMat?.material_name && (
+                                                <span style={{ display: 'block', fontSize: '10px', color: '#64748B' }}>
+                                                  {kMat.material_name}
+                                                </span>
+                                              )}
+                                            </div>
+                                            <strong style={{ color: '#0F172A', fontFamily: 'monospace' }}>{formatIDR(pouchCost)}</strong>
                                           </div>
                                         )}
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#334155' }}>
-                                          <span>🏷️ Stiker Depan:</span>
-                                          <strong style={{ color: sFrontCost > 0 ? '#0F172A' : '#059669' }}>
-                                            {sFrontCost > 0 ? formatIDR(sFrontCost) : 'Rp 0 (Tanpa Stiker)'}
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', color: '#334155' }}>
+                                          <div>
+                                            <span>🏷️ Stiker Depan:</span>
+                                            {sFrontCost > 0 && sfMat?.material_name && (
+                                              <span style={{ display: 'block', fontSize: '10px', color: '#64748B' }}>
+                                                {sfMat.material_name} {sfMat.current_stock != null ? `(Stok: ${sfMat.current_stock} pcs)` : ''}
+                                              </span>
+                                            )}
+                                          </div>
+                                          <strong style={{ color: sFrontCost > 0 ? '#0F172A' : '#059669', fontFamily: 'monospace' }}>
+                                            {sFrontCost > 0 ? formatIDR(sFrontCost) : 'Rp 0 (⚡ Polosan / Tanpa Stiker)'}
                                           </strong>
                                         </div>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#334155' }}>
-                                          <span>🏷️ Stiker Belakang:</span>
-                                          <strong style={{ color: sBackCost > 0 ? '#0F172A' : '#059669' }}>
-                                            {sBackCost > 0 ? formatIDR(sBackCost) : 'Rp 0 (Tanpa Stiker)'}
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', color: '#334155' }}>
+                                          <div>
+                                            <span>🏷️ Stiker Belakang:</span>
+                                            {sBackCost > 0 && sbMat?.material_name && (
+                                              <span style={{ display: 'block', fontSize: '10px', color: '#64748B' }}>
+                                                {sbMat.material_name} {sbMat.current_stock != null ? `(Stok: ${sbMat.current_stock} pcs)` : ''} {sbMat.supplier_name ? `· ${sbMat.supplier_name}` : ''}
+                                              </span>
+                                            )}
+                                          </div>
+                                          <strong style={{ color: sBackCost > 0 ? '#0F172A' : '#059669', fontFamily: 'monospace' }}>
+                                            {sBackCost > 0 ? formatIDR(sBackCost) : 'Rp 0 (⚡ Polosan / Tanpa Stiker)'}
                                           </strong>
                                         </div>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#334155' }}>
-                                          <span>📦 Plastik / Polymailer:</span>
-                                          <strong style={{ color: otherPkgCost > 0 ? '#0F172A' : '#059669' }}>
-                                            {otherPkgCost > 0 ? formatIDR(otherPkgCost) : 'Rp 0 (Tanpa Polymailer)'}
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', color: '#334155' }}>
+                                          <div>
+                                            <span>📦 Plastik / Polymailer:</span>
+                                            {otherPkgCost > 0 && pmMat?.material_name && (
+                                              <span style={{ display: 'block', fontSize: '10px', color: '#64748B' }}>
+                                                {pmMat.material_name}
+                                              </span>
+                                            )}
+                                          </div>
+                                          <strong style={{ color: otherPkgCost > 0 ? '#0F172A' : '#059669', fontFamily: 'monospace' }}>
+                                            {otherPkgCost > 0 ? formatIDR(otherPkgCost) : 'Rp 0 (Tanpa Polymailer / Bebas Kemasan)'}
                                           </strong>
                                         </div>
+
+                                        {(sFrontCost > 0 || sBackCost > 0) && (
+                                          <div style={{ fontSize: '9.5px', color: '#64748B', background: '#F1F5F9', padding: '4px 8px', borderRadius: '6px', border: '1px solid #E2E8F0', marginTop: '2px', lineHeight: 1.4 }}>
+                                            💡 <strong>HPP Riil Gudang:</strong> Stiker dihitung presisi sesuai HPP satuan stok fisik (Depan Rp 1.300 & Belakang Rp 867 dari Nota Sampoerna Rp 52.000).
+                                          </div>
+                                        )}
                                       </>
                                     ) : (
                                       <div style={{ display: 'flex', justifyContent: 'space-between', color: '#334155' }}>
                                         <span>Modal Pokok Produk:</span>
-                                        <strong style={{ color: '#0F172A' }}>{formatIDR(it.cogs_per_unit)}</strong>
+                                        <strong style={{ color: '#0F172A', fontFamily: 'monospace' }}>{formatIDR(it.cogs_per_unit)}</strong>
                                       </div>
                                     )}
 
@@ -704,162 +849,365 @@ export function SembakoSaleDetailSheet({ isOpen, onOpenChange, sale, onEdit }) {
               </div>
             )}
 
-            {/* Section: Financials & Cost Breakdown */}
+            {/* Section: RINCIAN KEUANGAN, HPP & LABA (Unified Financial & Profit Card) */}
             <div style={{ background: 'var(--bg-page)', borderRadius: '16px', padding: '16px', border: `1px solid ${C.border}` }}>
-              <p style={{ ...sLabel, marginBottom: '10px' }}>RINCIAN KEUANGAN & BIAYA</p>
-              <DetailRow label="Subtotal Barang" value={formatIDR(itemsSubtotal)} bold />
-              {totalReturnAmount > 0 && (
-                <DetailRow label="Potongan Retur Barang" value={`-${formatIDR(totalReturnAmount)}`} color={C.red} bold />
-              )}
-              {deliveryCost > 0 && (
-                <DetailRow label="Biaya Kirim (Tanggungan Seller)" value={formatIDR(deliveryCost)} color="var(--text-muted)" />
-              )}
-              {otherCost > 0 && (
-                <DetailRow label="Biaya Operasional Lainnya" value={formatIDR(otherCost)} color="var(--text-muted)" />
+              {/* Header with Title and Margin Badges */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '14px', paddingBottom: '10px', borderBottom: `1px solid ${C.border}` }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <TrendingUp size={16} className="text-emerald-600" />
+                  <span style={{ ...sLabel, color: C.text, margin: 0, fontSize: '12px', fontWeight: 800 }}>
+                    RINCIAN KEUANGAN, HPP & LABA
+                  </span>
+                </div>
+                {isOwner && (
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <span style={{
+                      fontSize: '9.5px',
+                      fontWeight: 800,
+                      padding: '2px 7px',
+                      borderRadius: '6px',
+                      textTransform: 'uppercase',
+                      background: netMarginPct < 0 ? '#FEE2E2' : netMarginPct <= 10 ? '#FEF3C7' : '#D1FAE5',
+                      color: netMarginPct < 0 ? '#DC2626' : netMarginPct <= 10 ? '#D97706' : '#059669',
+                      border: `1px solid ${netMarginPct < 0 ? '#FCA5A5' : netMarginPct <= 10 ? '#FDE68A' : '#A7F3D0'}`,
+                    }}>
+                      {netMarginPct < 0 ? '🚨 RUGI' : netMarginPct <= 10 ? '⚠️ MARGIN TIPIS' : '✓ SEHAT'}
+                    </span>
+                    <span style={{ fontSize: '11px', fontWeight: 900, color: profit >= 0 ? C.green : C.red }}>
+                      Net Margin {netMarginPct}%
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {isOwner && profit < 0 && (
+                <div style={{ marginBottom: '14px', padding: '10px 12px', background: '#FEF2F2', border: '1px solid #FEE2E2', borderRadius: '10px', fontSize: '11px', color: '#DC2626', display: 'flex', gap: '6px', alignItems: 'center' }}>
+                  <span>🚨</span>
+                  <span><strong>Perhatian:</strong> Transaksi ini mengalami rugi karena modal beli/operasional lebih besar dibanding harga jual.</span>
+                </div>
               )}
 
-              {/* Rincian Operasional & Kategori Pengeluaran (BBM, Makan, Tol, Bongkar) */}
-              {costDetails && (costDetails.otherCost > 0 || costDetails.detectedCategories.length > 0 || costDetails.fuelCost > 0) && (
-                <div style={{ background: 'var(--bg-surface)', border: `1px solid ${C.border}`, borderRadius: '12px', padding: '12px 14px', margin: '8px 0' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ fontSize: '13px' }}>🛠️</span>
-                      <p style={{ fontSize: '11px', fontWeight: 800, color: C.text, textTransform: 'uppercase', letterSpacing: '0.04em', margin: 0 }}>
-                        Rincian Biaya Operasional
-                      </p>
-                    </div>
-                    {costDetails.otherCost > 0 && (
-                      <span style={{ fontSize: '11px', fontWeight: 800, color: '#D97706', fontFamily: 'Sora' }}>
-                        {formatIDR(costDetails.otherCost)}
+              {/* SUB-SECTION 1: OMSET & TAGIHAN PENJUALAN */}
+              <div style={{ marginBottom: '14px' }}>
+                <p style={{ fontSize: '10px', fontWeight: 800, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+                  🏷️ Omset & Tagihan Penjualan
+                </p>
+                <DetailRow label="Subtotal Barang" value={formatIDR(itemsSubtotal)} bold />
+                {totalReturnAmount > 0 && (
+                  <DetailRow label="Potongan Retur Barang" value={`-${formatIDR(totalReturnAmount)}`} color={C.red} bold />
+                )}
+                {deliveryCost > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', fontSize: '13px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                      <span style={{ color: C.text, fontWeight: 600 }}>Biaya Kirim (Ditanggung Pembeli)</span>
+                      <span style={{
+                        fontSize: '9.5px',
+                        fontWeight: 800,
+                        padding: '1.5px 6px',
+                        borderRadius: '5px',
+                        background: fin.isKurirToko ? '#DCFCE7' : '#EFF6FF',
+                        color: fin.isKurirToko ? '#166534' : '#1E40AF',
+                        border: `1px solid ${fin.isKurirToko ? '#BBF7D0' : '#BFDBFE'}`,
+                      }}>
+                        {fin.isKurirToko ? '🛵 Kurir Toko (Profit Toko)' : '📦 Titipan Ekspedisi'}
                       </span>
+                    </div>
+                    <span style={{ fontWeight: 700, color: C.text }}>
+                      +{formatIDR(deliveryCost)}
+                    </span>
+                  </div>
+                )}
+                {(fin.shippingBorneBy === 'seller' || fin.sellerShippingFee > 0) && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', fontSize: '13px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                      <span style={{ color: '#059669', fontWeight: 700 }}>🎁 Free Ongkir Pelanggan</span>
+                      <span style={{
+                        fontSize: '9.5px',
+                        fontWeight: 800,
+                        padding: '1.5px 6px',
+                        borderRadius: '5px',
+                        background: '#FEF3C7',
+                        color: '#92400E',
+                        border: '1px solid #FDE68A',
+                      }}>
+                        Beban Toko {fin.sellerShippingFee > 0 ? formatIDR(fin.sellerShippingFee) : ''}
+                      </span>
+                    </div>
+                    <span style={{ fontWeight: 700, color: '#059669' }}>
+                      Rp 0 (Gratis)
+                    </span>
+                  </div>
+                )}
+                <div style={{ marginTop: '4px', paddingTop: '6px', borderTop: `1px dashed ${C.border}` }}>
+                  <DetailRow label={totalReturnAmount > 0 ? "Total Tagihan (Nota Bersih)" : "Total Tagihan Invoice"} value={formatIDR(grandTotal)} highlight bold />
+                </div>
+              </div>
+
+              {/* SUB-SECTION 2: MODAL POKOK & KOMPOSISI HPP (BOM) */}
+              <div style={{
+                background: 'var(--bg-surface)',
+                border: `1px solid ${C.border}`,
+                borderRadius: '12px',
+                padding: '14px 16px',
+                marginBottom: '14px'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Package size={14} className="text-amber-500" />
+                    <p style={{ fontSize: '11px', fontWeight: 800, color: C.text, textTransform: 'uppercase', letterSpacing: '0.04em', margin: 0 }}>
+                      Total HPP / Modal Pokok (COGS)
+                    </p>
+                  </div>
+                  <span style={{ fontSize: '13px', fontWeight: 800, color: C.text, fontFamily: 'monospace' }}>
+                    {formatIDR(effectiveCogs)}
+                  </span>
+                </div>
+
+                <p style={{ fontSize: '9.5px', fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 8px 0' }}>
+                  Sub-rincian komponen penyusun:
+                </p>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '11.5px' }}>
+                  {/* 1. Bawang Mentah / Bahan Pokok */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: C.text }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span style={{ color: C.muted }}>🧅 Bahan Baku (Bawang Curah Mentah):</span>
+                      {totalBomBreakdown?.matchedRawMaterialNames?.bawang && (
+                        <span style={{ fontSize: '9.5px', color: '#64748B' }}>({totalBomBreakdown.matchedRawMaterialNames.bawang})</span>
+                      )}
+                    </div>
+                    <strong style={{ fontFamily: 'monospace' }}>
+                      {formatIDR(totalBomBreakdown?.totalRaw > 0 ? totalBomBreakdown.totalRaw : effectiveCogs)}
+                    </strong>
+                  </div>
+
+                  {/* 2. Kemasan / Pouch */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: C.text }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span style={{ color: C.muted }}>🛍️ Kemasan / Pouch:</span>
+                      {totalBomBreakdown?.customPouchName ? (
+                        <span style={{ fontSize: '9.5px', fontWeight: 700, color: '#0284C7' }}>({totalBomBreakdown.customPouchName})</span>
+                      ) : totalBomBreakdown?.matchedRawMaterialNames?.pouch ? (
+                        <span style={{ fontSize: '9.5px', color: '#64748B' }}>({totalBomBreakdown.matchedRawMaterialNames.pouch})</span>
+                      ) : null}
+                    </div>
+                    <strong style={{ fontFamily: 'monospace', color: totalBomBreakdown?.totalPouch > 0 ? C.text : '#059669' }}>
+                      {totalBomBreakdown?.totalPouch > 0 ? formatIDR(totalBomBreakdown.totalPouch) : 'Rp 0 (Pouch Standar)'}
+                    </strong>
+                  </div>
+
+                  {/* 3. Stiker Depan */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: C.text }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span style={{ color: C.muted }}>🏷️ Stiker Label Depan:</span>
+                      {totalBomBreakdown?.totalStickerFront > 0 && totalBomBreakdown?.matchedRawMaterialNames?.stickerFront && (
+                        <span style={{ fontSize: '9.5px', color: '#64748B' }}>({totalBomBreakdown.matchedRawMaterialNames.stickerFront})</span>
+                      )}
+                    </div>
+                    <strong style={{ fontFamily: 'monospace', color: totalBomBreakdown?.totalStickerFront > 0 ? C.text : '#059669' }}>
+                      {totalBomBreakdown?.totalStickerFront > 0 ? formatIDR(totalBomBreakdown.totalStickerFront) : 'Rp 0 (⚡ Tanpa Stiker / Polosan)'}
+                    </strong>
+                  </div>
+
+                  {/* 4. Stiker Belakang */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: C.text }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span style={{ color: C.muted }}>🏷️ Stiker Label Belakang:</span>
+                      {totalBomBreakdown?.totalStickerBack > 0 && totalBomBreakdown?.matchedRawMaterialNames?.stickerBack && (
+                        <span style={{ fontSize: '9.5px', color: '#64748B' }}>({totalBomBreakdown.matchedRawMaterialNames.stickerBack})</span>
+                      )}
+                    </div>
+                    <strong style={{ fontFamily: 'monospace', color: totalBomBreakdown?.totalStickerBack > 0 ? C.text : '#059669' }}>
+                      {totalBomBreakdown?.totalStickerBack > 0 ? formatIDR(totalBomBreakdown.totalStickerBack) : 'Rp 0 (⚡ Tanpa Stiker / Polosan)'}
+                    </strong>
+                  </div>
+
+                  {/* 5. Plastik / Polymailer / Box */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: C.text }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span style={{ color: C.muted }}>📦 Plastik / Polymailer Packing:</span>
+                      {totalBomBreakdown?.totalOtherPkg > 0 && totalBomBreakdown?.matchedRawMaterialNames?.otherPkg && (
+                        <span style={{ fontSize: '9.5px', color: '#64748B' }}>({totalBomBreakdown.matchedRawMaterialNames.otherPkg})</span>
+                      )}
+                    </div>
+                    <strong style={{ fontFamily: 'monospace', color: totalBomBreakdown?.totalOtherPkg > 0 ? C.text : '#059669' }}>
+                      {totalBomBreakdown?.totalOtherPkg > 0 ? formatIDR(totalBomBreakdown.totalOtherPkg) : 'Rp 0 (Tanpa Polymailer / Bebas Kemasan)'}
+                    </strong>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: `1px dashed ${C.border}`, paddingTop: '6px', marginTop: '2px', fontWeight: 800 }}>
+                    <span style={{ color: C.text }}>
+                      {totalReturnAmount > 0 ? '⚡ Total HPP Bersih (Setelah Retur):' : fin.cogsIsEstimate ? '⚡ Total HPP / Modal Pokok (Estimasi):' : '⚡ Total HPP / Modal Pokok:'}
+                    </span>
+                    <span style={{ color: fin.cogsIsEstimate ? '#F59E0B' : C.text, fontFamily: 'monospace', fontSize: '12px' }}>
+                      {formatIDR(effectiveCogs)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* SUB-SECTION 3: MARGIN & KEUNTUNGAN TOKO */}
+              <div style={{ marginBottom: '14px' }}>
+                <p style={{ fontSize: '10px', fontWeight: 800, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+                  📈 Margin & Keuntungan
+                </p>
+                
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', fontSize: '13px' }}>
+                  <span style={{ color: C.text, fontWeight: 600 }}>Laba Kotor (Gross Profit)</span>
+                  <div style={{ textAlign: 'right' }}>
+                    <span style={{ fontWeight: 800, color: grossProfit >= 0 ? C.green : C.red, fontFamily: 'monospace' }}>
+                      {formatIDR(grossProfit)}
+                    </span>
+                    <span style={{ fontSize: '10px', color: C.muted, marginLeft: '6px' }}>
+                      ({itemsSubtotal > 0 ? ((grossProfit / itemsSubtotal) * 100).toFixed(1) : 0}%)
+                    </span>
+                  </div>
+                </div>
+
+                {fin.deliveryProfit > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0 5px 12px', fontSize: '11.5px', color: '#16A34A' }}>
+                    <span>↳ Termasuk Laba Ongkir Kurir Toko:</span>
+                    <strong style={{ fontFamily: 'monospace' }}>+{formatIDR(fin.deliveryProfit)}</strong>
+                  </div>
+                )}
+
+                {/* Rincian Operasional & Kategori Pengeluaran (BBM, Makan, Tol, Bongkar) */}
+                {(otherCost > 0 || (costDetails && (costDetails.otherCost > 0 || costDetails.detectedCategories.length > 0 || costDetails.fuelCost > 0))) && (
+                  <div style={{ background: 'var(--bg-surface)', border: `1px solid ${C.border}`, borderRadius: '12px', padding: '10px 12px', margin: '8px 0' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: costDetails?.detectedCategories?.length > 0 ? '6px' : '2px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <span style={{ fontSize: '12px' }}>🛠️</span>
+                        <span style={{ fontSize: '11px', fontWeight: 700, color: '#D97706' }}>
+                          Beban Operasional Toko
+                        </span>
+                      </div>
+                      <span style={{ fontSize: '11.5px', fontWeight: 800, color: '#D97706', fontFamily: 'monospace' }}>
+                        -{formatIDR(otherCost || costDetails?.otherCost || 0)}
+                      </span>
+                    </div>
+
+                    {/* Badges / Chips Kategori */}
+                    {costDetails?.detectedCategories?.length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '6px' }}>
+                        {costDetails.detectedCategories.map((cat, cIdx) => (
+                          <span
+                            key={cIdx}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '3px',
+                              padding: '3px 8px',
+                              borderRadius: '6px',
+                              fontSize: '10px',
+                              fontWeight: 700,
+                              background: cat.bg,
+                              color: cat.color,
+                              border: `1px solid ${cat.border}`,
+                            }}
+                          >
+                            <span>{cat.icon}</span>
+                            <span>{cat.label}</span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Keterangan / Notes Rincian */}
+                    {costDetails?.costNotes ? (
+                      <div style={{ background: 'rgba(15,23,42,0.03)', borderRadius: '6px', padding: '5px 8px', marginTop: '3px' }}>
+                        <p style={{ fontSize: '10.5px', color: C.text, margin: 0 }}>
+                          <span style={{ color: C.muted, fontWeight: 700 }}>Rincian:</span> "{costDetails.costNotes}"
+                        </p>
+                      </div>
+                    ) : costDetails?.rawNotes && costDetails.rawNotes.includes('Biaya') ? (
+                      <div style={{ background: 'rgba(15,23,42,0.03)', borderRadius: '6px', padding: '5px 8px', marginTop: '3px' }}>
+                        <p style={{ fontSize: '10.5px', color: C.text, margin: 0 }}>
+                          <span style={{ color: C.muted, fontWeight: 700 }}>Keterangan:</span> "{costDetails.rawNotes}"
+                        </p>
+                      </div>
+                    ) : null}
+
+                    {/* Internal Fuel Cost if present */}
+                    {costDetails?.fuelCost > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px', paddingTop: '4px', borderTop: `1px dashed ${C.border}`, fontSize: '10.5px', color: C.muted }}>
+                        <span>⛽ Biaya BBM Internal Armada:</span>
+                        <strong style={{ color: C.text, fontWeight: 800 }}>{formatIDR(costDetails.fuelCost)}</strong>
+                      </div>
                     )}
                   </div>
+                )}
 
-                  {/* Badges / Chips Kategori yang dicentang */}
-                  {costDetails.detectedCategories.length > 0 && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
-                      {costDetails.detectedCategories.map((cat, cIdx) => (
-                        <span
-                          key={cIdx}
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            padding: '4px 9px',
-                            borderRadius: '8px',
-                            fontSize: '11px',
-                            fontWeight: 700,
-                            background: cat.bg,
-                            color: cat.color,
-                            border: `1px solid ${cat.border}`,
-                          }}
-                        >
-                          <span>{cat.icon}</span>
-                          <span>{cat.label}</span>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Keterangan / Notes Rincian */}
-                  {costDetails.costNotes ? (
-                    <div style={{ background: 'rgba(15,23,42,0.03)', borderRadius: '8px', padding: '6px 10px', marginTop: '4px' }}>
-                      <p style={{ fontSize: '11px', color: C.text, margin: 0, fontWeight: 500 }}>
-                        <span style={{ color: C.muted, fontWeight: 700 }}>Rincian:</span> "{costDetails.costNotes}"
-                      </p>
-                    </div>
-                  ) : costDetails.rawNotes && costDetails.rawNotes.includes('Biaya') ? (
-                    <div style={{ background: 'rgba(15,23,42,0.03)', borderRadius: '8px', padding: '6px 10px', marginTop: '4px' }}>
-                      <p style={{ fontSize: '11px', color: C.text, margin: 0, fontWeight: 500 }}>
-                        <span style={{ color: C.muted, fontWeight: 700 }}>Keterangan:</span> "{costDetails.rawNotes}"
-                      </p>
-                    </div>
-                  ) : null}
-
-                  {/* Internal Fuel Cost if present */}
-                  {costDetails.fuelCost > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px', paddingTop: '6px', borderTop: `1px dashed ${C.border}`, fontSize: '11px', color: C.muted }}>
-                      <span>⛽ Biaya BBM Internal Armada:</span>
-                      <strong style={{ color: C.text, fontWeight: 800 }}>{formatIDR(costDetails.fuelCost)}</strong>
-                    </div>
-                  )}
+                {/* Net Profit Row */}
+                <div style={{ marginTop: '6px', paddingTop: '6px', borderTop: `1px dashed ${C.border}` }}>
+                  <DetailRow
+                    label="Estimasi Laba Bersih (Net Profit)"
+                    value={formatIDR(profit)}
+                    color={profit >= 0 ? C.green : C.red}
+                    bold
+                    highlight
+                  />
                 </div>
-              )}
+              </div>
 
-              {/* Rincian Armada & Pengiriman jika ada */}
-              {deliveries.length > 0 && (
-                <div style={{ background: 'var(--bg-surface)', border: `1px solid ${C.border}`, borderRadius: '12px', padding: '10px 12px', margin: '8px 0' }}>
-                  <p style={{ fontSize: '10px', fontWeight: 800, color: C.muted, textTransform: 'uppercase', marginBottom: '6px', margin: 0 }}>
-                    🚚 Rincian Logistik Pengiriman:
+              <div style={{ height: 1, background: C.border, margin: '14px 0' }} />
+
+              {/* SUB-SECTION 4: STATUS PEMBAYARAN & PIUTANG */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <p style={{ fontSize: '10px', fontWeight: 800, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>
+                    💳 Status Pembayaran & Kas
                   </p>
-                  {deliveries.map((d, dIdx) => (
-                    <div key={d.id || dIdx} style={{ fontSize: '11px', color: C.text, display: 'flex', flexDirection: 'column', gap: '3px', marginTop: '6px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ color: C.muted }}>Kurir / Sopir:</span>
-                        <strong style={{ color: C.text }}>{d.driver_name || d.employees?.full_name || 'Kurir Toko'}</strong>
-                      </div>
-                      {(d.vehicle_type || d.vehicle_plate) && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span style={{ color: C.muted }}>Kendaraan & Plat:</span>
-                          <span>{[d.vehicle_type, d.vehicle_plate].filter(Boolean).join(' - ')}</span>
-                        </div>
-                      )}
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ color: C.muted }}>Status Pengiriman:</span>
-                        <strong style={{ color: d.status === 'delivered' ? '#16A34A' : '#D97706', textTransform: 'capitalize' }}>
-                          {d.status === 'delivered' ? '✓ Terkirim' : d.status || 'Disiapkan'}
-                        </strong>
-                      </div>
-                      {d.notes && d.notes.includes('Biaya') && (
-                        <div style={{ fontSize: '10px', color: C.muted, marginTop: '2px', fontStyle: 'italic' }}>
-                          Info: {d.notes}
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                  <span style={{
+                    fontSize: '9.5px',
+                    fontWeight: 800,
+                    padding: '2px 7px',
+                    borderRadius: '5px',
+                    background: remainingAmount <= 0 ? '#DCFCE7' : '#FEE2E2',
+                    color: remainingAmount <= 0 ? '#166534' : '#DC2626',
+                    border: `1px solid ${remainingAmount <= 0 ? '#BBF7D0' : '#FCA5A5'}`
+                  }}>
+                    {remainingAmount <= 0 ? '✓ LUNAS' : '⚠️ BELUM LUNAS'}
+                  </span>
                 </div>
-              )}
 
-              <div style={{ height: 1, background: C.border, margin: '12px 0' }} />
-              <DetailRow label={totalReturnAmount > 0 ? "Total Tagihan (Nota Bersih)" : "Total Tagihan"} value={formatIDR(grandTotal)} highlight />
-              
-              {(fin.grossPaidAmount > 0 || rawPaidAmount > 0) && (
-                <DetailRow label="Total Uang Toko Diterima" value={formatIDR(fin.grossPaidAmount || rawPaidAmount)} color={C.green} />
-              )}
-              {fin.refundPaymentsAmount > 0 && (
-                <DetailRow label="Pengembalian Uang Ke Toko (Refund)" value={`-${formatIDR(fin.refundPaymentsAmount)}`} color="#34D399" bold />
-              )}
-              <DetailRow label="Sudah Dibayar (Bersih)" value={formatIDR(paidAmount)} color={C.green} bold />
-              <DetailRow label="Sisa Piutang" value={formatIDR(remainingAmount)} color={remainingAmount > 0 ? C.red : C.green} bold />
-              {isOverpaid && (
-                <DetailRow label="Sisa Saldo Deposit Toko (Overpay)" value={formatIDR(overpayAmount)} color="#34D399" bold />
-              )}
+                {(fin.grossPaidAmount > 0 || rawPaidAmount > 0) && (
+                  <DetailRow label="Total Uang Toko Diterima" value={formatIDR(fin.grossPaidAmount || rawPaidAmount)} color={C.green} />
+                )}
+                {fin.refundPaymentsAmount > 0 && (
+                  <DetailRow label="Pengembalian Uang Ke Toko (Refund)" value={`-${formatIDR(fin.refundPaymentsAmount)}`} color="#34D399" bold />
+                )}
+                <DetailRow label="Sudah Dibayar (Bersih)" value={formatIDR(paidAmount)} color={C.green} bold />
+                <DetailRow label="Sisa Piutang" value={formatIDR(remainingAmount)} color={remainingAmount > 0 ? C.red : C.green} bold />
+                {isOverpaid && (
+                  <DetailRow label="Sisa Saldo Deposit Toko (Overpay)" value={formatIDR(overpayAmount)} color="#34D399" bold />
+                )}
 
-              {/* Warning Alert Banner for Overpaid / Return Cashback */}
-              {isOverpaid && (
-                <div style={{ marginTop: '12px', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '12px', padding: '12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                    <AlertCircle size={18} style={{ color: '#16A34A', flexShrink: 0, marginTop: '2px' }} />
-                    <div style={{ flex: 1 }}>
-                      <p style={{ fontSize: '11px', fontWeight: 900, color: '#16A34A', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        💵 WAJIB KEMBALIKAN UANG KE TOKO: {formatIDR(overpayAmount)}
-                      </p>
-                      <p style={{ fontSize: '11px', color: '#15803D', margin: '4px 0 0 0', lineHeight: '1.4' }}>
-                        Akibat retur barang, total pembayaran yang telah diterima (<strong>{formatIDR(rawPaidAmount)}</strong>) melebihi tagihan bersih (<strong>{formatIDR(grandTotal)}</strong>).<br/>
-                        Jika uang sudah diserahkan/ditransfer ke toko, klik tombol di bawah untuk menyelesaikannya.
-                      </p>
-                      <button
-                        type="button"
-                        disabled={isRefunding}
-                        onClick={openRefundDialog}
-                        className="bg-[#0F172A] hover:bg-slate-900 text-white dark:bg-tko-brand-500 dark:hover:bg-tko-brand-600 dark:text-tko-forest-950 dark:font-black shadow-tko-brand active:scale-95 transition-all w-full flex items-center justify-center gap-1.5 text-xs py-2.5 px-3 rounded-lg mt-2 text-center uppercase font-bold tracking-wider"
-                      >
-                        {isRefunding ? <Loader2 size={14} className="animate-spin" /> : `✓ Atur / Tandai Pengembalian Uang (${formatIDR(overpayAmount)})`}
-                      </button>
+                {/* Warning Alert Banner for Overpaid / Return Cashback */}
+                {isOverpaid && (
+                  <div style={{ marginTop: '12px', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '12px', padding: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                      <AlertCircle size={18} style={{ color: '#16A34A', flexShrink: 0, marginTop: '2px' }} />
+                      <div style={{ flex: 1 }}>
+                        <p style={{ fontSize: '11px', fontWeight: 900, color: '#16A34A', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          💵 WAJIB KEMBALIKAN UANG KE TOKO: {formatIDR(overpayAmount)}
+                        </p>
+                        <p style={{ fontSize: '11px', color: '#15803D', margin: '4px 0 0 0', lineHeight: '1.4' }}>
+                          Akibat retur barang, total pembayaran yang telah diterima (<strong>{formatIDR(rawPaidAmount)}</strong>) melebihi tagihan bersih (<strong>{formatIDR(grandTotal)}</strong>).<br/>
+                          Jika uang sudah diserahkan/ditransfer ke toko, klik tombol di bawah untuk menyelesaikannya.
+                        </p>
+                        <button
+                          type="button"
+                          disabled={isRefunding}
+                          onClick={openRefundDialog}
+                          className="bg-[#0F172A] hover:bg-slate-900 text-white dark:bg-tko-brand-500 dark:hover:bg-tko-brand-600 dark:text-tko-forest-950 dark:font-black shadow-tko-brand active:scale-95 transition-all w-full flex items-center justify-center gap-1.5 text-xs py-2.5 px-3 rounded-lg mt-2 text-center uppercase font-bold tracking-wider"
+                        >
+                          {isRefunding ? <Loader2 size={14} className="animate-spin" /> : `✓ Atur / Tandai Pengembalian Uang (${formatIDR(overpayAmount)})`}
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
 
             {/* Section: Riwayat Pembayaran */}
@@ -930,156 +1278,121 @@ export function SembakoSaleDetailSheet({ isOpen, onOpenChange, sale, onEdit }) {
               )}
             </div>
 
-            {/* Section: Profit Analysis (Owner Only) */}
-            {isOwner && (
-              <div style={{ background: 'var(--bg-page)', borderRadius: '16px', padding: '16px', border: `1px solid var(--border-soft)` }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                  <p style={{ ...sLabel, color: C.green, margin: 0 }}>ANALISIS LABA (INTERNAL)</p>
-                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                    <span style={{
-                      fontSize: '9px',
-                      fontWeight: 800,
-                      padding: '2px 6px',
-                      borderRadius: '5px',
-                      textTransform: 'uppercase',
-                      background: netMarginPct < 0 ? '#FEE2E2' : netMarginPct <= 10 ? '#FEF3C7' : '#D1FAE5',
-                      color: netMarginPct < 0 ? '#DC2626' : netMarginPct <= 10 ? '#D97706' : '#059669',
-                      border: `1px solid ${netMarginPct < 0 ? '#FCA5A5' : netMarginPct <= 10 ? '#FDE68A' : '#A7F3D0'}`,
-                    }}>
-                      {netMarginPct < 0 ? '🚨 RUGI' : netMarginPct <= 10 ? '⚠️ TIPIS' : '✓ SEHAT'}
-                    </span>
-                    <span style={{ fontSize: '10px', fontWeight: 900, color: profit >= 0 ? C.green : C.red }}>
-                      Net Margin {netMarginPct}%
-                    </span>
-                  </div>
+            {/* Section: Rincian Logistik & Pengemasan */}
+            <div style={{ background: 'var(--bg-page)', borderRadius: '16px', padding: '16px', border: `1px solid ${C.border}` }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Truck size={15} color="#0284C7" />
+                  <p style={{ ...sLabel, margin: 0, color: '#0284C7' }}>RINCIAN LOGISTIK & PENGIRIMAN</p>
                 </div>
-                {profit < 0 && (
-                  <div style={{ marginTop: '12px', padding: '10px 12px', background: '#FEF2F2', border: '1px solid #FEE2E2', borderRadius: '10px', fontSize: '11px', color: '#DC2626', display: 'flex', gap: '6px', alignItems: 'center' }}>
-                    <span>🚨</span>
-                    <span><strong>Perhatian:</strong> Transaksi ini rugi karena modal beli lebih besar dibanding harga jual.</span>
-                  </div>
-                )}
-                <div style={{ marginTop: '8px' }}>
-                  <DetailRow label="Total Tagihan" value={formatIDR(grandTotal)} />
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', fontSize: '13px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ color: C.muted }}>{totalReturnAmount > 0 ? 'Total COGS / Modal (Bersih)' : fin.cogsIsEstimate ? 'Total COGS / Modal (estimasi)' : 'Total COGS / Modal'}</span>
-                      {totalBomBreakdown && totalBomBreakdown.hasAny && (
-                        <button
-                          type="button"
-                          onClick={() => setExpandedTotalBom(v => !v)}
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '2px',
-                            fontSize: '9.5px',
-                            fontWeight: 800,
-                            color: '#2563EB',
-                            background: '#EFF6FF',
-                            border: '1px solid #BFDBFE',
-                            borderRadius: '5px',
-                            padding: '1px 5px',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          <Layers size={9} />
-                          <span>{expandedTotalBom ? 'Tutup' : 'Rincian BOM'}</span>
-                          {expandedTotalBom ? <ChevronUp size={9} /> : <ChevronDown size={9} />}
-                        </button>
-                      )}
-                    </div>
-                    <span style={{ fontWeight: 700, color: fin.cogsIsEstimate ? '#F59E0B' : C.text, fontFamily: 'monospace' }}>
-                      {formatIDR(effectiveCogs)}
-                    </span>
-                  </div>
-
-                  {/* Expandable Total BOM Breakdown Card */}
-                  {expandedTotalBom && totalBomBreakdown && totalBomBreakdown.hasAny && (
-                    <div style={{
-                      margin: '6px 0 10px 0',
-                      padding: '10px 12px',
-                      background: 'var(--bg-surface)',
-                      border: '1px solid var(--border-soft)',
-                      borderRadius: '12px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '5px',
-                      fontSize: '11px'
-                    }}>
-                      <p style={{ fontSize: '10px', fontWeight: 800, color: C.muted, textTransform: 'uppercase', margin: '0 0 3px 0' }}>
-                        📊 Total Komposisi Biaya Modal (BOM Invoice Ini):
-                      </p>
-                      {totalBomBreakdown.totalRaw > 0 && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', color: C.text }}>
-                          <span>🧅 Total Bawang Curah / Mentah:</span>
-                          <strong style={{ fontFamily: 'monospace' }}>{formatIDR(totalBomBreakdown.totalRaw)}</strong>
-                        </div>
-                      )}
-                      {totalBomBreakdown.totalPouch > 0 && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', color: C.text }}>
-                          <span>🛍️ Total Kemasan / Pouch:</span>
-                          <strong style={{ fontFamily: 'monospace' }}>{formatIDR(totalBomBreakdown.totalPouch)}</strong>
-                        </div>
-                      )}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', color: C.text }}>
-                        <span>🏷️ Total Stiker Label:</span>
-                        <strong style={{ fontFamily: 'monospace', color: (totalBomBreakdown.totalStickerFront + totalBomBreakdown.totalStickerBack) > 0 ? C.text : '#059669' }}>
-                          {(totalBomBreakdown.totalStickerFront + totalBomBreakdown.totalStickerBack) > 0 ? formatIDR(totalBomBreakdown.totalStickerFront + totalBomBreakdown.totalStickerBack) : 'Rp 0 (Tanpa Stiker)'}
-                        </strong>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', color: C.text }}>
-                        <span>📦 Total Plastik / Polymailer:</span>
-                        <strong style={{ fontFamily: 'monospace', color: totalBomBreakdown.totalOtherPkg > 0 ? C.text : '#059669' }}>
-                          {totalBomBreakdown.totalOtherPkg > 0 ? formatIDR(totalBomBreakdown.totalOtherPkg) : 'Rp 0 (Tanpa Polymailer)'}
-                        </strong>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed var(--border-soft)', paddingTop: '4px', marginTop: '2px', fontWeight: 800, color: C.text }}>
-                        <span>⚡ Total COGS:</span>
-                        <strong style={{ fontFamily: 'monospace' }}>{formatIDR(effectiveCogs)}</strong>
-                      </div>
-                    </div>
-                  )}
-
-                  <DetailRow label="Gross Profit" value={formatIDR(grossProfit)} color={grossProfit >= 0 ? C.green : C.red} />
-                  {fin.totalExpenses > 0 && (
-                    <DetailRow label="Dikurangi Biaya Operasional" value={`-${formatIDR(fin.totalExpenses)}`} color={C.red} />
-                  )}
-                  <DetailRow label="Estimasi Net Profit" value={formatIDR(profit)} color={profit >= 0 ? C.green : C.red} bold highlight />
-                </div>
+                <span style={{
+                  fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', padding: '3px 10px', borderRadius: '99px',
+                  background: isDelivered ? '#F0FDF4' : deliveries.length > 0 ? '#FFFBEB' : '#F1F5F9',
+                  color: isDelivered ? '#16A34A' : deliveries.length > 0 ? '#D97706' : '#64748B',
+                  border: `1px solid ${isDelivered ? '#BBF7D0' : deliveries.length > 0 ? '#FDE68A' : '#E2E8F0'}`
+                }}>
+                  {isDelivered ? '✓ TERKIRIM' : deliveries.length > 0 ? '🚚 DI JALAN' : '📦 DISIAPKAN'}
+                </span>
               </div>
-            )}
 
-            {/* Section: Delivery Status */}
-            {!isOwner && (
-              <div style={{ background: '#F0F9FF', borderRadius: '16px', padding: '16px', border: `1px solid #BAE6FD` }}>
+              <div style={{ background: 'var(--bg-surface)', border: `1px solid ${C.border}`, borderRadius: '12px', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12px' }}>
+                {/* Metode Pengiriman */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <p style={{ ...sLabel, color: '#60A5FA' }}>PENGIRIMAN</p>
-                  <span style={{
-                    fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', padding: '3px 10px', borderRadius: '99px',
-                    background: isDelivered ? '#F0FDF4' : deliveries.length > 0 ? '#FFFBEB' : '#F1F5F9',
-                    color: isDelivered ? '#16A34A' : deliveries.length > 0 ? '#D97706' : '#64748B'
-                  }}>
-                    {isDelivered ? '✓ TERKIRIM' : deliveries.length > 0 ? 'DI JALAN' : 'BELUM DIKIRIM'}
+                  <span style={{ color: C.muted }}>Metode Pengiriman:</span>
+                  <strong style={{ color: C.text }}>
+                    {fin.isPickup ? '🏪 Ambil Sendiri (Pickup di Toko)' : fin.isKurirToko ? '🛵 Kurir Toko (Armada Sendiri)' : '📦 Ekspedisi / Cargo Luar Kota'}
+                  </strong>
+                </div>
+
+                {/* Tanggungan Ongkir */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: C.muted }}>Tanggungan Ongkir:</span>
+                  <span style={{ fontWeight: 700, color: fin.shippingBorneBy === 'seller' ? '#059669' : C.text }}>
+                    {fin.shippingBorneBy === 'seller' ? '🏪 Ditanggung Penjual (Free Ongkir)' : fin.deliveryCost > 0 ? `👤 Ditanggung Pembeli (+${formatIDR(fin.deliveryCost)})` : '🎁 Bebas Ongkir (Rp 0)'}
                   </span>
                 </div>
 
-                {deliveries.length > 0 && (
-                  <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {deliveries.map((d, i) => (
-                      <div key={d.id || i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', background: 'var(--bg-surface)', padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--border-soft)' }}>
-                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                          <Truck size={14} color="#0284C7" />
-                          <span style={{ color: C.text, fontWeight: 700 }}>{[d.vehicle_type, d.vehicle_plate].filter(Boolean).join(' ') || 'Pengiriman'}</span>
+                {/* Data Pengiriman dari Deliveries */}
+                {deliveries.length > 0 ? (
+                  deliveries.map((d, dIdx) => {
+                    const notesCombined = [sale.notes || '', d.notes || ''].join(' ')
+                    const resiMatch = notesCombined.match(/(?:resi|no\.?\s*resi|connote)[:\s]*([A-Za-z0-9_-]+)/i)
+                    const resiNumber = resiMatch ? resiMatch[1] : null
+                    const areaMatch = notesCombined.match(/(?:area|tujuan|wilayah)[:\s]*([^\n,\]]+)/i)
+                    const areaName = d.delivery_area || (areaMatch ? areaMatch[1].trim() : null)
+                    const deliveryTime = d.completed_at || d.delivered_at
+
+                    return (
+                      <React.Fragment key={d.id || dIdx}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ color: C.muted }}>Kurir / Driver:</span>
+                          <strong style={{ color: C.text }}>{d.driver_name || d.employees?.full_name || (fin.isKurirToko ? 'Kurir Toko' : 'Ekspedisi')}</strong>
                         </div>
-                        <span style={{ fontSize: '11px', fontWeight: 800, color: d.status === 'delivered' ? '#16A34A' : '#D97706' }}>
-                          {d.status === 'delivered' ? '✓ Terkirim' : d.status === 'on_route' ? 'Di Jalan' : 'Disiapkan'}
-                        </span>
-                      </div>
-                    ))}
+
+                        {(d.vehicle_type || d.vehicle_plate) && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ color: C.muted }}>Kendaraan & Plat:</span>
+                            <span style={{ fontWeight: 700, color: C.text }}>
+                              {[d.vehicle_type, d.vehicle_plate].filter(Boolean).join(' · ')}
+                            </span>
+                          </div>
+                        )}
+
+                        {areaName && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ color: C.muted }}>Area Pengiriman:</span>
+                            <span style={{ fontWeight: 600, color: C.text }}>{areaName}</span>
+                          </div>
+                        )}
+
+                        {resiNumber && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ color: C.muted }}>No. Resi Pengiriman:</span>
+                            <span style={{ fontWeight: 800, fontFamily: 'monospace', color: '#2563EB' }}>{resiNumber}</span>
+                          </div>
+                        )}
+
+                        {deliveryTime && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#16A34A' }}>
+                            <span>Waktu Terkirim:</span>
+                            <span style={{ fontWeight: 700 }}>{fmtDate(deliveryTime)}</span>
+                          </div>
+                        )}
+                      </React.Fragment>
+                    )
+                  })
+                ) : (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: C.muted }}>Kurir / Driver:</span>
+                    <strong style={{ color: C.text }}>
+                      {fin.isPickup ? 'Ambil Sendiri' : fin.isKurirToko ? 'Kurir Toko' : 'Ekspedisi Eksternal'}
+                    </strong>
+                  </div>
+                )}
+
+                {/* Kemasan Packing Luar */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: `1px dashed ${C.border}`, paddingTop: '8px', marginTop: '2px' }}>
+                  <span style={{ color: C.muted }}>📦 Kemasan & Packing:</span>
+                  <span style={{ fontWeight: 800, color: '#0F172A' }}>
+                    {fin.packingInfo?.material_name
+                      ? `${fin.packingInfo.quantity || 1} pcs ${fin.packingInfo.material_name}`
+                      : 'Plastik Packing Standar'}
+                  </span>
+                </div>
+
+                {/* Catatan Kustom Pouch jika ada */}
+                {sale.notes && sale.notes.includes('[Kemasan:') && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: C.muted }}>🛍️ Kustom Pouch Produk:</span>
+                    <span style={{ fontWeight: 700, color: '#0284C7' }}>
+                      {sale.notes.match(/\[Kemasan:\s*([^\]]+)\]/)?.[1] || 'Kustom'}
+                    </span>
                   </div>
                 )}
               </div>
-            )}
+            </div>
+
+
 
             {sale.notes && (
               <div>

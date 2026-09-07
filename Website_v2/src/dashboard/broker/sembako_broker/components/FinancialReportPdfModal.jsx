@@ -267,9 +267,9 @@ export default function FinancialReportPdfModal({ open, onClose, reportType = 'b
                             <td className="p-2 text-right" style={{ color: '#475569' }}>{calcPct(summary.totalReturns || summary.totalReturnsAmount || 0)}</td>
                           </tr>
                           <tr style={{ backgroundColor: '#F8FAFC', fontWeight: 700 }}>
-                            <td className="p-2 font-sans" style={{ color: '#0F172A' }}>= Revenue Bersih (Net Revenue)</td>
-                            <td className="p-2 text-right whitespace-nowrap" style={{ color: '#0F172A' }}>{formatIDR(summary.totalRevenue || 0)}</td>
-                            <td className="p-2 text-right" style={{ color: '#334155' }}>100.0%</td>
+                            <td className="p-2 font-sans" style={{ color: '#0F172A' }}>= Penjualan Bersih (Net Sales)</td>
+                            <td className="p-2 text-right whitespace-nowrap" style={{ color: '#0F172A' }}>{formatIDR(summary.netMerchandiseRevenue ?? ((summary.totalGrossRevenue || summary.totalRevenue || 0) - (summary.totalReturns || 0)))}</td>
+                            <td className="p-2 text-right" style={{ color: '#334155' }}>{calcPct(summary.netMerchandiseRevenue ?? ((summary.totalGrossRevenue || summary.totalRevenue || 0) - (summary.totalReturns || 0)))}</td>
                           </tr>
                           <tr>
                             <td className="p-2 pl-4 font-sans" style={{ color: '#475569' }}>− HPP (COGS FIFO)</td>
@@ -282,9 +282,9 @@ export default function FinancialReportPdfModal({ open, onClose, reportType = 'b
                             <td className="p-2 text-right">{summary.grossMarginPct || calcPct(summary.grossProfit)}%</td>
                           </tr>
                           <tr>
-                            <td className="p-2 pl-4 font-sans" style={{ color: '#475569' }}>− Biaya Pengiriman & Armada (Asumsi Tunai)</td>
-                            <td className="p-2 text-right whitespace-nowrap" style={{ color: '#475569' }}>({formatIDR(summary.totalDeliveryCost || summary.deliveryCost || 0)})</td>
-                            <td className="p-2 text-right" style={{ color: '#475569' }}>{calcPct(summary.totalDeliveryCost || summary.deliveryCost || 0)}</td>
+                            <td className="p-2 pl-4 font-sans" style={{ color: '#059669' }}>+ Pendapatan Ongkir / Pengiriman</td>
+                            <td className="p-2 text-right whitespace-nowrap" style={{ color: '#059669' }}>{formatIDR(summary.totalDeliveryCost || summary.deliveryCost || 0)}</td>
+                            <td className="p-2 text-right" style={{ color: '#059669' }}>{calcPct(summary.totalDeliveryCost || summary.deliveryCost || 0)}</td>
                           </tr>
                           <tr>
                             <td className="p-2 pl-4 font-sans" style={{ color: '#475569' }}>− Biaya Lain-lain</td>

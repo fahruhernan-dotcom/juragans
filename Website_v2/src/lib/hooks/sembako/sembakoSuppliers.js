@@ -34,11 +34,15 @@ export const useSembakoSuppliers = () => {
           .eq('is_deleted', false)
 
         // Fetch restock audit logs
-        const { data: auditLogs } = await supabase.from('sembako_audit_logs')
-          .select('id, product_name, action_type, notes, created_at, timestamp')
+        const { data: auditLogs, error: auditErr } = await supabase.from('sembako_audit_logs')
+          .select('id, product_name, action_type, notes, created_at')
           .eq('tenant_id', tenant.id)
           .eq('action_type', 'RESTOCK_BAHAN')
           .order('created_at', { ascending: false })
+
+        if (auditErr) {
+          logSupabaseError(auditErr, { table: 'sembako_audit_logs', operation: 'select', component: 'useSembakoSuppliers' })
+        }
 
         // Fetch supplier payments
         const { data: payments } = await supabase.from('sembako_supplier_payments')

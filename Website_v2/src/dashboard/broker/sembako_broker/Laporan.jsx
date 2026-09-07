@@ -397,17 +397,18 @@ function KPICard({ icon: Icon, label, value, badge, color, subtitle }) {
 function WaterfallPL({ summary: s }) {
   const isMobile = useMediaQuery('(max-width: 639px)')
   const maxVal = Math.max(s.totalGrossRevenue || s.totalRevenue, 1)
+  const netMerchandiseRevenue = (s.totalGrossRevenue || s.totalRevenue || 0) - (s.totalReturns || 0)
   const rows = [
     { label: 'Penjualan Kotor (Gross)', value: s.totalGrossRevenue || s.totalRevenue, type: 'positive' },
     { label: 'Retur Penjualan (Returns)', value: -Math.abs(s.totalReturns || 0), type: 'negative' },
-    { label: 'Revenue Bersih', value: s.totalRevenue, type: 'subtotal' },
+    { label: 'Penjualan Bersih', value: netMerchandiseRevenue, type: 'subtotal' },
     { label: 'HPP (COGS)', value: -s.totalCOGS, type: 'negative' },
-    { label: 'Gross Profit', value: s.grossProfit, type: 'subtotal' },
-    { label: 'Biaya Kirim', value: -s.totalDeliveryCost, type: 'negative' },
-    { label: 'Biaya Lain', value: -s.totalOtherCost, type: 'negative' },
-    { label: 'Operasional', value: -s.totalExpenses, type: 'negative' },
+    { label: 'Laba Kotor (Gross Profit)', value: s.grossProfit, type: 'subtotal' },
+    { label: 'Pendapatan Ongkir', value: s.totalDeliveryCost, type: 'positive' },
+    { label: 'Biaya Ops Nota', value: -s.totalOtherCost, type: 'negative' },
+    { label: 'Operasional Toko', value: -s.totalExpenses, type: 'negative' },
     { label: 'Gaji Pegawai', value: -s.totalPayroll, type: 'negative' },
-    { label: 'NET PROFIT', value: s.netProfit, type: 'total' },
+    { label: 'LABA BERSIH (Net Profit)', value: s.netProfit, type: 'total' },
   ]
 
   return (

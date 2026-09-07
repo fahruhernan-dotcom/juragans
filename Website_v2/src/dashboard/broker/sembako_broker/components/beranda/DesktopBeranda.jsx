@@ -50,9 +50,7 @@ export function DesktopBeranda({
   const totalExp  = (stats?.pengeluaran?.totalExpenseThisMonth || 0) +
                     (stats?.pengeluaran?.totalPayrollThisMonth || 0) +
                     (stats?.pengeluaran?.totalSupplierPaymentThisMonth || 0) +
-                    (stats?.pengeluaran?.totalDeliveryCostThisMonth || 0) +
-                    (stats?.pengeluaran?.totalOtherCostThisMonth || 0) +
-                    (stats?.pengeluaran?.totalCogsThisMonth || 0)
+                    (stats?.pengeluaran?.totalOtherCostThisMonth || 0)
   const showProfit = canViewProfit(profile)
 
   return (

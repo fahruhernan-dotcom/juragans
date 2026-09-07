@@ -17,64 +17,89 @@ export const useSembakoProducts = () => {
     staleTime: STALE_5M,
     queryFn: async () => {
       try {
-        const [prodRes, batchRes, rawRes] = await Promise.all([
+        const [prodRes, batchRes, rawRes, custodyRes] = await Promise.all([
           supabase.from('sembako_products')
             .select('*')
             .eq('tenant_id', tenant.id)
             .eq('is_deleted', false)
             .order('product_name'),
           supabase.from('sembako_stock_batches')
-            .select('product_id, qty_sisa, qty_masuk, buy_price')
+            .select('product_id, qty_sisa, qty_masuk, buy_price, purchase_date, created_at')
             .eq('tenant_id', tenant.id)
             .eq('is_deleted', false)
-            .gt('qty_sisa', 0),
+            .gt('qty_sisa', 0)
+            .order('purchase_date', { ascending: true })
+            .order('created_at', { ascending: true }),
           supabase.from('sembako_raw_materials')
             .select('*')
             .eq('tenant_id', tenant.id)
-            .eq('is_deleted', false)
+            .eq('is_deleted', false),
+          supabase.from('sembako_stock_custody')
+            .select('product_id, quantity, holder_type, employee_id')
+            .eq('tenant_id', tenant.id)
         ])
 
-        if (prodRes.error) { console.warn('[useSembakoProducts]', prodRes.error.message); return [] }
+        if (prodRes.error) {
+          logSupabaseError(prodRes.error, { table: 'sembako_products', operation: 'select', component: 'useSembakoProducts' })
+          return []
+        }
         const products = prodRes.data || []
         const batches = batchRes.data || []
         const rawMaterials = rawRes.data || []
+        const custodies = custodyRes.data || []
 
         const batchStockMap = {}
-        const batchCostMap = {}  // weighted avg buy_price per product
+        const fifoActivePriceMap = {} // FIFO: Oldest active batch price (queue head to be consumed next)
+        const fifoAssetValueMap = {}  // FIFO: Exact sum of remaining lot values (qty_sisa * buy_price)
         batches.forEach(b => {
           const qty = Number(b.qty_sisa) || 0
+          const price = Number(b.buy_price) || 0
           batchStockMap[b.product_id] = (batchStockMap[b.product_id] || 0) + qty
-          if (!batchCostMap[b.product_id]) batchCostMap[b.product_id] = { totalCost: 0, totalQty: 0 }
-          batchCostMap[b.product_id].totalCost += qty * (Number(b.buy_price) || 0)
-          batchCostMap[b.product_id].totalQty += qty
+          fifoAssetValueMap[b.product_id] = (fifoAssetValueMap[b.product_id] || 0) + (qty * price)
+
+          // First batch encountered is oldest active lot due to ASC order
+          if (fifoActivePriceMap[b.product_id] === undefined && qty > 0) {
+            fifoActivePriceMap[b.product_id] = price
+          }
+        })
+
+        const custodyStockMap = {}
+        custodies.forEach(c => {
+          custodyStockMap[c.product_id] = (custodyStockMap[c.product_id] || 0) + (Number(c.quantity) || 0)
         })
 
         const syncedProducts = products.map(p => {
           const hasBatches = batchStockMap[p.id] !== undefined
           const batchSum = batchStockMap[p.id] || 0
+          const hasCustody = custodyStockMap[p.id] !== undefined
+          const custodySum = custodyStockMap[p.id] || 0
 
           // Calculate live capacity from Bill of Materials (BOM)
           const bomData = calculateBomProductStock(p, rawMaterials)
 
-          // SINGLE SOURCE OF TRUTH: If has physical finished batches use batchSum, otherwise auto-sync from BOM materials
-          const realStock = hasBatches ? batchSum : (bomData.totalStock !== undefined ? bomData.totalStock : Number(p.current_stock || 0))
+          // STOK FISIK PRODUK JADI:
+          // 1. Batch produk jadi jika ada
+          // 2. Custody fisik (Gudang/Tim) jika ada
+          // 3. current_stock di tabel sembako_products
+          const realStock = hasBatches
+            ? batchSum
+            : (hasCustody ? custodySum : Number(p.current_stock || 0))
 
-          // Fallback avg_buy_price from active batches (FIFO-weighted)
-          const batchCost = batchCostMap[p.id]
-          const batchAvgBuyPrice = batchCost && batchCost.totalQty > 0
-            ? Math.round(batchCost.totalCost / batchCost.totalQty)
-            : 0
-          const realAvgBuyPrice = Number(p.avg_buy_price) || batchAvgBuyPrice
+          // Pure FIFO active unit cost: uses oldest active lot price if batches exist
+          const fifoActiveBuyPrice = fifoActivePriceMap[p.id] !== undefined
+            ? fifoActivePriceMap[p.id]
+            : (Number(p.avg_buy_price) || 0)
 
-          // Auto-heal/sync database current_stock so DB is never desynchronized from BOM / batch sum
-          if (Number(p.current_stock) !== realStock) {
-            supabase.from('sembako_products').update({ current_stock: realStock }).eq('id', p.id).then(() => { })
-          }
+          const realAvgBuyPrice = fifoActiveBuyPrice
+          const fifoAssetVal = fifoAssetValueMap[p.id] !== undefined
+            ? fifoAssetValueMap[p.id]
+            : (realStock * realAvgBuyPrice)
 
           return {
             ...p,
             current_stock: realStock,
             avg_buy_price: realAvgBuyPrice,
+            fifo_asset_value: fifoAssetVal,
             bom_stock: bomData.totalStock,
             bom_bottleneck: bomData.bottleneck,
             bom_components: bomData.components,
@@ -82,7 +107,10 @@ export const useSembakoProducts = () => {
         })
 
         return syncedProducts
-      } catch (e) { console.warn('[useSembakoProducts]', e); return [] }
+      } catch (e) {
+        logError(e, { component: 'useSembakoProducts' })
+        return []
+      }
     }
   })
 }

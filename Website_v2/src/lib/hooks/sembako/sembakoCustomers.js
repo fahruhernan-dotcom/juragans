@@ -20,17 +20,20 @@ export const useSembakoCustomers = () => {
           .eq('tenant_id', tenant.id)
           .eq('is_deleted', false)
           .order('customer_name')
-        if (custError) { console.warn('[useSembakoCustomers]', custError.message); return [] }
+        if (custError) {
+          logSupabaseError(custError, { table: 'sembako_customers', operation: 'select', component: 'useSembakoCustomers' })
+          return []
+        }
 
         // Efficiently fetch outstanding remaining_amount for active unpaid sales
         const { data: unpaidSales, error: salesError } = await supabase.from('sembako_sales')
-          .select('id, customer_id, customer_name, total_amount, paid_amount, remaining_amount, payment_status, sembako_payments(amount, amount_paid, payment_method, is_deleted)')
+          .select('id, customer_id, customer_name, total_amount, paid_amount, remaining_amount, payment_status, sembako_payments(amount, payment_method, is_deleted)')
           .eq('tenant_id', tenant.id)
           .eq('is_deleted', false)
           .neq('payment_status', 'lunas')
         
         if (salesError) {
-          console.warn('[useSembakoCustomers] sales fetch error:', salesError.message)
+          logSupabaseError(salesError, { table: 'sembako_sales', operation: 'select', component: 'useSembakoCustomers' })
           return customers || []
         }
 
@@ -165,7 +168,9 @@ export const useSembakoCustomerInvoices = (customerId) => useQuery({
     try {
       const saved = localStorage.getItem('erp_retur_list')
       if (saved) localReturns = JSON.parse(saved)
-    } catch (e) { }
+    } catch (e) {
+      console.warn('[useCustomerSales] Gagal parse erp_retur_list dari localStorage:', e.message)
+    }
 
     // Deduplicate returns by ID to prevent double subtraction of synced records
     const returnsMap = {}

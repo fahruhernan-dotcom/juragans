@@ -480,12 +480,49 @@ export function calculateSaleFinancials(sale, returnsList = [], products = []) {
   const paidAmount = Math.min(grandTotal, rawPaidAmount)
   const remainingAmount = isOverpaid ? 0 : Math.max(0, grandTotal - paidAmount)
 
+  const notesText = [
+    sale.notes || '',
+    ...(Array.isArray(sale.sembako_deliveries) ? sale.sembako_deliveries.map(d => d.notes || '') : [])
+  ].join(' ')
+
+  const isExternalCargo = /Ongkir Ditanggung Pembeli/i.test(notesText) ||
+    /ekspedisi/i.test(notesText) ||
+    /cargo/i.test(notesText) ||
+    (Array.isArray(sale.sembako_deliveries) && sale.sembako_deliveries.some(d => d.vehicle_type === 'cargo' || /ekspedisi/i.test(d.driver_name || d.notes || '')))
+
+  const isKurirToko = /Kurir Toko/i.test(notesText) ||
+    /Pengiriman kurir/i.test(notesText) ||
+    (Array.isArray(sale.sembako_deliveries) && sale.sembako_deliveries.some(d => d.vehicle_type && d.vehicle_type !== 'cargo')) ||
+    (!isExternalCargo && (Array.isArray(sale.sembako_deliveries) && sale.sembako_deliveries.length > 0))
+
+  const isPickup = /Ambil Sendiri|Pickup/i.test(notesText)
+
+  const isSellerBorne = /Ditanggung Penjual|Free Ongkir|Beban Toko/i.test(notesText)
+  const shippingBorneBy = isSellerBorne ? 'seller' : (deliveryCost > 0 ? 'buyer' : 'none')
+
+  let sellerShippingFee = 0
+  const sellerShipMatch = notesText.match(/(?:Ditanggung Penjual|Free Ongkir|Beban Toko)[^Rp\d]*Rp\s*([\d\.,]+)/i)
+  if (sellerShipMatch && sellerShipMatch[1]) {
+    sellerShippingFee = Number(sellerShipMatch[1].replace(/[^\d]/g, '')) || 0
+  }
+
+  // Delivery profit: Jika Kurir Toko dan ongkir ditanggung pembeli, ongkir menjadi laba toko (+100% margin)
+  const deliveryProfit = (isKurirToko && deliveryCost > 0) ? deliveryCost : 0
+
   const totalExpenses = otherCost
-  const grossProfit = (itemsSubtotal - totalReturnAmount) - effectiveCogs
+  const grossProfit = (itemsSubtotal - totalReturnAmount) - effectiveCogs + deliveryProfit
   const profit = grossProfit - totalExpenses
   const netMarginPct = grandTotal > 0 ? Number(((profit / grandTotal) * 100).toFixed(1)) : 0
 
-
+  let packingInfo = null
+  if (sale.packing_details && typeof sale.packing_details === 'object' && sale.packing_details.material_name) {
+    packingInfo = sale.packing_details
+  } else if (/\[Kemasan:[^\]]+\]/i.test(notesText)) {
+    const pkgMatch = notesText.match(/\[Kemasan:\s*([^\]]+)\]/i)
+    if (pkgMatch) {
+      packingInfo = { material_name: pkgMatch[1], packing_type: 'custom', quantity: 1 }
+    }
+  }
 
   return {
     items,
@@ -509,6 +546,13 @@ export function calculateSaleFinancials(sale, returnsList = [], products = []) {
     profit,
     netMarginPct,
     refundPaymentsAmount,
+    deliveryProfit,
+    isKurirToko,
+    isExternalCargo,
+    isPickup,
+    shippingBorneBy,
+    sellerShippingFee,
+    packingInfo,
   }
 }
 

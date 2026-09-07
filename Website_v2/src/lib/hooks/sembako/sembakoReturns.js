@@ -217,57 +217,84 @@ export const useCreateSembakoReturn = () => {
       }
 
       // 3. Automatic Piutang Deduction (Potong Piutang Toko -> Auto Mark Lunas)
+      // NOTE: processSaleRow already reduces total_amount by return amount.
+      // So we must NOT add to paid_amount here (that would double-deduct).
+      // Instead, we record the potong_piutang_retur payment as an audit marker
+      // and recalculate remaining_amount based on net total vs real payments.
       const financialAction = payload.financial_action || 'potong_piutang'
       if (return_type === 'sale_return' && financialAction === 'potong_piutang' && total_amount > 0) {
         try {
-          // Find unpaid sales specifically for this customer/party
-          let unpaidSalesQuery = supabase.from('sembako_sales')
-            .select('id, remaining_amount, paid_amount, total_amount, invoice_number, customer_id, customer_name')
-            .eq('tenant_id', tenantId)
-            .eq('is_deleted', false)
-            .neq('payment_status', 'lunas')
-
-          if (customer_id) {
-            unpaidSalesQuery = unpaidSalesQuery.eq('customer_id', customer_id)
-          } else if (party_name && party_name.trim()) {
-            unpaidSalesQuery = unpaidSalesQuery.eq('customer_name', party_name.trim())
+          // Find the specific sale linked to this return, or find unpaid sales for this customer
+          let targetSales = []
+          if (sale_id) {
+            const { data: saleRow } = await supabase.from('sembako_sales')
+              .select('id, remaining_amount, paid_amount, total_amount, invoice_number, customer_id, customer_name')
+              .eq('id', sale_id)
+              .single()
+            if (saleRow) targetSales = [saleRow]
           } else {
-            unpaidSalesQuery = null
+            let unpaidSalesQuery = supabase.from('sembako_sales')
+              .select('id, remaining_amount, paid_amount, total_amount, invoice_number, customer_id, customer_name')
+              .eq('tenant_id', tenantId)
+              .eq('is_deleted', false)
+              .neq('payment_status', 'lunas')
+
+            if (customer_id) {
+              unpaidSalesQuery = unpaidSalesQuery.eq('customer_id', customer_id)
+            } else if (party_name && party_name.trim()) {
+              unpaidSalesQuery = unpaidSalesQuery.eq('customer_name', party_name.trim())
+            } else {
+              unpaidSalesQuery = null
+            }
+
+            const { data: unpaidSales } = unpaidSalesQuery ? await unpaidSalesQuery.order('transaction_date', { ascending: true }) : { data: [] }
+            targetSales = unpaidSales || []
           }
 
-          const { data: unpaidSales } = unpaidSalesQuery ? await unpaidSalesQuery.order('transaction_date', { ascending: true }) : { data: [] }
-
-          let remainingCredit = Number(total_amount)
-
-          if (unpaidSales && unpaidSales.length > 0) {
-            for (const sale of unpaidSales) {
-              if (remainingCredit <= 0) break
-              const curRem = Number(sale.remaining_amount || 0)
-              if (curRem <= 0) continue
-
-              const deduct = Math.min(curRem, remainingCredit)
-              const newRem = curRem - deduct
-              const newPaid = Number(sale.paid_amount || 0) + deduct
-              const newStatus = newRem <= 0 ? 'lunas' : 'sebagian'
-
-              await supabase.from('sembako_sales').update({
-                remaining_amount: newRem,
-                paid_amount: newPaid,
-                payment_status: newStatus,
-              }).eq('id', sale.id)
-
-              // Record payment entry
-              await supabase.from('sembako_payments').insert({
+          if (targetSales.length > 0) {
+            for (const sale of targetSales) {
+              // Record the potong_piutang_retur payment entry as audit marker (non-cash)
+              const { error: payReturErr } = await supabase.from('sembako_payments').insert({
                 tenant_id: tenantId,
                 sale_id: sale.id,
                 customer_id: customer_id || sale.customer_id || null,
-                amount: deduct,
-                amount_paid: deduct,
+                amount: Number(total_amount),
                 payment_method: 'potong_piutang_retur',
                 notes: `Potong Piutang Retur ${returnNumber} (${product_name})`,
               })
+              if (payReturErr) {
+                logSupabaseError(payReturErr, { table: 'sembako_payments', operation: 'insert', component: 'useRecordSembakoReturn' })
+              }
 
-              remainingCredit -= deduct
+              // Recalculate remaining_amount from net total minus REAL payments
+              const { data: allReturns } = await supabase
+                .from('sembako_returns')
+                .select('total_amount')
+                .eq('sale_id', sale.id)
+                .eq('is_deleted', false)
+
+              const allReturnTotal = (allReturns || []).reduce((s, r) => s + Number(r.total_amount || 0), 0)
+
+              // Fetch real payments (excluding potong_piutang_retur since those are markers)
+              const { data: realPayments } = await supabase
+                .from('sembako_payments')
+                .select('amount, payment_method')
+                .eq('sale_id', sale.id)
+                .eq('is_deleted', false)
+
+              const realPaid = (realPayments || [])
+                .filter(p => p.payment_method !== 'potong_piutang_retur' && p.payment_method !== 'pengembalian_tunai_retur')
+                .reduce((s, p) => s + Math.max(0, Number(p.amount || 0)), 0)
+
+              const grossTotal = Number(sale.total_amount || 0)
+              const netTotal = Math.max(0, grossTotal - allReturnTotal)
+              const newRemaining = Math.max(0, netTotal - realPaid)
+              const newStatus = newRemaining <= 0 && netTotal > 0 ? 'lunas' : (realPaid > 0 ? 'sebagian' : 'belum_lunas')
+
+              await supabase.from('sembako_sales').update({
+                remaining_amount: newRemaining,
+                payment_status: newStatus,
+              }).eq('id', sale.id)
             }
           }
         } catch (piutangErr) {
@@ -371,17 +398,26 @@ export const useUpdateSembakoReturnStatus = () => {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async ({ id, status }) => {
-      try {
-        await supabase.from('sembako_returns').update({ status }).eq('id', id)
-      } catch (e) {
-        // ignore
+      const { error: updateErr } = await supabase
+        .from('sembako_returns')
+        .update({ status })
+        .eq('id', id)
+
+      if (updateErr) {
+        console.error('[useUpdateSembakoReturnStatus] Gagal update status retur:', updateErr.message)
+        throw new Error(`Gagal update status retur: ${updateErr.message}`)
       }
+
       // Update local storage
-      const saved = localStorage.getItem('erp_retur_list')
-      if (saved) {
-        const list = JSON.parse(saved)
-        const updated = list.map(r => r.id === id ? { ...r, status } : r)
-        localStorage.setItem('erp_retur_list', JSON.stringify(updated))
+      try {
+        const saved = localStorage.getItem('erp_retur_list')
+        if (saved) {
+          const list = JSON.parse(saved)
+          const updated = list.map(r => r.id === id ? { ...r, status } : r)
+          localStorage.setItem('erp_retur_list', JSON.stringify(updated))
+        }
+      } catch (localErr) {
+        console.warn('[useUpdateSembakoReturnStatus] localStorage backup warning:', localErr.message)
       }
 
       // Record Audit Log
@@ -714,7 +750,9 @@ export const useVoidSembakoReturnsBySale = () => {
           )
           localStorage.setItem('erp_retur_list', JSON.stringify(filtered))
         }
-      } catch (e) { }
+      } catch (e) {
+        console.warn('[useDeleteSembakoReturn] Gagal cleanup erp_retur_list di localStorage:', e.message)
+      }
 
       return { saleId }
     },
